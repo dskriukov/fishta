@@ -1,0 +1,30 @@
+# main.air — Agent Interpretation Reference
+# Stores INTERPRETATION RESULTS (not chain-of-thought).
+# Purpose: let a weaker model reuse decisions made by a stronger one.
+
+terminology:
+  "поверхность": surface (2D plane), not 3D terrain
+  "ловит": predation by overlap + size rule, not aiming/projectiles
+  "растёт": size increases, radius derived from size
+  "песочница": no lose condition; open-ended
+
+accepted_interpretations:
+  - decision: "No fail state in sandbox mode."
+    confidence: high
+  - decision: "Prefer pure vec helpers for geometry-heavy modules."
+    confidence: high
+  - decision: "Use fixed-step approximation for continuous time."
+    confidence: high
+  - decision: "Keep render separate from pure domain step."
+    confidence: high
+    rationale: "Entities are plain data; behaviours are functions over data (ECS-lite)."
+  - decision: "Browser Canvas 2D target with minimal runtime friction."
+    confidence: high
+    rationale: "Lowest friction to opens-in-browser constraints."
+
+architectural_assumptions:
+  - "Pure-function domain step: world' = step(world, input, dt). Render is separate."  # ia:web-canvas.ecs-arch
+  - "Entities are plain data; behaviours are functions over data (ECS-lite)."          # ia:web-canvas.ecs-arch
+
+open_questions:
+  - "Should bigger prey ever threaten the player later? Deferred (symmetry noted)."

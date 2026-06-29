@@ -1,0 +1,10 @@
+# controls.air — Agent Interpretation Reference
+
+rationale_notes:
+  - "Hunt input changes movement regime, not steering source."
+  - "Keyboard steering has priority over pointer steering until pointer movement reactivates pointer control."
+  - "Movement keys support layout equivalents where possible, and simultaneous keys compose direction."
+  - "Fixed camera is a deliberate scope boundary for the current stage."
+
+input_bindings:
+  hunt: [ "Space", "mouse-button-held", "touch-held" ]

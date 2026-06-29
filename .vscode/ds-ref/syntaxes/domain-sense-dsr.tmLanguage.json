@@ -1,0 +1,74 @@
+{
+  "name": "Domain Sense Rules",
+  "scopeName": "source.domain-sense.dsr",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#rule-head" },
+    { "include": "#operators" },
+    { "include": "#references" },
+    { "include": "#numbers" },
+    { "include": "#strings" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.number-sign.domain-sense",
+          "match": "^\\s*#.*$"
+        }
+      ]
+    },
+    "rule-head": {
+      "patterns": [
+        {
+          "name": "entity.name.function.rule.domain-sense",
+          "match": "^\\s*([A-Za-z_][A-Za-z0-9_.-]*)\\s*:(?=\\s|$)"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.logical.domain-sense",
+          "match": "\\b(and|or|not|if|then|else|when)\\b|=>|->|<=|>=|==|!=|<|>"
+        }
+      ]
+    },
+    "references": {
+      "patterns": [
+        {
+          "name": "meta.reference.domain-sense",
+          "match": "(@)(ds|ia|fn|it|do|eg)(:)([a-zA-Z0-9_.-]+)",
+          "captures": {
+            "1": { "name": "punctuation.definition.comment.domain-sense" },
+            "2": { "name": "keyword.control.marker-kind.domain-sense" },
+            "3": { "name": "punctuation.separator.key-value.domain-sense" },
+            "4": { "name": "entity.name.function.marker.domain-sense" }
+          }
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.domain-sense",
+          "match": "\\b\\d+(?:\\.\\d+)?\\b"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.domain-sense",
+          "begin": "\"",
+          "end": "\""
+        },
+        {
+          "name": "string.quoted.single.domain-sense",
+          "begin": "'",
+          "end": "'"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "name": "Domain Sense AIR",
+  "scopeName": "source.domain-sense.air",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#list-item" },
+    { "include": "#keys" },
+    { "include": "#multiline-indicator" },
+    { "include": "#references" },
+    { "include": "#scalars" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.number-sign.domain-sense",
+          "match": "^\\s*#.*$"
+        }
+      ]
+    },
+    "list-item": {
+      "patterns": [
+        {
+          "name": "punctuation.definition.list.begin.domain-sense",
+          "match": "^\\s*-\\s+"
+        }
+      ]
+    },
+    "keys": {
+      "patterns": [
+        {
+          "name": "meta.mapping.key.domain-sense",
+          "match": "^\\s*([A-Za-z_][A-Za-z0-9_.-]*)\\s*:",
+          "captures": {
+            "1": { "name": "variable.other.property.domain-sense" }
+          }
+        }
+      ]
+    },
+    "multiline-indicator": {
+      "patterns": [
+        {
+          "name": "keyword.operator.block-scalar.domain-sense",
+          "match": "[:\\-]\\s*[>|]\\s*$"
+        }
+      ]
+    },
+    "references": {
+      "patterns": [
+        {
+          "name": "meta.reference.domain-sense",
+          "match": "(@)(ds|ia|fn|it|do|eg)(:)([a-zA-Z0-9_.-]+)",
+          "captures": {
+            "1": { "name": "punctuation.definition.comment.domain-sense" },
+            "2": { "name": "keyword.control.marker-kind.domain-sense" },
+            "3": { "name": "punctuation.separator.key-value.domain-sense" },
+            "4": { "name": "entity.name.function.marker.domain-sense" }
+          }
+        }
+      ]
+    },
+    "scalars": {
+      "patterns": [
+        {
+          "name": "constant.language.boolean.domain-sense",
+          "match": "\\b(true|false|yes|no|high|medium|low)\\b"
+        },
+        {
+          "name": "constant.numeric.domain-sense",
+          "match": "\\b\\d+(?:\\.\\d+)?%?\\b"
+        },
+        {
+          "name": "string.quoted.double.domain-sense",
+          "begin": "\"",
+          "end": "\""
+        },
+        {
+          "name": "string.quoted.single.domain-sense",
+          "begin": "'",
+          "end": "'"
+        }
+      ]
+    }
+  }
+}

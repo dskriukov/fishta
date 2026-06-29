@@ -1,0 +1,8 @@
+# fish.air — Agent Interpretation Reference
+
+rationale_notes:
+  - "Burst-only size cost avoids starvation during ordinary cruise and wandering."
+  - "Speed, growth, and radius formulas must preserve readability and long-session balance."
+  - "Decor states are separate visual channels: mouth, swim phase, and fear eye should not interfere."
+  - "Exhale is a two-stage decor cycle: inhale pull on existing bubbles, then exhale emission and push."
+  - "Exhale scale is visual-only and must not mutate domain size or gameplay physics."

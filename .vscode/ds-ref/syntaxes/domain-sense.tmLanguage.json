@@ -1,0 +1,165 @@
+{
+  "name": "Domain Sense",
+  "scopeName": "source.domain-sense",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#headings" },
+    { "include": "#horizontal-rule" },
+    { "include": "#blockquote" },
+    { "include": "#lists" },
+    { "include": "#fenced-code" },
+    { "include": "#markers" },
+    { "include": "#references" },
+    { "include": "#links" },
+    { "include": "#inline-code" },
+    { "include": "#emphasis" },
+    { "include": "#numbers" },
+    { "include": "#keywords" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.number-sign.domain-sense",
+          "match": "^\\s*#(?!#).*$"
+        }
+      ]
+    },
+    "headings": {
+      "patterns": [
+        {
+          "name": "entity.name.section.domain-sense",
+          "match": "^\\s{0,3}#{1,6}\\s+.+$"
+        }
+      ]
+    },
+    "horizontal-rule": {
+      "patterns": [
+        {
+          "name": "meta.separator.domain-sense",
+          "match": "^\\s{0,3}(?:-{3,}|\\*{3,}|_{3,})\\s*$"
+        }
+      ]
+    },
+    "blockquote": {
+      "patterns": [
+        {
+          "name": "markup.quote.domain-sense",
+          "match": "^\\s*>\\s?.*$"
+        }
+      ]
+    },
+    "lists": {
+      "patterns": [
+        {
+          "name": "markup.list.unnumbered.domain-sense",
+          "match": "^\\s{0,3}(?:[-*+])\\s+.+$"
+        },
+        {
+          "name": "markup.list.numbered.domain-sense",
+          "match": "^\\s{0,3}\\d+[.)]\\s+.+$"
+        }
+      ]
+    },
+    "fenced-code": {
+      "patterns": [
+        {
+          "name": "markup.fenced_code.block.domain-sense",
+          "begin": "^\\s*(```|~~~)([A-Za-z0-9_-]*)\\s*$",
+          "beginCaptures": {
+            "1": { "name": "punctuation.definition.markdown" },
+            "2": { "name": "fenced_code.block.language" }
+          },
+          "end": "^\\s*(```|~~~)\\s*$",
+          "endCaptures": {
+            "1": { "name": "punctuation.definition.markdown" }
+          }
+        }
+      ]
+    },
+    "markers": {
+      "patterns": [
+        {
+          "name": "meta.definition.marker.domain-sense",
+          "begin": "\\[(ds|ia|fn|it|do|eg):",
+          "beginCaptures": {
+            "0": { "name": "punctuation.definition.bracket.begin.domain-sense" },
+            "1": { "name": "keyword.control.marker-kind.domain-sense" }
+          },
+          "end": "\\]",
+          "endCaptures": {
+            "0": { "name": "punctuation.definition.bracket.end.domain-sense" }
+          },
+          "patterns": [
+            {
+              "name": "entity.name.function.marker.domain-sense",
+              "match": "[a-zA-Z0-9_.-]+"
+            }
+          ]
+        }
+      ]
+    },
+    "references": {
+      "patterns": [
+        {
+          "name": "meta.reference.domain-sense",
+          "match": "(@)(ds|ia|fn|it|do|eg)(:)([a-zA-Z0-9_.-]+)",
+          "captures": {
+            "1": { "name": "punctuation.definition.comment.domain-sense" },
+            "2": { "name": "keyword.control.marker-kind.domain-sense" },
+            "3": { "name": "punctuation.separator.key-value.domain-sense" },
+            "4": { "name": "entity.name.function.marker.domain-sense" }
+          }
+        }
+      ]
+    },
+    "links": {
+      "patterns": [
+        {
+          "name": "markup.underline.link.domain-sense",
+          "match": "!?\\[[^\\]]+\\]\\([^)\\s]+(?:\\s+\"[^\"]*\")?\\)"
+        }
+      ]
+    },
+    "inline-code": {
+      "patterns": [
+        {
+          "name": "markup.raw.inline.domain-sense",
+          "match": "`[^`]+`"
+        }
+      ]
+    },
+    "emphasis": {
+      "patterns": [
+        {
+          "name": "markup.bold.domain-sense",
+          "match": "\\*\\*[^*]+\\*\\*|__[^_]+__"
+        },
+        {
+          "name": "markup.italic.domain-sense",
+          "match": "(?<!\\*)\\*[^*]+\\*(?!\\*)|(?<!_)_[^_]+_(?!_)"
+        },
+        {
+          "name": "markup.strikethrough.domain-sense",
+          "match": "~~[^~]+~~"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.domain-sense",
+          "match": "\\b\\d+(?:[.,]\\d+)?%?\\b"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.other.domain-sense",
+          "match": "\\b(если|то|иначе|должен|должна|должны|может|можно|нельзя|всегда|никогда|только)\\b"
+        }
+      ]
+    }
+  }
+}

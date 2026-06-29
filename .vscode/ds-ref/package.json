@@ -1,0 +1,63 @@
+{
+  "name": "ds-ref",
+  "displayName": "DS Ref",
+  "publisher": "local",
+  "version": "0.0.1",
+  "engines": { "vscode": "^1.80.0" },
+  "activationEvents": ["onStartupFinished"],
+  "main": "./extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "domain-sense",
+        "aliases": ["Domain Sense", "domain-sense", "ds"],
+        "extensions": [".ds", ".ia"]
+      },
+      {
+        "id": "domain-sense-dsc",
+        "aliases": ["Domain Sense Config", "dsc"],
+        "extensions": [".dsc"]
+      },
+      {
+        "id": "domain-sense-dsr",
+        "aliases": ["Domain Sense Rules", "dsr"],
+        "extensions": [".dsr"]
+      },
+      {
+        "id": "domain-sense-air",
+        "aliases": ["Domain Sense AIR", "air"],
+        "extensions": [".air"]
+      }
+    ],
+    "grammars": [
+      {
+        "language": "domain-sense",
+        "scopeName": "source.domain-sense",
+        "path": "./syntaxes/domain-sense.tmLanguage.json"
+      },
+      {
+        "language": "domain-sense-dsc",
+        "scopeName": "source.domain-sense.dsc",
+        "path": "./syntaxes/domain-sense-dsc.tmLanguage.json"
+      },
+      {
+        "language": "domain-sense-dsr",
+        "scopeName": "source.domain-sense.dsr",
+        "path": "./syntaxes/domain-sense-dsr.tmLanguage.json"
+      },
+      {
+        "language": "domain-sense-air",
+        "scopeName": "source.domain-sense.air",
+        "path": "./syntaxes/domain-sense-air.tmLanguage.json"
+      },
+      {
+        "scopeName": "source.domain-sense.injection",
+        "path": "./syntaxes/domain-sense-injection.tmLanguage.json",
+        "injectTo": [
+          "text.html.markdown",
+          "source.yaml"
+        ]
+      }
+    ]
+  }
+}

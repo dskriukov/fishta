@@ -1,0 +1,8 @@
+{
+  "files.associations": {
+    "*.ds": "markdown",
+    "*.ia": "markdown",
+    "*.air": "yaml",
+    "*.dsc": "yaml"
+  }
+}

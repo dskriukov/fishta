@@ -1,0 +1,53 @@
+{
+  "scopeName": "source.domain-sense.injection",
+  "injectionSelector": "L:text.html.markdown, L:source.yaml",
+  "patterns": [
+    { "include": "#markers" },
+    { "include": "#references" },
+    { "include": "#hash-links" }
+  ],
+  "repository": {
+    "markers": {
+      "patterns": [
+        {
+          "name": "meta.definition.marker.domain-sense",
+          "begin": "\\[(ds|ia|fn|it|do|eg):",
+          "beginCaptures": {
+            "1": { "name": "keyword.control.marker-kind.domain-sense" }
+          },
+          "end": "\\]",
+          "patterns": [
+            {
+              "name": "entity.name.function.marker.domain-sense",
+              "match": "[A-Za-z0-9_.-]+"
+            }
+          ]
+        }
+      ]
+    },
+    "references": {
+      "patterns": [
+        {
+          "name": "meta.reference.domain-sense",
+          "match": "(@)(ds|ia|fn|it|do|eg)(:)([A-Za-z0-9_.-]+)",
+          "captures": {
+            "2": { "name": "keyword.control.marker-kind.domain-sense" },
+            "4": { "name": "entity.name.function.marker.domain-sense" }
+          }
+        }
+      ]
+    },
+    "hash-links": {
+      "patterns": [
+        {
+          "name": "meta.reference.domain-sense.hash",
+          "match": "\\b(ds|ia):([0-9a-f]{8})\\b",
+          "captures": {
+            "1": { "name": "keyword.control.marker-kind.domain-sense" },
+            "2": { "name": "constant.character.hex.domain-sense" }
+          }
+        }
+      ]
+    }
+  }
+}

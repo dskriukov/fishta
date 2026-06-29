@@ -1,0 +1,73 @@
+{
+  "name": "Domain Sense Config",
+  "scopeName": "source.domain-sense.dsc",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#section" },
+    { "include": "#key-value" },
+    { "include": "#references" },
+    { "include": "#numbers" },
+    { "include": "#booleans" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.number-sign.domain-sense",
+          "match": "^\\s*#.*$"
+        }
+      ]
+    },
+    "section": {
+      "patterns": [
+        {
+          "name": "entity.name.section.domain-sense",
+          "match": "^\\s*\\[[^\\]]+\\]\\s*$"
+        }
+      ]
+    },
+    "key-value": {
+      "patterns": [
+        {
+          "name": "meta.mapping.domain-sense",
+          "match": "^\\s*([a-zA-Z_][a-zA-Z0-9_.-]*)\\s*(:|=)\\s*(.*)$",
+          "captures": {
+            "1": { "name": "variable.other.property.domain-sense" },
+            "2": { "name": "keyword.operator.assignment.domain-sense" },
+            "3": { "name": "string.unquoted.domain-sense" }
+          }
+        }
+      ]
+    },
+    "references": {
+      "patterns": [
+        {
+          "name": "meta.reference.domain-sense",
+          "match": "(@)(ds|ia|fn|it|do|eg)(:)([a-zA-Z0-9_.-]+)",
+          "captures": {
+            "1": { "name": "punctuation.definition.comment.domain-sense" },
+            "2": { "name": "keyword.control.marker-kind.domain-sense" },
+            "3": { "name": "punctuation.separator.key-value.domain-sense" },
+            "4": { "name": "entity.name.function.marker.domain-sense" }
+          }
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.domain-sense",
+          "match": "\\b\\d+(?:\\.\\d+)?\\b"
+        }
+      ]
+    },
+    "booleans": {
+      "patterns": [
+        {
+          "name": "constant.language.boolean.domain-sense",
+          "match": "\\b(true|false|on|off|yes|no)\\b"
+        }
+      ]
+    }
+  }
+}

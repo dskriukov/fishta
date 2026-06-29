@@ -1,0 +1,22 @@
+# ecs-loop.dsr — Reusable Implementation Guidance (dsr/use)
+# May be referenced by any imp/*.dsr. Must NOT reference imp/*.
+
+provides: fixed-step-game-loop
+
+pattern:
+  name: "pure domain step + render"
+  shape: |
+    state = init()
+    loop(dt):
+      input   = readInput()
+      state   = step(state, input, dt)   # PURE, no I/O, no canvas
+      render(state)                       # read-only over state
+
+requirements:
+  - "step() is deterministic given (state, input, dt)."
+  - "dt is clamped (e.g. <= 1/30 s) to keep integration stable."
+  - "render layer never mutates domain state."
+
+rationale_source:
+  - main.air#ia:web-canvas.loop   # continuous time -> fixed step
+  - "workspace.air: domain stays render-agnostic"
