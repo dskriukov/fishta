@@ -116,16 +116,6 @@ function drawFish(ctx, f){
     ctx.closePath();
     ctx.fill();
 
-        // ds:bd354b7a
-    ctx.fillStyle = bodyShadow;
-    ctx.beginPath();
-    ctx.moveTo(tailX, tailY);
-    ctx.quadraticCurveTo(-r * 1.18, -r * 0.7 + tailWave * 0.35, -r * 1.34, -r * 0.18 + tailWave);
-    ctx.quadraticCurveTo(-r * 1.12, tailWave * 0.55, -r * 1.34, r * 0.18 + tailWave);
-    ctx.quadraticCurveTo(-r * 1.18, r * 0.7 + tailWave * 0.35, tailX, tailY);
-    ctx.closePath();
-    ctx.fill();
-
     // gill line and eye socket shadow
     ctx.strokeStyle = bodyShadow;
     ctx.lineWidth = Math.max(1, r * 0.045);
@@ -140,7 +130,7 @@ function drawFish(ctx, f){
     const mouthWidth = r * (0.22 + mouthOpenRatio * 0.16);
     const mouthHeight = r * (0.45 + mouthOpenRatio * 0.8);
     const lipStroke = Math.max(1, r * 0.06);
-    const showTeeth = mouthOpenRatio > 0.04;
+    const showTeeth = mouthOpenRatio > 0 && mouthOpenRatio < (MOUTH.chaseOpenRatio + 0.05);
 
     if( mouthOpenRatio > 0 ){
 
@@ -216,6 +206,16 @@ function drawFish(ctx, f){
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
     ctx.arc(r * 0.49, -r * 0.2, Math.max(1, r * 0.03 * eyeScale), 0, Math.PI * 2);
+    ctx.fill();
+
+    // ds:bd354b7a
+    ctx.fillStyle = bodyShadow;
+    ctx.beginPath();
+    ctx.moveTo(tailX, tailY);
+    ctx.quadraticCurveTo(-r * 1.18, -r * 0.7 + tailWave * 0.35, -r * 1.34, -r * 0.18 + tailWave);
+    ctx.quadraticCurveTo(-r * 1.12, tailWave * 0.55, -r * 1.34, r * 0.18 + tailWave);
+    ctx.quadraticCurveTo(-r * 1.18, r * 0.7 + tailWave * 0.35, tailX, tailY);
+    ctx.closePath();
     ctx.fill();
 
     ctx.restore();

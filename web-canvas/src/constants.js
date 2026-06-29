@@ -93,9 +93,10 @@ export const FEAR_EYE = {
 export const EXHALE = {
     inhaleScale: 1.1,       // fn:exhale inhale visual target
     inhaleDuration: 0.18,   // seconds
-    exhaleDuration: 0.24,   // seconds
-    emitMinCount: 9,        // fn:exhale
-    emitMaxCount: 16,       // fn:exhale
+    exhaleDuration: 2,   // seconds
+    emitInterval: 0.05,      // fn:a9a3ed12, seconds between sequential exhale bubbles
+    emitMinCount: 50,        // fn:exhale
+    emitMaxCount: 70,       // fn:exhale
     influenceRadiusSizes: 1,
     bubbleDisplaceSpeed: 36,
 };

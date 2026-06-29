@@ -89,7 +89,7 @@ export function createInput(canvas){
         const key = normalizeKey(e.key);
         input.keys.add(key);
         if( isMovementKey(key) ) input.pointer.lockedByKeyboard = true;
-        if( !e.repeat && isExhaleKey(key) ) input.exhaleRequested = true;
+        if( !e.repeat && isExhaleKey(key) ) input.exhaleRequested = true; // ds:d9fc8d9c
     });
     window.addEventListener('keyup', e =>{ input.keys.delete(normalizeKey(e.key)); });
 

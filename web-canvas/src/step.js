@@ -13,7 +13,7 @@ import { emitBubble, advanceBubbles } from './world.js';
 export function step(state, input, dt, rng){
     // ds:22fd3ab4 ds:55c13a4f ds:10baf178 ds:7ce238da
     state.player.mode = huntMode(input);
-    if( input.exhaleRequested ){
+    if( input.exhaleRequested ){ // ds:d9fc8d9c
         requestExhale(state.player);
         input.exhaleRequested = false;
     }
@@ -27,7 +27,6 @@ export function step(state, input, dt, rng){
         const steer = preySteer(p, threats, dt, rng);
         p.mode = steer.mode;
         integrate(p, steer.accel ?? { x: 0, y: 0 }, state.world, dt);
-        runExhaleCycle(p, state.bubbles, rng, dt);
         capPreySpeed(p);
     }
 

@@ -36,7 +36,9 @@ export function makeFish({ pos, size = 1, isPlayer = false, hue = 200 }){
             requested: false,
             stage: 'idle',
             t: 0,
-            emitted: false,
+            emitTimer: 0,
+            emitCount: 0,
+            emitTotal: 0,
         },
         bubbleTimer: 0,              // @ia 7a8b9c0d
         bubbleBurstRemaining: 0,     // @ia 7a8b9c0d
@@ -100,7 +102,6 @@ export function grow(fish, preySize){
     fish.eatenFishCount += 1;
     fish.mouthEatenSize = Math.max(fish.mouthEatenSize, preySize);
     fish.mouthHold = Math.max(fish.mouthHold, MOUTH.holdDuration);
-    requestExhale(fish);
 }
 
 // ds:975ca168
@@ -134,7 +135,7 @@ export function updateFearEye(fish, accel, dt){
     fish.eyeFear += (target - fish.eyeFear) * Math.min(1, dt * rate);
 }
 
-// fn:d1c14620
+// fn:a9a3ed12
 export function requestExhale(fish){
     fish.exhale.requested = true;
 }
@@ -190,18 +191,34 @@ function makeExhaleBubble(fish, rng){
     };
 }
 
-function emitExhaleBubbles(fish, bubbles, rng){
-    const count = EXHALE.emitMinCount + Math.floor(rng() * (EXHALE.emitMaxCount - EXHALE.emitMinCount + 1));
-    for( let i = 0; i < count; i++ ) bubbles.push(makeExhaleBubble(fish, rng));
+function beginExhaleEmission(exhale, rng){
+    exhale.emitTotal = EXHALE.emitMinCount + Math.floor(rng() * (EXHALE.emitMaxCount - EXHALE.emitMinCount + 1));
+    exhale.emitCount = 0;
+    exhale.emitTimer = 0;
 }
 
-// fn:d1c14620 ia:4a2ebf0d ia:0adbe79e ia:617964be
+// @fn:a9a3ed12
+function emitExhaleSequential(fish, bubbles, rng, dt){
+    const exhale = fish.exhale;
+    if( exhale.emitCount >= exhale.emitTotal ) return;
+
+    exhale.emitTimer -= dt;
+    if( exhale.emitTimer > 0 ) return;
+
+    bubbles.push(makeExhaleBubble(fish, rng));
+    exhale.emitCount++;
+    exhale.emitTimer += EXHALE.emitInterval;
+}
+
+// fn:a9a3ed12 ia:4a2ebf0d ia:0adbe79e ia:617964be
 export function runExhaleCycle(fish, bubblesAround, rng, dt){
     const exhale = fish.exhale;
     if( exhale.stage === 'idle' && exhale.requested ){
         exhale.stage = 'inhale';
         exhale.t = 0;
-        exhale.emitted = false;
+        exhale.emitTimer = 0;
+        exhale.emitCount = 0;
+        exhale.emitTotal = 0;
         exhale.requested = false;
     }
 
@@ -219,6 +236,7 @@ export function runExhaleCycle(fish, bubblesAround, rng, dt){
         if( t >= 1 ){
             exhale.stage = 'exhale';
             exhale.t = 0;
+            beginExhaleEmission(exhale, rng);
         }
         return;
     }
@@ -226,21 +244,20 @@ export function runExhaleCycle(fish, bubblesAround, rng, dt){
     exhale.t += dt;
     const t = Math.min(1, exhale.t / EXHALE.exhaleDuration);
     fish.visualScale = lerp(EXHALE.inhaleScale, 1, t);
-    if( !exhale.emitted ){
-        emitExhaleBubbles(fish, bubblesAround, rng);
-        exhale.emitted = true;
-    }
+    emitExhaleSequential(fish, bubblesAround, rng, dt);
     displaceExistingBubbles(fish, bubblesAround, dt, false);
 
     if( t >= 1 ){
         exhale.stage = 'idle';
         exhale.t = 0;
-        exhale.emitted = false;
+        exhale.emitTimer = 0;
+        exhale.emitCount = 0;
+        exhale.emitTotal = 0;
         fish.visualScale = 1;
     }
 }
 
-// do:93cbace8
+// do:a7a50f7b
 export function serializeFish(fish){
     const type = fish.isPlayer ? 'user' : 'npc';
     return [

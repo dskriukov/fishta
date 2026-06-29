@@ -51,7 +51,7 @@ canvas.addEventListener('click', e =>{
     const rect = canvas.getBoundingClientRect();
     const clickPos = v(e.clientX - rect.left, e.clientY - rect.top);
     const fish = [state.player, ...state.prey].find(candidate => dist(clickPos, candidate.pos) <= candidate.radius);
-    if( fish ) console.log(serializeFish(fish));
+    if( fish ) console.log(serializeFish(fish)); // ds:2e1570ed
 });
 window.addEventListener('resize', resize);
 
