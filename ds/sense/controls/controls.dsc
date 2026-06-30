@@ -42,7 +42,7 @@ input:
       name: exhaleHotkey
       inputs: [keysDown]
       output: exhaleRequest
-      rule: "pressing O or Щ requests @fn:exhale"
+      rule: "pressing O or Щ requests @fn:exhale for player only; this hotkey path is separate from auto-triggers"
     status: added
   inspect_click:
     from: ds:controls.inspect-click

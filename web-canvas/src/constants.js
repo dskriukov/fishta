@@ -1,7 +1,7 @@
 // imp/web-canvas/src/constants.js
 // Tunables. Each value is traceable back to an .air interpretation id.
 // Editing these is "implementation tuning"; editing behaviour means editing sense/*.ds.
-// @ds b28b7af6 ca07d970 c83f4c1e d6cebf86 cbc1225a 7ce238da 8869f043 f51831f5 d867989f 975ca168 bd354b7a 906be50b 55c13a4f 10baf178 22fd3ab4 31cb7a0d 579e4888 e6ecfbdd 1e66d817 a3e394a8 27ebde84 e9fb3705
+// @ds b28b7af6 ca07d970 c83f4c1e d6cebf86 cbc1225a 7ce238da 8869f043 f51831f5 d867989f 975ca168 bd354b7a 906be50b 55c13a4f 10baf178 22fd3ab4 31cb7a0d 579e4888 e6ecfbdd 1e66d817 a3e394a8 98224ab9 e9fb3705
 
 export const WORLD = {
     // size set at runtime to canvas size — world.air#ia:world.fit-to-screen, ds:b28b7af6 ds:c83f4c1e
@@ -33,7 +33,7 @@ export const ENERGY = {
 };
 
 export const PREDATION = {
-    eatRatio: 1.15,         // predator.size > prey.size * eatRatio — predation.dsc, ds:27ebde84
+    eatRatio: 1.15,         // predator.size > prey.size * eatRatio — predation.dsc, ds:98224ab9
 };
 
 export const PREY = {
@@ -43,9 +43,9 @@ export const PREY = {
     smallBias: 2.0,         // exponent biasing spawns toward small — ds:1e66d817
     wanderAccel: 240,       // gentler than player — prey.dsc wander, ds:31cb7a0d
     wanderTurn: 0.9,        // chance/s to pick a new heading — ds:31cb7a0d
-    fleeAccel: 520,         // prey.dsc flee (status: added), ds:579e4888
-    fleeRadius: 150,        // px awareness range for threats — ds:579e4888
-    speedMargin: 20,        // px/s surplus before skipping burst — prey.air#ia:prey.flee-vain-skip, ds:e699c42d
+    fleeAccel: 760,         // stronger close-range escape — ds:579e4888 ds:e6ecfbdd
+    fleeRadius: 240,        // wider threat awareness before contact pressure — ds:579e4888 ds:e6ecfbdd
+    speedMargin: 35,        // px/s surplus before skipping burst — @ia:5f6a7b8c
     spawnMargin: 20,        // px beyond edge before new prey enters view — prey.air#ia:prey.spawn-from-edge, ds:e6ecfbdd
     spawnGrace: 0.75,       // s without world clamp after spawning — prey.air#ia:prey.spawn-from-edge, ds:e6ecfbdd
     maxSpeed: 170,          // caps prey speed — ds:579e4888 ds:31cb7a0d
@@ -93,10 +93,9 @@ export const FEAR_EYE = {
 export const EXHALE = {
     inhaleScale: 1.1,       // fn:exhale inhale visual target
     inhaleDuration: 0.18,   // seconds
-    exhaleDuration: 2,   // seconds
     emitInterval: 0.05,      // fn:a9a3ed12, seconds between sequential exhale bubbles
-    emitMinCount: 50,        // fn:exhale
-    emitMaxCount: 70,       // fn:exhale
+    emitMinCount: 9,         // fn:a9a3ed12
+    emitMaxCount: 16,        // fn:a9a3ed12
     influenceRadiusSizes: 1,
     bubbleDisplaceSpeed: 36,
 };

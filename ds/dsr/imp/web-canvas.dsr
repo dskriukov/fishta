@@ -24,6 +24,7 @@ references:
     - sense/world.air
     - sense/fish.air
     - sense/prey.air
+    - sense/predation.air
     - sense/controls.air
 
 file_plan:
@@ -31,10 +32,10 @@ file_plan:
   imp/web-canvas/style.css:         "fullscreen canvas, HUD"
   imp/web-canvas/src/constants.js:  "tunables; each traceable to an .air id"
   imp/web-canvas/src/vec.js:        "vec2 helpers"
-  imp/web-canvas/src/world.js:      "bounds clamp + drag  (world.dsc)"
+  imp/web-canvas/src/world.js:      "bounds clamp + drag"
   imp/web-canvas/src/fish.js:       "fish data + swim/grow/facing + exhale + serialize (fish.dsc)"
   imp/web-canvas/src/prey.js:       "wander/flee/spawn (prey.dsc)"
-  imp/web-canvas/src/predation.js:  "overlaps/canEat/resolveEating (predation.dsc)"
+  imp/web-canvas/src/predation.js:  "overlaps/isEdibleBySize/canEat/resolveEating (predation.dsc)"
   imp/web-canvas/src/controls.js:   "pointer/keys steering (controls.dsc)"
   imp/web-canvas/src/step.js:       "pure step(state,input,dt) = compose behaviours"
   imp/web-canvas/src/render.js:     "draw world + fish (read-only)"
@@ -44,34 +45,39 @@ contract_map:                       # dsc contract  -> imp symbol
   world.keepInsideBounds:  world.js#clampToBounds
   world.applyDrag:         world.js#applyDrag
   world.emitBubbles:       world.js#emitBubble
-  world.advanceBubbles:    world.js#advanceBubbles
+  world.advanceBubbles:    world.js#advanceBubbles  # @ds:d6cebf86 @ia:3c4d5e6f @ia:f4604af3
+  world.triggerExhaleOnAccelStart: step.js#triggerExhaleOnAccelStart  # @ds:67f150ce @ia:d87fe07b
   fish.integrateMotion:    fish.js#integrate        # now takes mode (cruise|burst)
   fish.grow:               fish.js#grow
   fish.updateFacing:       fish.js#updateFacing
   fish.spendEnergy:        fish.js#spendEnergy       # refined: charges only when mode==burst
-  fish.runExhaleCycle:     fish.js#runExhaleCycle
-  fish.serializeFish:      fish.js#serializeFish
+  fish.runExhaleCycle:     fish.js#runExhaleCycle  # @fn:a9a3ed12
+  fish.serializeFish:      fish.js#serializeFish   # @do:a7a50f7b
   # fish.thrust: already satisfied by fish.js#integrate (no new symbol)
   prey.wanderSteer:        prey.js#wanderSteer       # returns { accel, mode:'cruise' }
   prey.fleeSteer:          prey.js#fleeSteer         # returns { accel, mode }
   prey.maintainPopulation: prey.js#maintainPopulation
   predation.overlaps:      predation.js#overlaps
-  predation.canEat:        predation.js#canEat
+  predation.isEdibleBySize: predation.js#isEdibleBySize  # @ds:98224ab9
+  predation.canEat:        predation.js#canEat       # @ds:98224ab9
   predation.resolveEating: predation.js#resolveEating
+  predation.hunt:          hunt.js#huntSteer  # @ds:d4f6a1c2
   controls.pointerSteer:   controls.js#pointerSteer
   controls.keySteer:       controls.js#keySteer
   controls.huntMode:       controls.js#huntMode      # burst while Space/mouse/touch held
-  controls.exhaleHotkey:   controls.js#createInput   # sets input.exhaleRequested on O/Щ
-  controls.inspectClick:   main.js#(canvas click handler)  # logs serializeFish on clicked fish
+  controls.exhaleHotkey:   controls.js#createInput   # @ds:d9fc8d9c
+  controls.inspectClick:   main.js#(canvas click handler)  # @ds:2e1570ed
 
 data_model_notes:                   # for the implementer
   - "Every fish carries a 'mode' field: 'cruise' (default) or 'burst'."
-  - "Player mode set by controls.huntMode each tick; prey mode set by fleeSteer/wanderSteer."
+  - "Player mode set by controls.huntMode each tick; prey mode set by huntSteer/fleeSteer/wanderSteer."
   - "integrate() clamps speed to (mode==='burst' ? maxSpeedOf(size) : cruiseSpeedOf(size))."
   - "World keeps a bubbles[] decor layer; bubbles are not part of fish/predation state."
   - "Each fish maintains hidden bubble-burst state so emission can produce 2-5 bubbles in a short sequence."
   - "Exhale is a reusable action API on fish; gameplay systems may trigger it from different scenarios."
-  - "serializeFish() is read-only and returns structured fish info for console/info panel."
+  - "serializeFish() is read-only and returns structured fish info as text for console/info panel."
+  - "Predation steering uses size eligibility before it selects burst; eating resolution uses canEat after mode is set."
+  - "Prey fear must start before contact pressure is visually obvious: use the prey.air flee radius and acceleration tunables, not a short collision-near radius."
 
 implementation_notes:               # explicit pseudocode — do not improvise beyond this
   speed_caps: |
@@ -82,7 +88,7 @@ implementation_notes:               # explicit pseudocode — do not improvise b
       fish.velocity += accel * dt
       cap = fish.mode === 'burst' ? maxSpeedOf(fish.size) : cruiseSpeedOf(fish.size)
       fish.velocity = clampMagnitude(fish.velocity, cap)
-      fish.velocity = applyDrag(fish.velocity, world)   // world.dsc
+      fish.velocity = applyDrag(fish.velocity, world)   // @ds:ca07d970
       const dist = magnitude(fish.velocity) * dt
       fish.position += fish.velocity * dt
       spendEnergy(fish, dist)                            // gated inside
@@ -109,17 +115,41 @@ implementation_notes:               # explicit pseudocode — do not improvise b
     }
   exhaleHotkey: |
     // input layer sets input.exhaleRequested = true on non-repeat O/Щ keydown
-    // simulation step consumes flag and calls requestExhale(player)
+    // simulation step consumes flag and calls requestExhale(player) only
+  triggerExhaleOnAccelStart: |
+    function triggerExhaleOnAccelStart(fish, accel, prevAccel){
+      // auto-trigger for any fish only on acceleration-start edge  # @ds:67f150ce @ia:d87fe07b
+      // (prev magnitude <= eps && current magnitude > eps)
+      // this scenario is independent from player hotkey exhale
+    }
   inspectClick: |
     // on canvas click, find fish under clickPos
     // if found, log serializeFish(fish)
   fleeSteer: |
     function fleeSteer(self, threats){
-      const nearest = nearest threat t where canEat(t, self) AND dist(t,self) <= PREY.fleeRadius
+      const nearest = nearest threat t where isEdibleBySize(t, self) AND dist(t,self) <= PREY.fleeRadius
       if (!nearest) return { accel: ZERO, mode: 'cruise' }
       if (speed(self) > speed(nearest) + PREY.speedMargin) return { accel: ZERO, mode: 'cruise' }
       const proximity = clamp01((PREY.fleeRadius - dist(nearest,self)) / PREY.fleeRadius)
       const dir = normalize(self.position - nearest.position)
+      return { accel: dir * (PREY.fleeAccel * proximity), mode: 'burst' }
+    }
+  isEdibleBySize: |
+    function isEdibleBySize(predator, prey){
+      return predator.size > prey.size * PREDATION.eatRatio
+    }
+  canEat: |
+    function canEat(predator, prey){
+      // eating requires the predator to be in burst mode  # @ds:98224ab9
+      return predator.mode === 'burst' && isEdibleBySize(predator, prey)
+    }
+  hunt: |
+    function huntSteer(hunter, targets){
+      const nearest = nearest target t where t !== hunter AND isEdibleBySize(hunter, t) AND dist(hunter,t) <= PREY.fleeRadius
+      if (!nearest) return { accel: ZERO, mode: 'cruise' }
+      if (speed(hunter) > speed(nearest) + PREY.speedMargin) return { accel: ZERO, mode: 'cruise' }
+      const proximity = clamp01((PREY.fleeRadius - dist(hunter,nearest)) / PREY.fleeRadius)
+      const dir = normalize(nearest.position - hunter.position)
       return { accel: dir * (PREY.fleeAccel * proximity), mode: 'burst' }
     }
   emitBubble: |
@@ -147,9 +177,11 @@ implementation_notes:               # explicit pseudocode — do not improvise b
     function runExhaleCycle(fish, bubbles, rng, dt){
       // visual-only effect: never mutate fish.size here
       // stage machine: idle -> inhale -> exhale -> idle
-      // inhale: raise exhaleScale toward EXHALE.inhaleScale (1.10), pull existing nearby bubbles to mouth
-      // exhale: return exhaleScale to 1.0, emit 9..16 bubbles, push nearby existing bubbles from mouth
-      // displacement force uses distance falloff and is zero beyond fish.size radius
+      // inhale (0.18s): raise exhaleScale to EXHALE.inhaleScale and pull existing nearby bubbles to mouth
+      // exhale: return exhaleScale to 1.0, emit 9..16 bubbles sequentially with 50ms spacing, and push nearby existing bubbles from mouth
+      // bubble emission in exhale is staggered by EXHALE.emitInterval; emission is not a single bulk spawn
+      // - displacement force uses distance falloff and is zero beyond fish.size radius
+      // - exhale has no time cap; advance to idle only after all planned emissions finish
     }
   serializeFish: |
     function serializeFish(fish){
@@ -163,41 +195,45 @@ implementation_notes:               # explicit pseudocode — do not improvise b
   step_threading: |
     // in step.js, per fish, each tick:
     //   player.mode = huntMode(input.keysDown, input.pointerDown)
-    //   if input.exhaleRequested: requestExhale(player) and clear flag
-    //   for each prey: { accel, mode } = wander/flee; prey.mode = mode
+    //   if input.exhaleRequested: requestExhale(player) and clear flag  // @ds:d9fc8d9c
+    //   for each prey: try huntSteer first; if no hunt accel, use fleeSteer/wanderSteer; prey.mode = mode
     //   integrate(fish, accel, dt, world)  // uses fish.mode for cap + energy
+    //   triggerExhaleOnAccelStart(fish, accel, prevAccel) for any fish  // @ds:67f150ce @ia:d87fe07b
     //   runExhaleCycle(fish, world.bubbles, rng, dt) when a scenario triggers exhale
     //   emit/advance bubbles as world decor
+    // on canvas click: find fish under cursor, if found log serializeFish(fish)  // @ds:2e1570ed
 
-new_constants:                      # add to constants.js (traceable to .air)
-  FISH.baseRadius:    16            # fish.air#ia:fish.radius-formula: readable decorated fish sprite scale
-  REGIME.cruiseFactor: 0.55         # fish.air#ia:fish.regime.cruise-factor: cruiseSpeed = 0.55 * maxSpeed
-  PREY.speedMargin:    20           # prey.air#ia:prey.flee-vain-skip: px/s surplus before skipping burst
-  BUBBLE.maxRatio:     0.08         # world.air#ia:world.bubble.radius-formula: bubble radius target ratio
-  BUBBLE.minRadius:    1.1          # world.air#ia:world.bubble.radius-formula: minimum readable bubble size in px
-  BUBBLE.baseInterval:  0.8         # world.air#ia:world.bubble.animation: seconds between bubbles
-  BUBBLE.intervalJitter: 0.8        # world.air#ia:world.bubble.animation: extra randomized delay
-  BUBBLE.life:         1.6          # world.air#ia:world.bubble.animation: seconds before bubble fades
-  BUBBLE.riseSpeed:    18           # world.air#ia:world.bubble.animation: px/s upward drift
-  BUBBLE.drift:        8            # world.air#ia:world.bubble.animation: px/s sideways wobble
-  BUBBLE.burstMinCount: 2           # world.air#ia:world.bubble.burst-sequence: minimum bubbles per burst
-  BUBBLE.burstMaxCount: 5           # world.air#ia:world.bubble.burst-sequence: maximum bubbles per burst
-  BUBBLE.gapMinPx:     2            # world.air#ia:world.bubble.burst-sequence: minimum separation between bubbles
-  BUBBLE.gapMaxRatio:  1            # world.air#ia:world.bubble.burst-sequence: maximum gap = about one bubble size
-  EXHALE.inhaleScale:  1.10         # fish.dsc:decor.exhale / fn:exhale: inhale visual scale target
-  EXHALE.emitMinCount: 9            # fish.dsc:decor.exhale / fn:exhale
-  EXHALE.emitMaxCount: 16           # fish.dsc:decor.exhale / fn:exhale
-  EXHALE.influenceRadiusSizes: 1    # fish.dsc:decor.exhale / ia:fish.exhale.bubble-displacement
-  # reuse existing: PREY.fleeRadius=150, PREY.fleeAccel=520, ENERGY.lossPerRef=0.10,
-  #                 ENERGY.refSizes=10, ENERGY.minSize=0.2 (already present)
+new_constants:
+  FISH.baseRadius:    16            # @ia:1e2f3a4b
+  REGIME.cruiseFactor: 0.55         # @ia:5e6f7a8b
+  BUBBLE.maxRatio:     0.08         # @ia:9e0f1a2b
+  BUBBLE.minRadius:    1.1          # @ia:9e0f1a2b
+  BUBBLE.baseInterval:  0.8         # @ia:3c4d5e6f
+  BUBBLE.intervalJitter: 0.8        # @ia:3c4d5e6f
+  BUBBLE.life:         1.6          # @ia:3c4d5e6f
+  BUBBLE.riseSpeed:    18           # @ia:f4604af3
+  BUBBLE.drift:        8            # @ia:3c4d5e6f
+  BUBBLE.burstMinCount: 2           # @ia:7a8b9c0d
+  BUBBLE.burstMaxCount: 5           # @ia:7a8b9c0d
+  BUBBLE.gapMinPx:     2            # @ia:7a8b9c0d
+  BUBBLE.gapMaxRatio:  1            # @ia:7a8b9c0d
+  EXHALE.inhaleScale:  1.10         # @fn:a9a3ed12
+  EXHALE.emitInterval: 0.05         # @fn:a9a3ed12
+  EXHALE.emitMinCount: 9            # @fn:a9a3ed12
+  EXHALE.emitMaxCount: 16           # @fn:a9a3ed12
+  EXHALE.influenceRadiusSizes: 1    # @ia:617964be
+  PREY.fleeRadius:     240           # @ds:579e4888 @ds:e6ecfbdd
+  PREY.fleeAccel:      760           # @ds:579e4888 @ds:e6ecfbdd
+  PREY.speedMargin:    35            # @ia:5f6a7b8c
+  # reuse existing: ENERGY.lossPerRef=0.10, ENERGY.refSizes=10, ENERGY.minSize=0.2
 
-fish_mouth:                         # fish.dsc:decor.mouth  (fish.air#ia:fish.decor.mouth-state)
+fish_mouth:
   # Three states drive the mouth; stored as plain numbers on each fish object.
   # mouthOpen    : 0..1  — current open ratio; 0 = fully closed, 1 = fully agape
   # mouthHold    : seconds remaining in the post-eat hold; drives eat state
   # mouthEatenSize: size of the last eaten prey, decays back to 0 over time
 
-  data_model_fields:                # add to fish.js#makeFish
+  data_model_fields:
     mouthOpen: 0
     mouthHold: 0
     mouthEatenSize: 0
@@ -286,14 +322,14 @@ fish_mouth:                         # fish.dsc:decor.mouth  (fish.air#ia:fish.de
       if (open <= 0) return
       # … use render_mouth pseudocode above …
 
-new_constants_mouth:                # add to constants.js under MOUTH = { … }
+new_constants_mouth:
   MOUTH:
-    chaseOpenRatio: 0.22            # fish.air#ia:fish.decor.mouth-state: slight open while thrusting in burst
-    holdDuration:   0.40            # fish.air#ia:fish.decor.mouth-state: seconds to keep post-eat open state
-    # mouthEatenSize decays at rate (fish.size * 2) per second — no constant needed
+    chaseOpenRatio: 0.22            # @ia:9c0d1e2f
+    holdDuration:   0.40            # @ia:9c0d1e2f
+    # mouthEatenSize decays at rate (fish.size * 2) per second
 
-fish_swim_motion:                   # fish.dsc:decor.swimMotion  (fish.air#ia:fish.decor.swim-state)
-  data_model_fields:                # add to fish.js#makeFish
+fish_swim_motion:
+  data_model_fields:
     swimPhase: 0                    # radians; drives tail/fin oscillation
     burstKick: 0                    # 0..1 temporary wider swing after burst starts
     wasBurstThrusting: false        # edge detector for burst start
@@ -328,7 +364,7 @@ new_constants_swim:
     finBurstSwing: 0.18             # burst/kick fin addition in radii
     kickDecay: 4.5                  # seconds^-1 decay after burst starts
 
-fish_fear_eye:                      # fish.dsc:decor.fearEye  (fish.air#ia:fish.decor.fear-eye-state)
+fish_fear_eye:
   data_model_fields:
     eyeFear: 0                      # 0..1 visual fear value; renderer scales eye
 
@@ -345,7 +381,7 @@ fish_fear_eye:                      # fish.dsc:decor.fearEye  (fish.air#ia:fish.
     }
 
   render_eye: |
-    # render.js#drawFish uses eyeFear read-only:
+    # render.js#drawFish uses eyeFear read-only.
     # eyeScale = 1 + (FEAR_EYE.maxScale - 1) * clamp01(fish.eyeFear)
     # apply eyeScale to iris, pupil, and highlight radius.
 
@@ -357,18 +393,20 @@ new_constants_fear_eye:
 
 acceptance_rules:
   - "Player fish follows pointer; capped speed; clamps at world edges."
-  - "Player eats any prey with size < player.size / EAT_RATIO on overlap."
-  - "Eating increases player size with diminishing returns (fish.air#ia:fish.growth-formula)."
+  - "A fish eats an overlapping smaller fish only while the predator is in burst mode."
+  - "Eating increases player size with diminishing returns."
   - "Default regime is cruise: swimming in cruise keeps size constant (no shrink)."
-  - "Player burst on Space or mouse/touch hold => speed up to maxSpeed AND size shrinks (fish.air#ia:fish.energy.burst-only / ia:fish.regime.cruise-factor)."
+  - "Player burst on Space or mouse/touch hold => speed up to maxSpeed AND size shrinks."
   - "Prey wander in cruise (no size cost) and never starve to MIN by wandering."
-  - "Prey burst only when a threat that can eat them is within fleeRadius; strength scales with proximity; skip burst if already outrunning the threat by speedMargin (prey.air#ia:prey.flee-proximity .. ia:prey.wander-cruise)."
+  - "Prey burst only when a threat that can eat them is within fleeRadius; strength scales with proximity; skip burst if already outrunning the threat by speedMargin."
   - "Burst travel of 10*size distance => -1% size; size floored at MIN_SIZE."
-  - "runExhaleCycle supports two strict stages: inhale (pull existing bubbles) then exhale (emit 9-16 + push existing bubbles)."
+  - "runExhaleCycle has two strict phases: inhale (pull existing bubbles) then exhale (emit 9-16 and push existing bubbles)."
+  - "Exhale emission is sequential: bubbles are released with EXHALE.emitInterval (0.05s / 50ms) spacing, not as a single-frame bulk spawn."
+  - "Auto-exhale is triggered for any fish on acceleration-start edge only; player hotkey exhale remains a separate scenario."
   - "Exhale scaling is visual-only; fish.size and related gameplay physics stay unchanged by exhale itself."
   - "serializeFish output always contains exactly: type(user|npc), size, age, eatenFishCount."
-  - "Fish periodically emit bubbles; bubble radius is at least 3px and usually around 7% of the emitter's visual size."
-  - "Bubble emissions happen in short bursts of 2-5 bubbles with a small gap between consecutive bubbles."
+  - "Fish periodically emit bubbles during idle; bubble radius is at least 3px and usually around 7% of the emitter's visual size."
+  - "Bubble emissions happen in short bursts of 2-5 bubbles with a small gap between consecutive bubbles (during idle/cruise emission, not exhale)."
   - "Bubbles rise, drift, fade, and are culled when they leave the world or expire."
   - "Prey population auto-refills toward target count."
   - "No fail state; player never removed (predation.symmetry)."

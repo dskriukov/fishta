@@ -4,8 +4,10 @@ rationale_notes:
   - "Clamp at world edges is preferred over bounce to keep behaviour deterministic and simple."
   - "Linear drag is sufficient for water-like feel at current scope."
   - "Bubble decor should remain subtle and asynchronous to avoid visual noise."
+  - "Bubble rise speed should stay near-constant and close to median cruise fish speed, so decor pacing remains readable across fish sizes."
   - "Bubble radius cap is relative to fish radius: bubbleRadius <= 0.10 * fish.radius."
   - "Do not multiply bubble target radius by extra size terms (for example sqrt(size)); fish.radius already includes fish size scaling."
+  - "Automatic exhale belongs to the start of acceleration, while the player hotkey is a separate trigger path."
 
 units:
   position: pixels

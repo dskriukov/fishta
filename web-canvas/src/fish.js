@@ -51,6 +51,7 @@ export function makeFish({ pos, size = 1, isPlayer = false, hue = 200 }){
         eyeFear: 0,                  // @ia 7d8e9f0a
         isPlayer,
         hue,
+        prevAccel: { x: 0, y: 0 },
         // prey-only steering memory (ignored for player)
         heading: { x: 0, y: 0 },
     };
@@ -242,12 +243,12 @@ export function runExhaleCycle(fish, bubblesAround, rng, dt){
     }
 
     exhale.t += dt;
-    const t = Math.min(1, exhale.t / EXHALE.exhaleDuration);
-    fish.visualScale = lerp(EXHALE.inhaleScale, 1, t);
     emitExhaleSequential(fish, bubblesAround, rng, dt);
+    const t = exhale.emitTotal > 0 ? Math.min(1, exhale.emitCount / exhale.emitTotal) : 1;
+    fish.visualScale = lerp(EXHALE.inhaleScale, 1, t);
     displaceExistingBubbles(fish, bubblesAround, dt, false);
 
-    if( t >= 1 ){
+    if( exhale.emitCount >= exhale.emitTotal ){
         exhale.stage = 'idle';
         exhale.t = 0;
         exhale.emitTimer = 0;

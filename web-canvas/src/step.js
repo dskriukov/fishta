@@ -5,9 +5,17 @@
 
 import { integrate, runExhaleCycle, requestExhale } from './fish.js';
 import { preySteer, capPreySpeed, maintainPopulation } from './prey.js';
+import { huntSteer } from './hunt.js';
 import { playerSteer, huntMode } from './controls.js';
 import { resolveEating } from './predation.js';
 import { emitBubble, advanceBubbles } from './world.js';
+
+// @fn:a9a3ed12
+export function triggerExhaleOnAccelStart(fish, accel, prevAccel){
+    const prevMagnitude = Math.hypot(prevAccel.x, prevAccel.y);
+    const currentMagnitude = Math.hypot(accel.x, accel.y);
+    if( prevMagnitude <= 1e-3 && currentMagnitude > 1e-3 ) requestExhale(fish);
+}
 
 // @ia e5f60718
 export function step(state, input, dt, rng){
@@ -18,15 +26,21 @@ export function step(state, input, dt, rng){
         input.exhaleRequested = false;
     }
     const playerAccel = playerSteer(state.player, input);
+    triggerExhaleOnAccelStart(state.player, playerAccel, state.player.prevAccel);
+    state.player.prevAccel = { ...playerAccel };
     integrate(state.player, playerAccel, state.world, dt);
     runExhaleCycle(state.player, state.bubbles, rng, dt);
 
-    // ds:579e4888 ds:31cb7a0d ds:27ebde84
+    // ds:579e4888 ds:31cb7a0d ds:98224ab9 @ds:d4f6a1c2
     const threats = [state.player, ...state.prey];
     for( const p of state.prey ){
-        const steer = preySteer(p, threats, dt, rng);
+        const hunt = huntSteer(p, state.prey);
+        const steer = hunt.accel ? hunt : preySteer(p, threats, dt, rng);
+        const accel = steer.accel ?? { x: 0, y: 0 };
         p.mode = steer.mode;
-        integrate(p, steer.accel ?? { x: 0, y: 0 }, state.world, dt);
+        triggerExhaleOnAccelStart(p, accel, p.prevAccel);
+        p.prevAccel = { ...accel };
+        integrate(p, accel, state.world, dt);
         capPreySpeed(p);
     }
 

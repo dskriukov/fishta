@@ -11,7 +11,7 @@
       {
         "id": "domain-sense",
         "aliases": ["Domain Sense", "domain-sense", "ds"],
-        "extensions": [".ds", ".ia"]
+        "extensions": [".ds", ".ia", ".fix"]
       },
       {
         "id": "domain-sense-dsc",

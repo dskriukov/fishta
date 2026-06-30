@@ -5,7 +5,7 @@
 import { PREY } from './constants.js';
 import { v, sub, add, scale, normalize, dist, clampLen } from './vec.js';
 import { makeFish } from './fish.js';
-import { canEat } from './predation.js';
+import { isEdibleBySize } from './predation.js';
 
 // @ia 7f8a9b0c
 function sampleSize(rng){
@@ -27,7 +27,7 @@ export function fleeSteer(p, threats){
     let nearest = null;
     let nearestD = PREY.fleeRadius;
     for( const t of threats ){
-        if( !canEat(t, p) ) continue;
+        if( !isEdibleBySize(t, p) ) continue;
         const d = dist(p.pos, t.pos);
         if( d < nearestD ){ nearestD = d; nearest = t; }
     }

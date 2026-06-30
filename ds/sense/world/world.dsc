@@ -55,4 +55,10 @@ decor:
       name: advanceBubbles
       inputs: [bubbles[], dt, world]
       output: bubbles[]
-      rule: "bubbles rise upward, drift slightly, fade out, and are removed when expired or out of world; the fill is nearly transparent while the contour remains visible and may subtly pulse in the vertical axis"
+      rule: "bubbles rise upward at near-constant speed close to median fish cruise speed, drift slightly, fade out, and are removed when expired or out of world; the fill is nearly transparent while the contour remains visible and may subtly pulse in the vertical axis"
+    exhale_trigger:
+      from: ds:world.exhale.accel-start-trigger
+      name: triggerExhaleOnAccelStart
+      inputs: [fish, accel, prevAccel]
+      output: exhaleRequest?
+      rule: "for any fish, auto-trigger @fn:exhale when acceleration transitions from zero to nonzero; hotkey trigger remains a separate player-only scenario"

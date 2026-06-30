@@ -5,8 +5,9 @@ const path = require('path');
 const REFERENCE_KINDS = ['ds', 'ia', 'fn', 'it', 'do', 'eg'];
 const IMPLEMENTATION_KINDS = ['fn', 'it', 'do', 'eg'];
 const MARKER_KINDS = [...REFERENCE_KINDS, ...IMPLEMENTATION_KINDS];
-const SENSE_FILE_EXTENSIONS = new Set(['.ds', '.ia', '.air', '.dsc']);
+const SENSE_FILE_EXTENSIONS = new Set(['.ds', '.ia', '.air', '.dsc', '.fix']);
 const INLINE_MARKER_RE = /\[(ds|ia|fn|it|do|eg):([A-Za-z0-9_.-]+)\]/;
+const DSMAP_ENTRY_KIND_RE = '(?:ds|ia|fn|it|do|eg)';
 
 function isSenseDocument(doc) {
   return SENSE_FILE_EXTENSIONS.has(path.extname(doc.uri.fsPath).toLowerCase());
@@ -315,19 +316,20 @@ function loadDsMapEntries(ws, fileIndexByHash = {}) {
   const entries = [];
   for (let line = 0; line < lines.length; line++) {
     const text = lines[line];
-    const m = text.match(/^(ds|ia):([A-Za-z0-9_.-]+)\s+-\s+([0-9a-f]{8})\s+(\S+)$/);
+    const m = text.match(new RegExp(`^${DSMAP_ENTRY_KIND_RE}:([A-Za-z0-9_.-]+)\\s+-\\s+([0-9a-f]{8})\\s+(\\S+)$`));
     if (!m) continue;
-    const slug = `${m[1]}:${m[2]}`;
-    const hash = m[3];
-    const fileRefText = m[4];
+    const type = text.slice(0, text.indexOf(':'));
+    const slug = `${type}:${m[1]}`;
+    const hash = m[2];
+    const fileRefText = m[3];
     const indexedFile = /^[0-9a-f]{8}$/.test(fileRefText) ? fileIndexByHash[fileRefText] : undefined;
     const file = indexedFile ? indexedFile.file : path.join(ws, fileRefText);
     const slugStart = text.indexOf(slug);
     const hashStart = text.indexOf(hash, slugStart + slug.length);
     const fileRefStart = text.indexOf(fileRefText, hashStart + hash.length);
     entries.push({
-      type: m[1],
-      name: m[2],
+      type,
+      name: m[1],
       slug,
       hash,
       file,
@@ -517,12 +519,13 @@ function loadRefMap(ws, fileIndexByHash = {}) {
   const refPath = refPaths.find(candidate => fs.existsSync(candidate));
   if (!refPath) return map;
   for (const line of fs.readFileSync(refPath, 'utf8').split('\n')) {
-    const m = line.match(/^(ds|ia):(\S+)\s+-\s+([0-9a-f]+)\s+(\S+)/);
+    const m = line.match(new RegExp(`^${DSMAP_ENTRY_KIND_RE}:(\\S+)\\s+-\\s+([0-9a-f]+)\\s+(\\S+)`));
     if (!m) continue;
-    const fileRef = m[4];
+    const type = line.slice(0, line.indexOf(':'));
+    const fileRef = m[3];
     const indexedFile = /^[0-9a-f]{8}$/.test(fileRef) ? fileIndexByHash[fileRef] : undefined;
     const file = indexedFile ? indexedFile.file : path.join(ws, fileRef);
-    map[m[3]] = { type: m[1], name: m[2], file };
+    map[m[2]] = { type, name: m[1], file };
   }
   return map;
 }
@@ -541,7 +544,7 @@ function findHashOccurrences(ws, hash) {
     const lines = text.split('\n');
     for (let line = 0; line < lines.length; line++) {
       const lineText = lines[line];
-      const annotationRe = /@(ds|ia)\b/g;
+      const annotationRe = /@(ds|ia|fn|it|do|eg)\b/g;
       let annotation;
       while ((annotation = annotationRe.exec(lineText)) !== null) {
         let cursor = annotation.index + annotation[0].length;
@@ -562,7 +565,7 @@ function findHashOccurrences(ws, hash) {
         }
       }
 
-      const directRe = /\b(ds|ia):([0-9a-f]{8})\b/g;
+      const directRe = /\b(ds|ia|fn|it|do|eg):([0-9a-f]{8})\b/g;
       let direct;
       while ((direct = directRe.exec(lineText)) !== null) {
         if (direct[2] !== hash) continue;
@@ -748,6 +751,7 @@ function activate(context) {
   watch('ds/**/*.ds');
   watch('ds/**/*.ia');
   watch('ds/**/*.air');
+  watch('ds/**/*.fix');
 
   context.subscriptions.push(
     vscode.workspace.onDidChangeTextDocument((event) => {
@@ -822,7 +826,13 @@ function activate(context) {
           if (position.line !== entry.line) continue;
           if (position.character >= entry.slugStart && position.character <= entry.slugEnd) {
             const airEntry = airMap[entry.slug];
-            return new vscode.Hover(airEntry ? renderAirDetails(airEntry, keyMap) : new vscode.MarkdownString(`**${entry.slug}**`));
+            if (airEntry) return new vscode.Hover(renderAirDetails(airEntry, keyMap));
+            const md = new vscode.MarkdownString();
+            md.isTrusted = true;
+            md.appendMarkdown(`**${entry.slug}**\n\n`);
+            const desc = getDescription(entry.file, entry.slug);
+            if (desc) md.appendMarkdown(renderWithLinks(desc, keyMap));
+            return new vscode.Hover(md);
           }
 
           if (position.character >= entry.hashStart && position.character <= entry.hashEnd) {

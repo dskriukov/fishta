@@ -6,6 +6,7 @@
     { "include": "#headings" },
     { "include": "#horizontal-rule" },
     { "include": "#blockquote" },
+    { "include": "#task-lists" },
     { "include": "#lists" },
     { "include": "#fenced-code" },
     { "include": "#markers" },
@@ -46,6 +47,24 @@
         {
           "name": "markup.quote.domain-sense",
           "match": "^\\s*>\\s?.*$"
+        }
+      ]
+    },
+    "task-lists": {
+      "patterns": [
+        {
+          "name": "markup.list.unchecked.domain-sense",
+          "match": "^\\s{0,3}[-*+]\\s+(\\[ \\])\\s+.+$",
+          "captures": {
+            "1": { "name": "constant.language.unchecked.domain-sense" }
+          }
+        },
+        {
+          "name": "markup.list.checked.domain-sense",
+          "match": "^\\s{0,3}[-*+]\\s+(\\[[xX]\\])\\s+.+$",
+          "captures": {
+            "1": { "name": "constant.language.checked.domain-sense" }
+          }
         }
       ]
     },

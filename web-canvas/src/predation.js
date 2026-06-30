@@ -1,7 +1,7 @@
 // imp/web-canvas/src/predation.js
 // Implements: predation.dsc (overlaps, canEat, resolveEating)
 // Note: player_immune = true (predation.symmetry, goal.growth)
-// @ds a3e394a8 27ebde84 e9fb3705 fcdfb2b7 d867989f
+// @ds a3e394a8 98224ab9 e9fb3705 fcdfb2b7 d867989f
 
 import { PREDATION } from './constants.js';
 import { dist } from './vec.js';
@@ -12,9 +12,14 @@ export function overlaps(a, b){
     return dist(a.pos, b.pos) < a.radius + b.radius;
 }
 
-// ds:27ebde84
-export function canEat(predator, prey){
+// ds:98224ab9
+export function isEdibleBySize(predator, prey){
     return predator.size > prey.size * PREDATION.eatRatio;
+}
+
+// ds:98224ab9
+export function canEat(predator, prey){
+    return predator.mode === 'burst' && isEdibleBySize(predator, prey);
 }
 
 // ds:e9fb3705

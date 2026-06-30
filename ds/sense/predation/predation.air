@@ -1,0 +1,4 @@
+# predation.air — Agent Interpretation Reference
+
+rationale_notes:
+  - "Distinguish size eligibility from immediate eating. Steering decisions may use isEdibleBySize before burst is selected; resolveEating must use canEat so contact eating remains burst-only."

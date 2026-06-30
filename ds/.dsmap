@@ -1,17 +1,19 @@
-ds/sense/controls/controls.ds#111a9fd7 - 323e0d97
-ds/sense/controls/controls.ia#e80a8567 - 3ab6da12
-ds/sense/fish/fish.ds#d2598f15 - 0e1af7e8
-ds/sense/fish/fish.ia#edb729df - 2b751007
-ds/sense/main.ds#57122026 - d3cd9207
-ds/sense/main.ia#660deae2 - feab7d75
-ds/sense/predation/predation.ds#b373e0d2 - c4f0fe31
-ds/sense/prey/prey.ds#c7aff45c - 3fbd0a6d
-ds/sense/prey/prey.ia#c916db35 - b73de1c3
-ds/sense/world/world.ds#52f6e44b - 0c44252a
-ds/sense/world/world.ia#5c1c5181 - a45699db
+ds/sense/controls/controls.ds#9b08cabb - 323e0d97
+ds/sense/controls/controls.ia#233ee10d - 3ab6da12
+ds/sense/fish/fish.ds#0536c4a5 - 0e1af7e8
+ds/sense/fish/fish.ia#526a7577 - 2b751007
+ds/sense/main.ds#4f98671a - d3cd9207
+ds/sense/main.ia#0cc4078e - feab7d75
+ds/sense/predation/predation.ds#bee4eecb - c4f0fe31
+ds/sense/prey/prey.ds#5b79d193 - 3fbd0a6d
+ds/sense/prey/prey.ia#d3b93b72 - b73de1c3
+ds/sense/world/world.ds#8fab7fac - 0c44252a
+ds/sense/world/world.ia#d8f06cec - a45699db
 
 ds:controls.camera - 7b9a7984 323e0d97
+ds:controls.exhale-hotkey - d9fc8d9c 323e0d97
 ds:controls.hunt - 22fd3ab4 323e0d97
+ds:controls.inspect-click - 2e1570ed 323e0d97
 ds:controls.keys - 10baf178 323e0d97
 ds:controls.player - 91e32235 323e0d97
 ds:controls.pointer - 55c13a4f 323e0d97
@@ -28,14 +30,15 @@ ds:fish.movement.swim - 7ce238da 0e1af7e8
 ds:fish.regime - 8869f043 0e1af7e8
 ds:fish.size - cbc1225a 0e1af7e8
 ds:fish.thrust - ee07d6da 0e1af7e8
-fn:exhale - d1c14620 0e1af7e8
-do:serialize - 93cbace8 0e1af7e8
+fn:exhale - a9a3ed12 0e1af7e8
+do:serialize - a7a50f7b 0e1af7e8
 ds:goal.growth - b433f1bc d3cd9207
 ds:intent.game - 27fa3caa d3cd9207
 ds:main - b28b7af6 d3cd9207
 ds:predation.contact - a3e394a8 c4f0fe31
+ds:predation.hunt - d4f6a1c2 c4f0fe31
 ds:predation.effect - e9fb3705 c4f0fe31
-ds:predation.rule - 27ebde84 c4f0fe31
+ds:predation.rule - 98224ab9 c4f0fe31
 ds:predation.symmetry - fcdfb2b7 c4f0fe31
 ds:prey.entity - ad8d81d8 3fbd0a6d
 ds:prey.flee - 579e4888 3fbd0a6d
@@ -46,6 +49,7 @@ ds:prey.wander - 31cb7a0d 3fbd0a6d
 ds:world.bounds - c83f4c1e 0c44252a
 ds:world.decor.bubbles - d6cebf86 0c44252a
 ds:world.drag - ca07d970 0c44252a
+ds:world.exhale.accel-start-trigger - 67f150ce 0c44252a
 ds:world.flat - c95ca496 d3cd9207
 ds:world.medium.water - d2e8a84c 0c44252a
 ds:world.surface.flat - 5fb1ff09 0c44252a
@@ -53,6 +57,8 @@ ds:world.spawn.from-edge - 89b9124f 0c44252a
 ds:world.time - 48c4fc99 d3cd9207
 ia:controls.camera-fixed - 0f1a2b3c 3ab6da12
 ia:controls.hunt-binding - 6b7c8d9e 3ab6da12
+ia:controls.key-combo-compose - 0a7383b1 3ab6da12
+ia:controls.key-layout-equivalents - aae3d11a 3ab6da12
 ia:fish.decor.fear-eye-state - 7d8e9f0a 2b751007
 ia:fish.decor.mouth-state - 9c0d1e2f 2b751007
 ia:fish.decor.swim-state - 3a4b5c6e 2b751007
@@ -81,5 +87,7 @@ ia:world.bounds.clamp - 7e8f9a0b a45699db
 ia:world.bubble.animation - 3c4d5e6f a45699db
 ia:world.bubble.burst-sequence - 7a8b9c0d a45699db
 ia:world.bubble.radius-formula - 9e0f1a2b a45699db
+ia:world.bubble.rise-speed - f4604af3 a45699db
 ia:world.drag.linear - 1c2d3e4f a45699db
+ia:world.exhale.accel-start-trigger - d87fe07b a45699db
 ia:world.fit-to-screen - 5a6b7c8d a45699db

@@ -184,11 +184,11 @@ function drawFish(ctx, f){
     ctx.lineCap = 'round';
     ctx.beginPath();
     if( mouthOpenRatio > 0 ){
-        ctx.moveTo(snoutX - mouthWidth * 0.12, mouthY - mouthHeight * 0.5);
-        ctx.quadraticCurveTo(mouthX - mouthWidth * 0.35, mouthY, snoutX - mouthWidth * 0.12, mouthY + mouthHeight * 0.5);
+        ctx.moveTo(snoutX - mouthWidth * 0.08, mouthY - mouthHeight * 0.18);
+        ctx.quadraticCurveTo(mouthX - mouthWidth * 0.28, mouthY, snoutX - mouthWidth * 0.08, mouthY + mouthHeight * 0.18);
     }else{
-        ctx.moveTo(snoutX - r * 0.1, mouthY - r * 0.08);
-        ctx.quadraticCurveTo(snoutX - r * 0.28, mouthY + r * 0.02, snoutX - r * 0.06, mouthY + r * 0.13);
+        ctx.moveTo(snoutX - r * 0.18, mouthY);
+        ctx.quadraticCurveTo(snoutX - r * 0.1, mouthY + r * 0.03, snoutX - r * 0.02, mouthY);
     }
     ctx.stroke();
 

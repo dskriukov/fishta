@@ -49,7 +49,7 @@ export function playerSteer(player, input){
 
 // ds:22fd3ab4
 export function huntMode(input){
-    return (input.keys.has(' ') || input.keys.has('Space') || input.pointerDown) ? 'burst' : 'cruise';
+    return (input.keys.has(' ') || input.keys.has('Space') || input.pointerDown || input.touchDown) ? 'burst' : 'cruise';
 }
 
 // @ia 6b7c8d9e
@@ -57,6 +57,7 @@ export function createInput(canvas){
     const input = {
         pointer: { pos: v(0, 0), active: false, lockedByKeyboard: false },
         pointerDown: false,
+        touchDown: false,
         keys: new Set(),
         exhaleRequested: false,
     };
@@ -76,14 +77,14 @@ export function createInput(canvas){
         const touch = e.touches[0];
         if( !touch ) return;
         setPointer(touch.clientX, touch.clientY);
-        input.pointerDown = true;
+        input.touchDown = true;
     }, { passive: true });
     canvas.addEventListener('touchmove', e =>{
         const touch = e.touches[0];
         if( !touch ) return;
         setPointer(touch.clientX, touch.clientY, true);
     }, { passive: true });
-    canvas.addEventListener('touchend', () =>{ input.pointer.active = false; input.pointerDown = false; });
+    canvas.addEventListener('touchend', () =>{ input.pointer.active = false; input.touchDown = false; });
 
     window.addEventListener('keydown', e =>{
         const key = normalizeKey(e.key);

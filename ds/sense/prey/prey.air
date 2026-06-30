@@ -3,10 +3,11 @@
 rationale_notes:
   - "Burst during flee must be proximity-aware and not trigger when escape margin is already sufficient."
   - "Cruise-only wandering preserves population stability by avoiding unnecessary size drain."
+  - "Flee awareness must be wide enough for visibly dangerous fish to affect prey before contact range; otherwise NPCs appear insufficiently afraid even though the rule is present."
 
 tunables:
-  FLEE_RADIUS: 150     # px, threat awareness range
-  FLEE_ACCEL: 520      # px/s^2 at max proximity
-  SPEED_MARGIN: 20     # px/s surplus over threat before skipping burst
+  FLEE_RADIUS: 240     # px, threat awareness range
+  FLEE_ACCEL: 760      # px/s^2 at max proximity
+  SPEED_MARGIN: 35     # px/s surplus over threat before skipping burst
   SPAWN_MARGIN: 20     # px beyond each edge before a new fish enters view
   SPAWN_GRACE: 0.75    # s without bounds clamp so a spawned fish can enter from outside

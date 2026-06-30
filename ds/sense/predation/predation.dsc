@@ -16,11 +16,31 @@ rule:
   threshold:
     name: EAT_RATIO
     meaning: "predator.size must exceed prey.size * (1 + margin)"
+  size_predicate:
+    name: isEdibleBySize
+    inputs: [predator, prey]
+    output: boolean
+    rule: "predator.size > prey.size * EAT_RATIO"
   contract:
     name: canEat
     inputs: [predator, prey]
     output: boolean
-    rule: "predator.size > prey.size * EAT_RATIO"
+    rule: "predator.mode == 'burst' and isEdibleBySize(predator, prey)"
+
+hunt:
+  from: ds:predation.hunt
+  contract:
+    name: huntSteer
+    inputs: [hunter, visiblePrey[]]
+    output: { acceleration, mode }
+    rule: >
+      if hunter has any visible prey edible by size: move toward the nearest edible prey and
+      return mode=burst; otherwise return no hunt acceleration and keep the
+      current cruising behaviour.
+    properties:
+      - "hunter selects a prey target by proximity among edible visible prey"
+      - "hunt is an active pursuit behaviour, not passive drift"
+      - "hunt mode change is a domain decision that enables canEat"
 
 effect:
   from: ds:predation.effect

@@ -88,10 +88,11 @@ decor:
         emission, already existing nearby bubbles are pulled toward mouth with
         distance-falloff and zero effect outside 1*size radius
         (ia:fish.exhale.bubble-inhale-order, ia:fish.exhale.bubble-displacement).
-        exhale stage: visual scale returns to baseline, fish emits 9..16 bubbles,
-        and existing nearby bubbles are pushed away from mouth with the same
-        distance-falloff and zero effect outside 1*size radius
-        (ia:fish.exhale.bubble-displacement).
+        exhale stage: visual scale returns to baseline, fish emits 9..16 bubbles
+        at 50ms intervals, and existing nearby bubbles are pushed away from mouth
+        with the same distance-falloff and zero effect outside 1*size radius;
+        exhale duration is not time-capped and completes only after planned
+        emissions finish (ia:fish.exhale.bubble-displacement).
       properties:
         - "visual-only scaling: no side effects on speed, predation, or energy"
         - "stage order is strict: inhale displacement happens before new emission"

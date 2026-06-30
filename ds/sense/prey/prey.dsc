@@ -24,7 +24,7 @@ behaviours:
       inputs: [self, threats[]]
       output: { acceleration, mode }
       rule: >
-        nearest = nearest threat with canEat(threat, self) within fleeRadius;
+        nearest = nearest threat that isEdibleBySize(threat, self) within fleeRadius;
         if none -> { accel: 0, mode: cruise };
         else burst away from nearest: |accel| ∝ proximity (closer -> stronger);
         SKIP burst (mode=cruise, accel:0) if speed(self) > speed(nearest) + SPEED_MARGIN.
