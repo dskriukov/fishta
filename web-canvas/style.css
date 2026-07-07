@@ -22,8 +22,9 @@ html, body {
     top: 12px;
     left: 12px;
     display: flex;
-    gap: 16px;
-    align-items: center;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
     color: #cdeeff;
     font-size: 14px;
     letter-spacing: 0.3px;
@@ -31,7 +32,162 @@ html, body {
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
+#hud .hud-row {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+#hud .toggle {
+    pointer-events: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+    color: #edf8ff;
+}
+
+#hud .toggle input {
+    width: 16px;
+    height: 16px;
+    accent-color: #6ed7ef;
+}
+
+#join {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: rgba(4, 38, 59, 0.55);
+}
+
+#join[hidden] {
+    display: none;
+}
+
+#join-form {
+    display: grid;
+    gap: 12px;
+    width: min(320px, calc(100vw - 32px));
+    padding: 16px;
+    border: 1px solid rgba(205, 238, 255, 0.24);
+    background: rgba(4, 38, 59, 0.88);
+    color: #edf8ff;
+}
+
+#join-form label {
+    display: grid;
+    gap: 6px;
+    font-size: 13px;
+}
+
+#join-form input[type="text"] {
+    width: 100%;
+    border: 1px solid rgba(205, 238, 255, 0.35);
+    background: #062f47;
+    color: #edf8ff;
+    padding: 8px 10px;
+}
+
+#join-form input[type="color"] {
+    width: 48px;
+    height: 34px;
+}
+
+#join-form button,
+#debug-toggle,
+#leave-game,
+#control-modes button,
+#joystick-hunt {
+    border: 1px solid rgba(205, 238, 255, 0.36);
+    background: rgba(110, 215, 239, 0.18);
+    color: #edf8ff;
+    padding: 7px 10px;
+    cursor: pointer;
+}
+
+#leave-game {
+    pointer-events: auto;
+    font-size: 12px;
+}
+
+#debug-toggle {
+    pointer-events: auto;
+    font-size: 12px;
+}
+
+#control-modes {
+    pointer-events: auto;
+    gap: 6px;
+}
+
+#control-modes button {
+    font-size: 12px;
+    padding: 5px 8px;
+}
+
+#debug-toggle[aria-pressed="true"],
+#control-modes button[aria-pressed="true"],
+#joystick-hunt[aria-pressed="true"] {
+    background: rgba(255, 228, 92, 0.22);
+    border-color: rgba(255, 228, 92, 0.55);
+}
+
 #hud .hint {
     opacity: 0.6;
     font-size: 12px;
+    max-width: min(80vw, 520px);
+}
+
+/* @ds:cd1c5776 */
+#joystick-panel {
+    position: fixed;
+    left: 24px;
+    right: 24px;
+    bottom: 24px;
+    height: 112px;
+    pointer-events: none;
+}
+
+#joystick-panel[hidden] {
+    display: none;
+}
+
+#joystick-base {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 112px;
+    height: 112px;
+    border: 1px solid rgba(205, 238, 255, 0.32);
+    border-radius: 50%;
+    background: rgba(4, 38, 59, 0.42);
+    touch-action: none;
+    pointer-events: auto;
+}
+
+#joystick-knob {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: 1px solid rgba(237, 248, 255, 0.6);
+    background: rgba(110, 215, 239, 0.28);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+}
+
+#joystick-hunt {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    min-width: 62px;
+    height: 44px;
+    font-size: 12px;
+    touch-action: none;
+    pointer-events: auto;
 }

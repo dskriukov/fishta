@@ -1,0 +1,2374 @@
+{
+    "type": "snapshot",
+    "clientId": "c7",
+    "currentUserFishId": 37,
+    "world": {
+        "width": 2280,
+        "height": 1520,
+        "nextSizeStep": {
+            "width": 2280,
+            "height": 1520
+        },
+        "fish": [
+            {
+                "id": 1,
+                "pos": {
+                    "x": 2075.57176577434,
+                    "y": 74.55648595025787
+                },
+                "vel": {
+                    "x": 120.95364059303726,
+                    "y": 51.27057996194995
+                },
+                "size": 0.2,
+                "radius": 7.155417527999327,
+                "facing": 1,
+                "mode": "cruise",
+                "age": 1728.799999999085,
+                "eatenFishCount": 0,
+                "visualScale": 1,
+                "exhale": {
+                    "requested": false,
+                    "stage": "idle",
+                    "t": 0,
+                    "emitTimer": 0,
+                    "emitCount": 0,
+                    "emitTotal": 0
+                },
+                "bubbleTimer": 0.05072771495379665,
+                "bubbleBurstRemaining": 1,
+                "mouthOpen": 0,
+                "mouthHold": 0,
+                "mouthEatenSize": 0,
+                "swimPhase": 16190.182113433926,
+                "burstKick": 0,
+                "wasBurstThrusting": false,
+                "eyeFear": 1.2908436395456563e-130,
+                "isPlayer": false,
+                "ownerKind": "npc",
+                "clientId": null,
+                "temporaryConnectionCode": null,
+                "userName": "",
+                "userColor": "#59bcd6",
+                "userTier": "free",
+                "playerVulnerabilityMode": "player_cannot_be_eaten",
+                "npcRole": "prey",
+                "formerUserColor": null,
+                "fryAge": null,
+                "nominalStartSize": 0.4131074305052059,
+                "hue": 44.02377226967827,
+                "prevAccel": {
+                    "x": 223.49868993689546,
+                    "y": 87.454763143533
+                },
+                "heading": {
+                    "x": 0.9312445414037311,
+                    "y": 0.36439484643138753
+                },
+                "spawnGrace": 0
+            },
+            {
+                "id": 3,
+                "pos": {
+                    "x": 1757.4880948916816,
+                    "y": 369.94836564769776
+                },
+                "vel": {
+                    "x": 5.376282356637887,
+                    "y": 132.0334300374102
+                },
+                "size": 0.2,
+                "radius": 7.155417527999327,
+                "facing": 1,
+                "mode": "cruise",
+                "age": 1728.799999999085,
+                "eatenFishCount": 0,
+                "visualScale": 1,
+                "exhale": {
+                    "requested": false,
+                    "stage": "idle",
+                    "t": 0,
+                    "emitTimer": 0,
+                    "emitCount": 0,
+                    "emitTotal": 0
+                },
+                "bubbleTimer": 0.6502017758362281,
+                "bubbleBurstRemaining": 0,
+                "mouthOpen": 0,
+                "mouthHold": 0,
+                "mouthEatenSize": 0,
+                "swimPhase": 16061.021736924866,
+                "burstKick": 0,
+                "wasBurstThrusting": false,
+                "eyeFear": 1.3982111268239726e-81,
+                "isPlayer": false,
+                "ownerKind": "npc",
+                "clientId": null,
+                "temporaryConnectionCode": null,
+                "userName": "",
+                "userColor": "#59bcd6",
+                "userTier": "free",
+                "playerVulnerabilityMode": "player_cannot_be_eaten",
+                "npcRole": "prey",
+                "formerUserColor": null,
+                "fryAge": null,
+                "nominalStartSize": 1.2346576902579622,
+                "hue": 81.92074751329316,
+                "prevAccel": {
+                    "x": 8.15426971509197,
+                    "y": 239.8614347605999
+                },
+                "heading": {
+                    "x": 0.03397612381288321,
+                    "y": 0.999422644835833
+                },
+                "spawnGrace": 0
+            },
+            {
+                "id": 11,
+                "pos": {
+                    "x": 88.83528944062073,
+                    "y": 1188.762566427913
+                },
+                "vel": {
+                    "x": 98.61857189716436,
+                    "y": -95.49306317651906
+                },
+                "size": 0.2,
+                "radius": 7.155417527999327,
+                "facing": 1,
+                "mode": "cruise",
+                "age": 1728.799999999085,
+                "eatenFishCount": 2,
+                "visualScale": 1,
+                "exhale": {
+                    "requested": false,
+                    "stage": "idle",
+                    "t": 0,
+                    "emitTimer": 0,
+                    "emitCount": 0,
+                    "emitTotal": 0
+                },
+                "bubbleTimer": 0.007232582754862035,
+                "bubbleBurstRemaining": 0,
+                "mouthOpen": 0,
+                "mouthHold": 0,
+                "mouthEatenSize": 0,
+                "swimPhase": 16195.814402178772,
+                "burstKick": 0,
+                "wasBurstThrusting": false,
+                "eyeFear": 9.46302690409305e-85,
+                "isPlayer": false,
+                "ownerKind": "npc",
+                "clientId": null,
+                "temporaryConnectionCode": null,
+                "userName": "",
+                "userColor": "#59bcd6",
+                "userTier": "free",
+                "playerVulnerabilityMode": "player_cannot_be_eaten",
+                "npcRole": "prey",
+                "formerUserColor": null,
+                "fryAge": null,
+                "nominalStartSize": 1.0607758785826147,
+                "hue": 45.45032834956467,
+                "prevAccel": {
+                    "x": 187.98006243706456,
+                    "y": -149.2095711613612
+                },
+                "heading": {
+                    "x": 0.7832502601544357,
+                    "y": -0.6217065465056717
+                },
+                "spawnGrace": 0
+            },
+            {
+                "id": 14,
+                "pos": {
+                    "x": 222.64837395497216,
+                    "y": 50.94341586232417
+                },
+                "vel": {
+                    "x": 45.96412858564266,
+                    "y": -134.23010038151023
+                },
+                "size": 0.2,
+                "radius": 7.155417527999327,
+                "facing": 1,
+                "mode": "cruise",
+                "age": 1723.19999999909,
+                "eatenFishCount": 3,
+                "visualScale": 1,
+                "exhale": {
+                    "requested": false,
+                    "stage": "idle",
+                    "t": 0,
+                    "emitTimer": 0,
+                    "emitCount": 0,
+                    "emitTotal": 0
+                },
+                "bubbleTimer": 0.10779479539529517,
+                "bubbleBurstRemaining": 3,
+                "mouthOpen": 0,
+                "mouthHold": 0,
+                "mouthEatenSize": 0,
+                "swimPhase": 15491.181807229917,
+                "burstKick": 0,
+                "wasBurstThrusting": false,
+                "eyeFear": 0,
+                "isPlayer": true,
+                "ownerKind": "npc",
+                "clientId": null,
+                "temporaryConnectionCode": "mr2n5irf-xvlzfbex",
+                "userName": "",
+                "userColor": "#de32ec",
+                "userTier": null,
+                "playerVulnerabilityMode": "player_cannot_be_eaten",
+                "npcRole": "abandoned-user-fish",
+                "formerUserColor": "#de32ec",
+                "fryAge": null,
+                "nominalStartSize": null,
+                "hue": 52,
+                "prevAccel": {
+                    "x": 78.10853224471461,
+                    "y": -226.93403709134594
+                },
+                "heading": {
+                    "x": 0.3254522176863109,
+                    "y": -0.9455584878806081
+                }
+            },
+            {
+                "id": 15,
+                "pos": {
+                    "x": 1032.6334303572958,
+                    "y": 1405.5222259841398
+                },
+                "vel": {
+                    "x": 74.5889807778395,
+                    "y": 8.792690739184886
+                },
+                "size": 0.2,
+                "radius": 7.155417527999327,
+                "facing": 1,
+                "mode": "cruise",
+                "age": 1716.8666666657625,
+                "eatenFishCount": 0,
+                "visualScale": 1,
+                "exhale": {
+                    "requested": false,
+                    "stage": "idle",
+                    "t": 0,
+                    "emitTimer": 0,
+                    "emitCount": 0,
+                    "emitTotal": 0
+                },
+                "bubbleTimer": 0.0964119047520477,
+                "bubbleBurstRemaining": 3,
+                "mouthOpen": 0,
+                "mouthHold": 0,
+                "mouthEatenSize": 0,
+                "swimPhase": 16050.533568366665,
+                "burstKick": 0,
+                "wasBurstThrusting": false,
+                "eyeFear": 1.1434022085593268e-242,
+                "isPlayer": false,
+                "ownerKind": "npc",
+                "clientId": null,
+                "temporaryConnectionCode": null,
+                "userName": "",
+                "userColor": "#59bcd6",
+                "userTier": "free",
+                "playerVulnerabilityMode": "player_cannot_be_eaten",
+                "npcRole": "prey",
+                "formerUserColor": null,
+                "fryAge": null,
+                "nominalStartSize": 1.3061413132609974,
+                "hue": 81.03011488016045,
+                "prevAccel": {
+                    "x": 44.57716749693884,
+                    "y": 235.82382436460878
+                },
+                "heading": {
+                    "x": 0.18573819790391183,
+                    "y": 0.98259926818587
+                },
+                "spawnGrace": 0
+            },
+            {
+                "id": 16,
+                "pos": {
+                    "x": 2.27560275801261,
+                    "y": 491.4295993149765
+                },
+                "vel": {
+                    "x": 8.034542767195573,
+                    "y": 72.7558009842728
+                },
+                "size": 0.2,
+                "radius": 7.155417527999327,
+                "facing": 1,
+                "mode": "cruise",
+                "age": 1716.6666666657627,
+                "eatenFishCount": 1,
+                "visualScale": 1,
+                "exhale": {
+                    "requested": false,
+                    "stage": "idle",
+                    "t": 0,
+                    "emitTimer": 0,
+                    "emitCount": 0,
+                    "emitTotal": 0
+                },
+                "bubbleTimer": 1.1564146909424244,
+                "bubbleBurstRemaining": 0,
+                "mouthOpen": 0,
+                "mouthHold": 0,
+                "mouthEatenSize": 0,
+                "swimPhase": 15905.768605251944,
+                "burstKick": 0,
+                "wasBurstThrusting": false,
+                "eyeFear": 1.1966487032808428e-69,
+                "isPlayer": false,
+                "ownerKind": "npc",
+                "clientId": null,
+                "temporaryConnectionCode": null,
+                "userName": "",
+                "userColor": "#59bcd6",
+                "userTier": "free",
+                "playerVulnerabilityMode": "player_cannot_be_eaten",
+                "npcRole": "prey",
+                "formerUserColor": null,
+                "fryAge": null,
+                "nominalStartSize": 0.48691992345039536,
+                "hue": 61.675037692672944,
+                "prevAccel": {
+                    "x": -169.78678826873076,
+                    "y": 169.62442786753678
+                },
+                "heading": {
+                    "x": -0.7074449511197115,
+                    "y": 0.7067684494480699
+                },
+                "spawnGrace": 0
+            },
+            {
+                "id": 18,
+                "pos": {
+                    "x": 1618.373255457136,
+                    "y": 1363.1822725248671
+                },
+                "vel": {
+                    "x": 105.01220916482221,
+                    "y": 91.76781412341127
+                },
+                "size": 0.2,
+                "radius": 7.155417527999327,
+                "facing": 1,
+                "mode": "cruise",
+                "age": 1710.2999999991018,
+                "eatenFishCount": 0,
+                "visualScale": 1,
+                "exhale": {
+                    "requested": false,
+                    "stage": "idle",
+                    "t": 0,
+                    "emitTimer": 0,
+                    "emitCount": 0,
+                    "emitTotal": 0
+                },
+                "bubbleTimer": 0.9408206828547068,
+                "bubbleBurstRemaining": 0,
+                "mouthOpen": 0,
+                "mouthHold": 0,
+                "mouthEatenSize": 0,
+                "swimPhase": 15994.807841832553,
+                "burstKick": 0,
+                "wasBurstThrusting": false,
+                "eyeFear": 3.342613680175639e-82,
+                "isPlayer": false,
+                "ownerKind": "npc",
+                "clientId": null,
+                "temporaryConnectionCode": null,
+                "userName": "",
+                "userColor": "#59bcd6",
+                "userTier": "free",
+                "playerVulnerabilityMode": "player_cannot_be_eaten",
+                "npcRole": "prey",
+                "formerUserColor": null,
+                "fryAge": null,
+                "nominalStartSize": 0.456948761177992,
+                "hue": 72.12479069414714,
+                "prevAccel": {
+                    "x": 182.35066850723484,
+                    "y": 156.03920563423975
+                },
+                "heading": {
+                    "x": 0.7597944521134785,
+                    "y": 0.6501633568093322
+                },
+                "spawnGrace": 0
+            },
+            {
+                "id": 19,
+                "pos": {
+                    "x": 258.0204886061515,
+                    "y": 220.4451523552823
+                },
+                "vel": {
+                    "x": 0.16431425381025788,
+                    "y": 140.75998346890026
+                },
+                "size": 0.2,
+                "radius": 7.155417527999327,
+                "facing": -1,
+                "mode": "cruise",
+                "age": 1709.099999999103,
+                "eatenFishCount": 0,
+                "visualScale": 1,
+                "exhale": {
+                    "requested": false,
+                    "stage": "idle",
+                    "t": 0,
+                    "emitTimer": 0,
+                    "emitCount": 0,
+                    "emitTotal": 0
+                },
+                "bubbleTimer": 0.3761762509065726,
+                "bubbleBurstRemaining": 0,
+                "mouthOpen": 0,
+                "mouthHold": 0,
+                "mouthEatenSize": 0,
+                "swimPhase": 15948.688196401798,
+                "burstKick": 0,
+                "wasBurstThrusting": false,
+                "eyeFear": 3.7097247109236057e-79,
+                "isPlayer": false,
+                "ownerKind": "npc",
+                "clientId": null,
+                "temporaryConnectionCode": null,
+                "userName": "",
+                "userColor": "#59bcd6",
+                "userTier": "free",
+                "playerVulnerabilityMode": "player_cannot_be_eaten",
+                "npcRole": "prey",
+                "formerUserColor": null,
+                "fryAge": null,
+                "nominalStartSize": 0.3590586663385833,
+                "hue": 54.799019387530215,
+                "prevAccel": {
+                    "x": 0.6534202551444099,
+                    "y": 239.99911050245618
+                },
+                "heading": {
+                    "x": 0.002722584396435041,
+                    "y": 0.999996293760234
+                },
+                "spawnGrace": 0
+            },
+            {
+                "id": 20,
+                "pos": {
+                    "x": 786.8701838470874,
+                    "y": 708.4413769006505
+                },
+                "vel": {
+                    "x": 122.89604774294897,
+                    "y": -26.359616337835874
+                },
+                "size": 0.2,
+                "radius": 7.155417527999327,
+                "facing": 1,
+                "mode": "cruise",
+                "age": 1704.9666666657733,
+                "eatenFishCount": 1,
+                "visualScale": 1,
+                "exhale": {
+                    "requested": false,
+                    "stage": "idle",
+                    "t": 0,
+                    "emitTimer": 0,
+                    "emitCount": 0,
+                    "emitTotal": 0
+                },
+                "bubbleTimer": 0.09814123588342996,
+                "bubbleBurstRemaining": 1,
+                "mouthOpen": 0,
+                "mouthHold": 0,
+                "mouthEatenSize": 0,
+                "swimPhase": 15902.812660202982,
+                "burstKick": 0,
+                "wasBurstThrusting": false,
+                "eyeFear": 2.373444027703593e-63,
+                "isPlayer": false,
+                "ownerKind": "npc",
+                "clientId": null,
+                "temporaryConnectionCode": null,
+                "userName": "",
+                "userColor": "#59bcd6",
+                "userTier": "free",
+                "playerVulnerabilityMode": "player_cannot_be_eaten",
+                "npcRole": "prey",
+                "formerUserColor": null,
+                "fryAge": null,
+                "nominalStartSize": 0.9118533770855701,
+                "hue": 42.313543365218926,
+                "prevAccel": {
+                    "x": 231.22727209854617,
+                    "y": -64.29579020328535
+                },
+                "heading": {
+                    "x": 0.9634469670772757,
+                    "y": -0.2678991258470223
+                },
+                "spawnGrace": 0
+            },
+            {
+                "id": 21,
+                "pos": {
+                    "x": 1743.9384786438113,
+                    "y": 1114.098989179789
+                },
+                "vel": {
+                    "x": 10.87943394424429,
+                    "y": -141.29673474191387
+                },
+                "size": 0.2,
+                "radius": 7.155417527999327,
+                "facing": 1,
+                "mode": "cruise",
+                "age": 1699.3333333324451,
+                "eatenFishCount": 1,
+                "visualScale": 1,
+                "exhale": {
+                    "requested": false,
+                    "stage": "idle",
+                    "t": 0,
+                    "emitTimer": 0,
+                    "emitCount": 0,
+                    "emitTotal": 0
+                },
+                "bubbleTimer": 0.05622491257634856,
+                "bubbleBurstRemaining": 3,
+                "mouthOpen": 0,
+                "mouthHold": 0,
+                "mouthEatenSize": 0,
+                "swimPhase": 15925.960537740852,
+                "burstKick": 0,
+                "wasBurstThrusting": false,
+                "eyeFear": 2.2890011764852535e-119,
+                "isPlayer": false,
+                "ownerKind": "npc",
+                "clientId": null,
+                "temporaryConnectionCode": null,
+                "userName": "",
+                "userColor": "#59bcd6",
+                "userTier": "free",
+                "playerVulnerabilityMode": "player_cannot_be_eaten",
+                "npcRole": "prey",
+                "formerUserColor": null,
+                "fryAge": null,
+                "nominalStartSize": 1.00552994909445,
+                "hue": 63.71362109511132,
+                "prevAccel": {
+                    "x": 19.66211244045724,
+                    "y": -239.19323011820134
+                },
+                "heading": {
+                    "x": 0.08192546850190516,
+                    "y": -0.9966384588258389
+                },
+                "spawnGrace": 0
+            },
+            {
+                "id": 23,
+                "pos": {
+                    "x": 2141.340897490998,
+                    "y": 649.7286241734455
+                },
+                "vel": {
+                    "x": 113.14436788771735,
+                    "y": -37.15786408531795
+                },
+                "size": 0.2,
+                "radius": 7.155417527999327,
+                "facing": 1,
+                "mode": "cruise",
+                "age": 1691.0999999991193,
+                "eatenFishCount": 0,
+                "visualScale": 1,
+                "exhale": {
+                    "requested": false,
+                    "stage": "idle",
+                    "t": 0,
+                    "emitTimer": 0,
+                    "emitCount": 0,
+                    "emitTotal": 0
+                },
+                "bubbleTimer": 0.5078266520775064,
+                "bubbleBurstRemaining": 0,
+                "mouthOpen": 0,
+                "mouthHold": 0,
+                "mouthEatenSize": 0,
+                "swimPhase": 15808.410616773694,
+                "burstKick": 0,
+                "wasBurstThrusting": false,
+                "eyeFear": 8.962287783579195e-147,
+                "isPlayer": false,
+                "ownerKind": "npc",
+                "clientId": null,
+                "temporaryConnectionCode": null,
+                "userName": "",
+                "userColor": "#59bcd6",
+                "userTier": "free",
+                "playerVulnerabilityMode": "player_cannot_be_eaten",
+                "npcRole": "prey",
+                "formerUserColor": null,
+                "fryAge": null,
+                "nominalStartSize": 0.3619748131907502,
+                "hue": 33.26036164929626,
+                "prevAccel": {
+                    "x": 239.7894887648501,
+                    "y": 10.049929248101106
+                },
+                "heading": {
+                    "x": 0.999122869853542,
+                    "y": 0.041874705200421275
+                },
+                "spawnGrace": 0
+            },
+            {
+                "id": 24,
+                "pos": {
+                    "x": 1569.3078427103956,
+                    "y": 1453.2137873351994
+                },
+                "vel": {
+                    "x": -164.24898558009068,
+                    "y": -18.436110626337047
+                },
+                "size": 0.2,
+                "radius": 7.155417527999327,
+                "facing": -1,
+                "mode": "cruise",
+                "age": 1650.7333333324893,
+                "eatenFishCount": 2,
+                "visualScale": 1,
+                "exhale": {
+                    "requested": false,
+                    "stage": "idle",
+                    "t": 0,
+                    "emitTimer": 0,
+                    "emitCount": 0,
+                    "emitTotal": 0
+                },
+                "bubbleTimer": 0.03845603592775428,
+                "bubbleBurstRemaining": 3,
+                "mouthOpen": 0,
+                "mouthHold": 0,
+                "mouthEatenSize": 0,
+                "swimPhase": 18628.08939517378,
+                "burstKick": 0,
+                "wasBurstThrusting": false,
+                "eyeFear": 0,
+                "isPlayer": true,
+                "ownerKind": "user",
+                "clientId": "c4",
+                "temporaryConnectionCode": "mr2n8dd9-2kvfi8y4",
+                "userName": "fish-612",
+                "userColor": "#65e26b",
+                "userTier": "free",
+                "playerVulnerabilityMode": "player_cannot_be_eaten",
+                "npcRole": "prey",
+                "formerUserColor": null,
+                "fryAge": null,
+                "nominalStartSize": null,
+                "hue": 200,
+                "prevAccel": {
+                    "x": -1391.2632272899523,
+                    "y": -156.16219898152812
+                },
+                "heading": {
+                    "x": 0,
+                    "y": 0
+                }
+            },
+            {
+                "id": 25,
+                "pos": {
+                    "x": 1033.145643906038,
+                    "y": 80.57722193062
+                },
+                "vel": {
+                    "x": 1.4831346628819704,
+                    "y": -0.25592196671620676
+                },
+                "size": 0.2,
+                "radius": 7.155417527999327,
+                "facing": -1,
+                "mode": "burst",
+                "age": 1650.699999999156,
+                "eatenFishCount": 0,
+                "visualScale": 1,
+                "exhale": {
+                    "requested": false,
+                    "stage": "idle",
+                    "t": 0,
+                    "emitTimer": 0,
+                    "emitCount": 0,
+                    "emitTotal": 0
+                },
+                "bubbleTimer": 0.07891379963392303,
+                "bubbleBurstRemaining": 1,
+                "mouthOpen": 0.22,
+                "mouthHold": 0,
+                "mouthEatenSize": 0,
+                "swimPhase": 15339.454844587908,
+                "burstKick": 0,
+                "wasBurstThrusting": true,
+                "eyeFear": 0.9999998978854588,
+                "isPlayer": false,
+                "ownerKind": "npc",
+                "clientId": null,
+                "temporaryConnectionCode": null,
+                "userName": "",
+                "userColor": "#59bcd6",
+                "userTier": "free",
+                "playerVulnerabilityMode": "player_cannot_be_eaten",
+                "npcRole": "prey",
+                "formerUserColor": null,
+                "fryAge": null,
+                "nominalStartSize": 0.30694918106513397,
+                "hue": 80.58307818363318,
+                "prevAccel": {
+                    "x": 1.072040081983963,
+                    "y": -0.0354288764951827
+                },
+                "heading": {
+                    "x": -0.8880351889715854,
+                    "y": -0.45977549211348867
+                },
+                "spawnGrace": 0
+            },
+            {
+                "id": 27,
+                "pos": {
+                    "x": 112.3346224034085,
+                    "y": 1095.3403401875894
+                },
+                "vel": {
+                    "x": 102.8193384480601,
+                    "y": -12.35622499044808
+                },
+                "size": 0.2,
+                "radius": 7.155417527999327,
+                "facing": 1,
+                "mode": "cruise",
+                "age": 1650.699999999156,
+                "eatenFishCount": 2,
+                "visualScale": 1,
+                "exhale": {
+                    "requested": false,
+                    "stage": "idle",
+                    "t": 0,
+                    "emitTimer": 0,
+                    "emitCount": 0,
+                    "emitTotal": 0
+                },
+                "bubbleTimer": 1.0782617477694738,
+                "bubbleBurstRemaining": 0,
+                "mouthOpen": 0,
+                "mouthHold": 0,
+                "mouthEatenSize": 0,
+                "swimPhase": 15521.017279553815,
+                "burstKick": 0,
+                "wasBurstThrusting": false,
+                "eyeFear": 1.2881825667191648e-185,
+                "isPlayer": false,
+                "ownerKind": "npc",
+                "clientId": null,
+                "temporaryConnectionCode": null,
+                "userName": "",
+                "userColor": "#59bcd6",
+                "userTier": "free",
+                "playerVulnerabilityMode": "player_cannot_be_eaten",
+                "npcRole": "prey",
+                "formerUserColor": null,
+                "fryAge": null,
+                "nominalStartSize": 0.8797000600187221,
+                "hue": 78.5425730328956,
+                "prevAccel": {
+                    "x": 239.4389278722593,
+                    "y": -16.401213960649564
+                },
+                "heading": {
+                    "x": 0.9976621994677471,
+                    "y": -0.06833839150270651
+                },
+                "spawnGrace": 0
+            },
+            {
+                "id": 28,
+                "pos": {
+                    "x": 1829.2936052752084,
+                    "y": 1367.431361785183
+                },
+                "vel": {
+                    "x": -116.81104840964976,
+                    "y": 41.49065189817502
+                },
+                "size": 0.2,
+                "radius": 7.155417527999327,
+                "facing": -1,
+                "mode": "cruise",
+                "age": 1650.699999999156,
+                "eatenFishCount": 1,
+                "visualScale": 1,
+                "exhale": {
+                    "requested": false,
+                    "stage": "idle",
+                    "t": 0,
+                    "emitTimer": 0,
+                    "emitCount": 0,
+                    "emitTotal": 0
+                },
+                "bubbleTimer": 0.1504009508548112,
+                "bubbleBurstRemaining": 0,
+                "mouthOpen": 0,
+                "mouthHold": 0,
+                "mouthEatenSize": 0,
+                "swimPhase": 15367.122961503384,
+                "burstKick": 0,
+                "wasBurstThrusting": false,
+                "eyeFear": 3.58074e-319,
+                "isPlayer": false,
+                "ownerKind": "npc",
+                "clientId": null,
+                "temporaryConnectionCode": null,
+                "userName": "",
+                "userColor": "#59bcd6",
+                "userTier": "free",
+                "playerVulnerabilityMode": "player_cannot_be_eaten",
+                "npcRole": "prey",
+                "formerUserColor": null,
+                "fryAge": null,
+                "nominalStartSize": 1.0941244382239665,
+                "hue": 84.84070905010546,
+                "prevAccel": {
+                    "x": -225.90315541409512,
+                    "y": -81.04174463790365
+                },
+                "heading": {
+                    "x": -0.9412631475587296,
+                    "y": -0.3376739359912652
+                },
+                "spawnGrace": 0
+            },
+            {
+                "id": 30,
+                "pos": {
+                    "x": 1207.9222461314616,
+                    "y": 1295.8276445401316
+                },
+                "vel": {
+                    "x": -67.00150734498162,
+                    "y": -109.78501414200053
+                },
+                "size": 0.2,
+                "radius": 7.155417527999327,
+                "facing": -1,
+                "mode": "cruise",
+                "age": 1650.699999999156,
+                "eatenFishCount": 0,
+                "visualScale": 1,
+                "exhale": {
+                    "requested": false,
+                    "stage": "idle",
+                    "t": 0,
+                    "emitTimer": 0,
+                    "emitCount": 0,
+                    "emitTotal": 0
+                },
+                "bubbleTimer": 0.9127610709055994,
+                "bubbleBurstRemaining": 0,
+                "mouthOpen": 0,
+                "mouthHold": 0,
+                "mouthEatenSize": 0,
+                "swimPhase": 15437.379005283503,
+                "burstKick": 0,
+                "wasBurstThrusting": false,
+                "eyeFear": 7.267698523334344e-54,
+                "isPlayer": false,
+                "ownerKind": "npc",
+                "clientId": null,
+                "temporaryConnectionCode": null,
+                "userName": "",
+                "userColor": "#59bcd6",
+                "userTier": "free",
+                "playerVulnerabilityMode": "player_cannot_be_eaten",
+                "npcRole": "prey",
+                "formerUserColor": null,
+                "fryAge": null,
+                "nominalStartSize": 0.3089251106960522,
+                "hue": 33.58677221060332,
+                "prevAccel": {
+                    "x": -165.04573569551985,
+                    "y": -174.24093987557745
+                },
+                "heading": {
+                    "x": -0.6876905653979993,
+                    "y": -0.7260039161482394
+                },
+                "spawnGrace": 0
+            },
+            {
+                "id": 32,
+                "pos": {
+                    "x": 982.3733912897196,
+                    "y": 1305.83397207493
+                },
+                "vel": {
+                    "x": 115.30034978423213,
+                    "y": -82.88423803716138
+                },
+                "size": 0.2,
+                "radius": 7.155417527999327,
+                "facing": 1,
+                "mode": "cruise",
+                "age": 1650.699999999156,
+                "eatenFishCount": 0,
+                "visualScale": 1,
+                "exhale": {
+                    "requested": false,
+                    "stage": "idle",
+                    "t": 0,
+                    "emitTimer": 0,
+                    "emitCount": 0,
+                    "emitTotal": 0
+                },
+                "bubbleTimer": 1.2689858389240367,
+                "bubbleBurstRemaining": 0,
+                "mouthOpen": 0,
+                "mouthHold": 0,
+                "mouthEatenSize": 0,
+                "swimPhase": 15498.36836050387,
+                "burstKick": 0,
+                "wasBurstThrusting": false,
+                "eyeFear": 2.2007262080633764e-127,
+                "isPlayer": false,
+                "ownerKind": "npc",
+                "clientId": null,
+                "temporaryConnectionCode": null,
+                "userName": "",
+                "userColor": "#59bcd6",
+                "userTier": "free",
+                "playerVulnerabilityMode": "player_cannot_be_eaten",
+                "npcRole": "prey",
+                "formerUserColor": null,
+                "fryAge": null,
+                "nominalStartSize": 0.33730891774414234,
+                "hue": 45.02962854766386,
+                "prevAccel": {
+                    "x": 194.87581821159856,
+                    "y": -140.0836017396754
+                },
+                "heading": {
+                    "x": 0.8119825758816607,
+                    "y": -0.5836816739153142
+                },
+                "spawnGrace": 0
+            },
+            {
+                "id": 33,
+                "pos": {
+                    "x": 638.318866899378,
+                    "y": 1447.542119445794
+                },
+                "vel": {
+                    "x": 136.463127292363,
+                    "y": -23.38802348337819
+                },
+                "size": 0.2,
+                "radius": 7.155417527999327,
+                "facing": 1,
+                "mode": "cruise",
+                "age": 1639.8666666658326,
+                "eatenFishCount": 0,
+                "visualScale": 1,
+                "exhale": {
+                    "requested": false,
+                    "stage": "idle",
+                    "t": 0,
+                    "emitTimer": 0,
+                    "emitCount": 0,
+                    "emitTotal": 0
+                },
+                "bubbleTimer": 1.3023145034441779,
+                "bubbleBurstRemaining": 0,
+                "mouthOpen": 0,
+                "mouthHold": 0,
+                "mouthEatenSize": 0,
+                "swimPhase": 15252.322440791006,
+                "burstKick": 0,
+                "wasBurstThrusting": false,
+                "eyeFear": 2.397984687510081e-266,
+                "isPlayer": false,
+                "ownerKind": "npc",
+                "clientId": null,
+                "temporaryConnectionCode": null,
+                "userName": "",
+                "userColor": "#59bcd6",
+                "userTier": "free",
+                "playerVulnerabilityMode": "player_cannot_be_eaten",
+                "npcRole": "prey",
+                "formerUserColor": null,
+                "fryAge": null,
+                "nominalStartSize": 0.5949649056785601,
+                "hue": 30.90732862656815,
+                "prevAccel": {
+                    "x": 236.37957598013202,
+                    "y": -41.529460139195194
+                },
+                "heading": {
+                    "x": 0.9849148999172167,
+                    "y": -0.17303941724664665
+                },
+                "spawnGrace": 0
+            },
+            {
+                "id": 34,
+                "pos": {
+                    "x": 1467.6028117850146,
+                    "y": 604.6211850435911
+                },
+                "vel": {
+                    "x": -73.8019826953182,
+                    "y": -52.19532550864669
+                },
+                "size": 0.2,
+                "radius": 7.155417527999327,
+                "facing": -1,
+                "mode": "cruise",
+                "age": 1635.633333332503,
+                "eatenFishCount": 0,
+                "visualScale": 1,
+                "exhale": {
+                    "requested": false,
+                    "stage": "idle",
+                    "t": 0,
+                    "emitTimer": 0,
+                    "emitCount": 0,
+                    "emitTotal": 0
+                },
+                "bubbleTimer": 0.9785630896099883,
+                "bubbleBurstRemaining": 0,
+                "mouthOpen": 0,
+                "mouthHold": 0,
+                "mouthEatenSize": 0,
+                "swimPhase": 15218.018854421514,
+                "burstKick": 0,
+                "wasBurstThrusting": false,
+                "eyeFear": 2.6466188169969746e-64,
+                "isPlayer": false,
+                "ownerKind": "npc",
+                "clientId": null,
+                "temporaryConnectionCode": null,
+                "userName": "",
+                "userColor": "#59bcd6",
+                "userTier": "free",
+                "playerVulnerabilityMode": "player_cannot_be_eaten",
+                "npcRole": "prey",
+                "formerUserColor": null,
+                "fryAge": null,
+                "nominalStartSize": 0.3094814424892164,
+                "hue": 46.2427276906504,
+                "prevAccel": {
+                    "x": -195.03866140650666,
+                    "y": -139.8567858802641
+                },
+                "heading": {
+                    "x": -0.8126610891937778,
+                    "y": -0.5827366078344338
+                },
+                "spawnGrace": 0
+            },
+            {
+                "id": 35,
+                "pos": {
+                    "x": 700.488314906424,
+                    "y": 23.574543216881693
+                },
+                "vel": {
+                    "x": -97.49755012106581,
+                    "y": 75.31798524263904
+                },
+                "size": 0.2,
+                "radius": 7.155417527999327,
+                "facing": -1,
+                "mode": "cruise",
+                "age": 1627.6333333325103,
+                "eatenFishCount": 0,
+                "visualScale": 1,
+                "exhale": {
+                    "requested": false,
+                    "stage": "idle",
+                    "t": 0,
+                    "emitTimer": 0,
+                    "emitCount": 0,
+                    "emitTotal": 0
+                },
+                "bubbleTimer": 1.211044464970776,
+                "bubbleBurstRemaining": 0,
+                "mouthOpen": 0,
+                "mouthHold": 0,
+                "mouthEatenSize": 0,
+                "swimPhase": 15193.433064964163,
+                "burstKick": 0,
+                "wasBurstThrusting": false,
+                "eyeFear": 8.462128504811617e-12,
+                "isPlayer": false,
+                "ownerKind": "npc",
+                "clientId": null,
+                "temporaryConnectionCode": null,
+                "userName": "",
+                "userColor": "#59bcd6",
+                "userTier": "free",
+                "playerVulnerabilityMode": "player_cannot_be_eaten",
+                "npcRole": "prey",
+                "formerUserColor": null,
+                "fryAge": null,
+                "nominalStartSize": 0.3242477556208811,
+                "hue": 55.63444039702467,
+                "prevAccel": {
+                    "x": -208.3856166475544,
+                    "y": 119.06063486483895
+                },
+                "heading": {
+                    "x": -0.8682734026981433,
+                    "y": 0.4960859786034956
+                },
+                "spawnGrace": 0
+            },
+            {
+                "id": 36,
+                "pos": {
+                    "x": 207.0347365148773,
+                    "y": 7.7165975158795845
+                },
+                "vel": {
+                    "x": -116.78347061825569,
+                    "y": 13.8556281025491
+                },
+                "size": 0.2,
+                "radius": 7.155417527999327,
+                "facing": -1,
+                "mode": "cruise",
+                "age": 1610.1999999991929,
+                "eatenFishCount": 0,
+                "visualScale": 1,
+                "exhale": {
+                    "requested": false,
+                    "stage": "idle",
+                    "t": 0,
+                    "emitTimer": 0,
+                    "emitCount": 0,
+                    "emitTotal": 0
+                },
+                "bubbleTimer": 1.078625985463024,
+                "bubbleBurstRemaining": 0,
+                "mouthOpen": 0,
+                "mouthHold": 0,
+                "mouthEatenSize": 0,
+                "swimPhase": 14553.355779032348,
+                "burstKick": 0,
+                "wasBurstThrusting": false,
+                "eyeFear": 0,
+                "isPlayer": true,
+                "ownerKind": "npc",
+                "clientId": null,
+                "temporaryConnectionCode": "mr2nenn3-q6loxs1q",
+                "userName": "",
+                "userColor": "#1a9792",
+                "userTier": null,
+                "playerVulnerabilityMode": "player_cannot_be_eaten",
+                "npcRole": "abandoned-user-fish",
+                "formerUserColor": "#1a9792",
+                "fryAge": null,
+                "nominalStartSize": null,
+                "hue": 52,
+                "prevAccel": {
+                    "x": -227.5641066979082,
+                    "y": 76.25337594351521
+                },
+                "heading": {
+                    "x": -0.9481837779079507,
+                    "y": 0.3177223997646467
+                }
+            },
+            {
+                "id": 37,
+                "pos": {
+                    "x": 793.5656989441641,
+                    "y": 88.50177828250025
+                },
+                "vel": {
+                    "x": -2.197188298483755e-15,
+                    "y": 1.7376976134595525e-15
+                },
+                "size": 0.9652084570751241,
+                "radius": 15.719203701562996,
+                "facing": -1,
+                "mode": "cruise",
+                "age": 321.16666666670653,
+                "eatenFishCount": 0,
+                "visualScale": 1,
+                "exhale": {
+                    "requested": false,
+                    "stage": "idle",
+                    "t": 0,
+                    "emitTimer": 0,
+                    "emitCount": 0,
+                    "emitTotal": 0
+                },
+                "bubbleTimer": 0.08880633922706449,
+                "bubbleBurstRemaining": 0,
+                "mouthOpen": 0,
+                "mouthHold": 0,
+                "mouthEatenSize": 0,
+                "swimPhase": 3559.3099941845658,
+                "burstKick": 0,
+                "wasBurstThrusting": false,
+                "eyeFear": 0,
+                "isPlayer": true,
+                "ownerKind": "user",
+                "clientId": "c7",
+                "temporaryConnectionCode": "mr2n5irf-xvlzfbex",
+                "userName": "fish-756",
+                "userColor": "#b084ef",
+                "userTier": "free",
+                "playerVulnerabilityMode": "player_cannot_be_eaten",
+                "npcRole": "prey",
+                "formerUserColor": null,
+                "fryAge": null,
+                "nominalStartSize": null,
+                "hue": 200,
+                "prevAccel": {
+                    "x": 0,
+                    "y": 0
+                },
+                "heading": {
+                    "x": 0,
+                    "y": 0
+                }
+            }
+        ],
+        "bubbles": [
+            {
+                "pos": {
+                    "x": 668.4587313394832,
+                    "y": 666.5581896838063
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": -2.060907194191869,
+                    "y": -15.43873407866953
+                },
+                "life": 0.033333333333331876,
+                "alpha": 0.02083333333333242,
+                "phase": 0.8647337889942255
+            },
+            {
+                "pos": {
+                    "x": 1028.7017210574095,
+                    "y": 58.06431823781885
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": -2.9730267661105003,
+                    "y": -15.516279369992914
+                },
+                "life": 0.033333333333331876,
+                "alpha": 0.02083333333333242,
+                "phase": 0.4707496761973772
+            },
+            {
+                "pos": {
+                    "x": 148.23273515417344,
+                    "y": 222.51094139250432
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": -3.6626343654245677,
+                    "y": -19.52879790294263
+                },
+                "life": 0.06666666666666521,
+                "alpha": 0.041666666666665755,
+                "phase": 0.8946525275667525
+            },
+            {
+                "pos": {
+                    "x": 1813.1118111701762,
+                    "y": 1455.2516047314546
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": -2.3757538301542684,
+                    "y": -16.939643099770084
+                },
+                "life": 0.06666666666666521,
+                "alpha": 0.041666666666665755,
+                "phase": 0.32398322004350855
+            },
+            {
+                "pos": {
+                    "x": 2264.1342738027543,
+                    "y": 1325.4547510604143
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": -2.15280185462165,
+                    "y": -18.49190551136886
+                },
+                "life": 0.09999999999999853,
+                "alpha": 0.062499999999999084,
+                "phase": 0.22483081553860673
+            },
+            {
+                "pos": {
+                    "x": 1988.5521429611733,
+                    "y": 1221.4308021924573
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": -0.22991870249428104,
+                    "y": -16.90935345184065
+                },
+                "life": 0.09999999999999853,
+                "alpha": 0.062499999999999084,
+                "phase": 0.4669415159539386
+            },
+            {
+                "pos": {
+                    "x": 163.25029603755513,
+                    "y": 218.1793871131181
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 3.519328849963701,
+                    "y": -14.574564523673677
+                },
+                "life": 0.1666666666666652,
+                "alpha": 0.10416666666666574,
+                "phase": 0.7343169321432217
+            },
+            {
+                "pos": {
+                    "x": 1801.764326652697,
+                    "y": 1458.6862703000413
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 1.0008777913692297,
+                    "y": -14.438960084947723
+                },
+                "life": 0.1666666666666652,
+                "alpha": 0.10416666666666574,
+                "phase": 0.1797882986200312
+            },
+            {
+                "pos": {
+                    "x": 1970.8156779347664,
+                    "y": 1236.9399780488409
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": -2.879466136303166,
+                    "y": -15.182993769454242
+                },
+                "life": 0.23333333333333184,
+                "alpha": 0.1458333333333324,
+                "phase": 0.05471542014193176
+            },
+            {
+                "pos": {
+                    "x": 263.5441634843529,
+                    "y": 14.200520140038748
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 2.9770266214144154,
+                    "y": -20.61561093644288
+                },
+                "life": 0.26666666666666516,
+                "alpha": 0.1666666666666657,
+                "phase": 0.9907876244257243
+            },
+            {
+                "pos": {
+                    "x": 1781.748422404683,
+                    "y": 1456.0957442164074
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": -1.617310641782761,
+                    "y": -16.08206835707318
+                },
+                "life": 0.26666666666666516,
+                "alpha": 0.1666666666666657,
+                "phase": 0.980188673882228
+            },
+            {
+                "pos": {
+                    "x": 310.7537378696908,
+                    "y": 25.396322519471994
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": -2.2723899081815997,
+                    "y": -17.315315105945295
+                },
+                "life": 0.26666666666666516,
+                "alpha": 0.1666666666666657,
+                "phase": 0.37261617907758215
+            },
+            {
+                "pos": {
+                    "x": 169.13703743481287,
+                    "y": 197.4659295522959
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 3.8925604430809093,
+                    "y": -18.266714497627586
+                },
+                "life": 0.2999999999999985,
+                "alpha": 0.18749999999999906,
+                "phase": 0.08916942922155002
+            },
+            {
+                "pos": {
+                    "x": 911.1014398307632,
+                    "y": 1475.4321734912521
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 3.018137002243492,
+                    "y": -20.915443943656612
+                },
+                "life": 0.2999999999999985,
+                "alpha": 0.18749999999999906,
+                "phase": 0.44546478484046415
+            },
+            {
+                "pos": {
+                    "x": 257.4465168084375,
+                    "y": 31.98476560589618
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": -1.619893002919862,
+                    "y": -18.61658648116678
+                },
+                "life": 0.36666666666666514,
+                "alpha": 0.2291666666666657,
+                "phase": 0.47935946446290967
+            },
+            {
+                "pos": {
+                    "x": 311.97299976924205,
+                    "y": 19.576326403663465
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 1.6412618976818303,
+                    "y": -19.899792276194024
+                },
+                "life": 0.36666666666666514,
+                "alpha": 0.2291666666666657,
+                "phase": 0.9980971256919974
+            },
+            {
+                "pos": {
+                    "x": 915.4011022735011,
+                    "y": 1473.3876767149561
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": -0.633870466851084,
+                    "y": -15.8618471961768
+                },
+                "life": 0.39999999999999847,
+                "alpha": 0.24999999999999903,
+                "phase": 0.15105408378813412
+            },
+            {
+                "pos": {
+                    "x": 1729.8155359856664,
+                    "y": 1261.1877838895819
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": -3.512915425024249,
+                    "y": -14.668500975444216
+                },
+                "life": 0.39999999999999847,
+                "alpha": 0.24999999999999903,
+                "phase": 0.4890300609055701
+            },
+            {
+                "pos": {
+                    "x": 1757.6024046850807,
+                    "y": 1453.2006519925283
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": -3.6688059705244846,
+                    "y": -18.23308495816061
+                },
+                "life": 0.39999999999999847,
+                "alpha": 0.24999999999999903,
+                "phase": 0.9841032592790016
+            },
+            {
+                "pos": {
+                    "x": 260.0919185638427,
+                    "y": 51.97458029442817
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 0.6638023534128301,
+                    "y": -14.444821326772015
+                },
+                "life": 0.4666666666666651,
+                "alpha": 0.2916666666666657,
+                "phase": 0.44816135152517733
+            },
+            {
+                "pos": {
+                    "x": 309.3850222055346,
+                    "y": 18.764679206988887
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 3.4215554586148125,
+                    "y": -18.08376590532788
+                },
+                "life": 0.4666666666666651,
+                "alpha": 0.2916666666666657,
+                "phase": 0.8821824259677525
+            },
+            {
+                "pos": {
+                    "x": 927.9789845564316,
+                    "y": 1460.6865313705584
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 2.213955845758676,
+                    "y": -19.85608191177957
+                },
+                "life": 0.49999999999999845,
+                "alpha": 0.312499999999999,
+                "phase": 0.8115907650838746
+            },
+            {
+                "pos": {
+                    "x": 1745.637869605341,
+                    "y": 1456.1281119087423
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 0.05254210330740161,
+                    "y": -15.553300882681857
+                },
+                "life": 0.49999999999999845,
+                "alpha": 0.312499999999999,
+                "phase": 0.3382037869799084
+            },
+            {
+                "pos": {
+                    "x": 1734.1567706758124,
+                    "y": 1239.7175625242724
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": -0.7756632709002114,
+                    "y": -19.108054774914287
+                },
+                "life": 0.5333333333333318,
+                "alpha": 0.3333333333333323,
+                "phase": 0.9966066178930826
+            },
+            {
+                "pos": {
+                    "x": 255.68218475301998,
+                    "y": 69.00026481214832
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": -3.550968133584263,
+                    "y": -17.39735613666041
+                },
+                "life": 0.5999999999999984,
+                "alpha": 0.374999999999999,
+                "phase": 0.5958534461770566
+            },
+            {
+                "pos": {
+                    "x": 298.4583848235578,
+                    "y": 12.812610341037582
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 0.8238793863399074,
+                    "y": -19.847851720260508
+                },
+                "life": 0.5999999999999984,
+                "alpha": 0.374999999999999,
+                "phase": 0.15282279110760932
+            },
+            {
+                "pos": {
+                    "x": 1736.8232005941552,
+                    "y": 1226.227878992602
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 3.302313296607438,
+                    "y": -20.51397920527237
+                },
+                "life": 0.6333333333333317,
+                "alpha": 0.3958333333333323,
+                "phase": 0.4763768060321073
+            },
+            {
+                "pos": {
+                    "x": 795.0308600428026,
+                    "y": 70.49016365551772
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": -0.9235028861348935,
+                    "y": -19.445767046959247
+                },
+                "life": 0.6333333333333317,
+                "alpha": 0.3958333333333323,
+                "phase": 0.41971877032027616
+            },
+            {
+                "pos": {
+                    "x": 2063.9545345266633,
+                    "y": 705.5788291729076
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": -2.762483963044933,
+                    "y": -19.96022683572941
+                },
+                "life": 0.6666666666666651,
+                "alpha": 0.41666666666666563,
+                "phase": 0.18727240611534102
+            },
+            {
+                "pos": {
+                    "x": 1242.3783372424832,
+                    "y": 1378.0769252333296
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 1.758521250829011,
+                    "y": -20.761144646349607
+                },
+                "life": 0.6666666666666651,
+                "alpha": 0.41666666666666563,
+                "phase": 0.8405403556622068
+            },
+            {
+                "pos": {
+                    "x": 257.9632923332439,
+                    "y": 81.14441717765989
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": -1.3453209091180431,
+                    "y": -21.009112507682506
+                },
+                "life": 0.6999999999999984,
+                "alpha": 0.437499999999999,
+                "phase": 0.7842430429496126
+            },
+            {
+                "pos": {
+                    "x": 792.7529530756299,
+                    "y": 75.16313781528194
+                },
+                "radius": 1.2286113090986486,
+                "vel": {
+                    "x": -3.658415104348922,
+                    "y": -16.297616137265173
+                },
+                "life": 0.7333333333333317,
+                "alpha": 0.4583333333333323,
+                "phase": 0.601380564452385
+            },
+            {
+                "pos": {
+                    "x": 2073.6034738374296,
+                    "y": 700.3848348658445
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 1.7466925057750906,
+                    "y": -14.720842081356727
+                },
+                "life": 0.766666666666665,
+                "alpha": 0.47916666666666563,
+                "phase": 0.7316356933454518
+            },
+            {
+                "pos": {
+                    "x": 1240.1719887881573,
+                    "y": 1367.780140586104
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": -1.434155667403627,
+                    "y": -19.129113655452876
+                },
+                "life": 0.7999999999999984,
+                "alpha": 0.49999999999999895,
+                "phase": 0.5188363621240477
+            },
+            {
+                "pos": {
+                    "x": 1752.3057794752162,
+                    "y": 267.4121210633874
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 0.2512545783933362,
+                    "y": -16.30736010402412
+                },
+                "life": 0.8333333333333317,
+                "alpha": 0.5208333333333323,
+                "phase": 0.901858112416857
+            },
+            {
+                "pos": {
+                    "x": 797.585686068323,
+                    "y": 73.8503809627839
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 2.266508957624368,
+                    "y": -21.05094205199262
+                },
+                "life": 0.866666666666665,
+                "alpha": 0.5416666666666656,
+                "phase": 0.5380786272052133
+            },
+            {
+                "pos": {
+                    "x": 2235.320578034465,
+                    "y": 451.44134900211475
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 0.045235936389407705,
+                    "y": -17.499549185451325
+                },
+                "life": 0.8999999999999984,
+                "alpha": 0.5624999999999989,
+                "phase": 0.6991402347284087
+            },
+            {
+                "pos": {
+                    "x": 1240.5992030734535,
+                    "y": 1359.274042665802
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 1.8980124453001128,
+                    "y": -18.11245917681825
+                },
+                "life": 0.8999999999999984,
+                "alpha": 0.5624999999999989,
+                "phase": 0.2351762072498359
+            },
+            {
+                "pos": {
+                    "x": 1755.3432179323117,
+                    "y": 276.7473718119451
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 3.8735151015207556,
+                    "y": -21.596656294251893
+                },
+                "life": 0.9333333333333317,
+                "alpha": 0.5833333333333323,
+                "phase": 0.043490059296212635
+            },
+            {
+                "pos": {
+                    "x": 747.5890524814814,
+                    "y": 1483.305656366478
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": -3.5953381340188804,
+                    "y": -21.33149018248944
+                },
+                "life": 0.966666666666665,
+                "alpha": 0.6041666666666656,
+                "phase": 0.18764397992363058
+            },
+            {
+                "pos": {
+                    "x": 2245.085364962507,
+                    "y": 452.5563321377623
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": -3.2944765604372774,
+                    "y": -17.855459258251816
+                },
+                "life": 0.9999999999999983,
+                "alpha": 0.6249999999999989,
+                "phase": 0.8092716501044293
+            },
+            {
+                "pos": {
+                    "x": 1237.2454959161023,
+                    "y": 1348.3875615228242
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 0.9573119562877128,
+                    "y": -20.249633111068572
+                },
+                "life": 0.9999999999999983,
+                "alpha": 0.6249999999999989,
+                "phase": 0.7009656290405735
+            },
+            {
+                "pos": {
+                    "x": 1753.9355845622758,
+                    "y": 298.86252493511995
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 0.6550908819439867,
+                    "y": -14.893495053223722
+                },
+                "life": 1.066666666666665,
+                "alpha": 0.6666666666666656,
+                "phase": 0.7773268537198545
+            },
+            {
+                "pos": {
+                    "x": 67.78735499988113,
+                    "y": 1093.1608791153278
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": -3.663611680375225,
+                    "y": -17.60719379353244
+                },
+                "life": 1.066666666666665,
+                "alpha": 0.6666666666666656,
+                "phase": 0.6546127644244961
+            },
+            {
+                "pos": {
+                    "x": 742.3717855419028,
+                    "y": 1496.2452235315902
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": -2.5714736458022136,
+                    "y": -16.476355612720443
+                },
+                "life": 1.066666666666665,
+                "alpha": 0.6666666666666656,
+                "phase": 0.395583391716695
+            },
+            {
+                "pos": {
+                    "x": 2258.1937633952375,
+                    "y": 458.55623351846043
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": -3.9076724409016883,
+                    "y": -16.15773836352098
+                },
+                "life": 1.133333333333332,
+                "alpha": 0.7083333333333325,
+                "phase": 0.044961597322184965
+            },
+            {
+                "pos": {
+                    "x": 580.4598431342621,
+                    "y": 1448.61603507511
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 3.71201333034582,
+                    "y": -19.722615718127294
+                },
+                "life": 1.133333333333332,
+                "alpha": 0.7083333333333325,
+                "phase": 0.3885573337596081
+            },
+            {
+                "pos": {
+                    "x": 1754.4175893945055,
+                    "y": 309.8175749148588
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 0.5453574898051547,
+                    "y": -21.143924603447125
+                },
+                "life": 1.1666666666666654,
+                "alpha": 0.7291666666666659,
+                "phase": 0.029738124998341164
+            },
+            {
+                "pos": {
+                    "x": 76.2329801325805,
+                    "y": 1091.9683680472006
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 0.5872045364463396,
+                    "y": -20.93368552404668
+                },
+                "life": 1.1666666666666654,
+                "alpha": 0.7291666666666659,
+                "phase": 0.8269617153392924
+            },
+            {
+                "pos": {
+                    "x": 935.5862567779093,
+                    "y": 1330.029026895505
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 0.937248688302807,
+                    "y": -21.49991071411752
+                },
+                "life": 1.1666666666666654,
+                "alpha": 0.7291666666666659,
+                "phase": 0.5502148779775584
+            },
+            {
+                "pos": {
+                    "x": 736.3368863030296,
+                    "y": 1504.6558255282096
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": -0.7902746541623982,
+                    "y": -19.421571221707765
+                },
+                "life": 1.1666666666666654,
+                "alpha": 0.7291666666666659,
+                "phase": 0.5895860506317541
+            },
+            {
+                "pos": {
+                    "x": 2267.5858796954744,
+                    "y": 464.97090459819896
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": -1.185392223160484,
+                    "y": -14.626488806533276
+                },
+                "life": 1.2333333333333323,
+                "alpha": 0.7708333333333326,
+                "phase": 0.07536199751130068
+            },
+            {
+                "pos": {
+                    "x": 591.8743274383052,
+                    "y": 1449.4488266888918
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": -0.5946862704052487,
+                    "y": -16.71937667413011
+                },
+                "life": 1.2333333333333323,
+                "alpha": 0.7708333333333326,
+                "phase": 0.09392620926652906
+            },
+            {
+                "pos": {
+                    "x": 1487.8147337236699,
+                    "y": 613.8199116715887
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": -3.7174151601354852,
+                    "y": -15.127264431345997
+                },
+                "life": 1.2333333333333323,
+                "alpha": 0.7708333333333326,
+                "phase": 0.357901489038691
+            },
+            {
+                "pos": {
+                    "x": 1755.3649003755818,
+                    "y": 325.30258330578647
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 1.816921058825261,
+                    "y": -18.47244395785261
+                },
+                "life": 1.2666666666666657,
+                "alpha": 0.7916666666666661,
+                "phase": 0.12439205739111026
+            },
+            {
+                "pos": {
+                    "x": 947.2753268971736,
+                    "y": 1324.9934665498724
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 1.6957868467787156,
+                    "y": -18.190977399893146
+                },
+                "life": 1.2666666666666657,
+                "alpha": 0.7916666666666661,
+                "phase": 0.3513304486284732
+            },
+            {
+                "pos": {
+                    "x": 2043.010231234408,
+                    "y": 55.91537413125185
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 0.33672630017698957,
+                    "y": -17.848790291197417
+                },
+                "life": 1.2999999999999992,
+                "alpha": 0.8124999999999994,
+                "phase": 0.6636310041541366
+            },
+            {
+                "pos": {
+                    "x": 1590.3876224948951,
+                    "y": 1334.6126291052494
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 3.0708684572427893,
+                    "y": -14.962444604754916
+                },
+                "life": 1.2999999999999992,
+                "alpha": 0.8124999999999994,
+                "phase": 0.7946530854495226
+            },
+            {
+                "pos": {
+                    "x": 86.14751217554095,
+                    "y": 1093.3420390552367
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 0.049383613962408646,
+                    "y": -19.35797897887933
+                },
+                "life": 1.2999999999999992,
+                "alpha": 0.8124999999999994,
+                "phase": 0.2154270443025892
+            },
+            {
+                "pos": {
+                    "x": 2274.965469830224,
+                    "y": 472.03342687639145
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 1.281028703251291,
+                    "y": -14.904109397924513
+                },
+                "life": 1.3333333333333326,
+                "alpha": 0.8333333333333328,
+                "phase": 0.7972239800804567
+            },
+            {
+                "pos": {
+                    "x": 1484.7792223038005,
+                    "y": 610.772543028694
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 2.572655492306958,
+                    "y": -18.977523959628382
+                },
+                "life": 1.3333333333333326,
+                "alpha": 0.8333333333333328,
+                "phase": 0.9007384283547795
+            },
+            {
+                "pos": {
+                    "x": 609.7036967611823,
+                    "y": 1449.0610234676676
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": -1.5100869948412576,
+                    "y": -14.916509127095253
+                },
+                "life": 1.366666666666666,
+                "alpha": 0.8541666666666662,
+                "phase": 0.9434413520890446
+            },
+            {
+                "pos": {
+                    "x": 2055.236077444577,
+                    "y": 62.9863294137529
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 3.3619901725707786,
+                    "y": -16.961188834341353
+                },
+                "life": 1.3999999999999995,
+                "alpha": 0.8749999999999997,
+                "phase": 0.9479250511395547
+            },
+            {
+                "pos": {
+                    "x": 95.33916176527939,
+                    "y": 1093.8620150944737
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 2.212915260981312,
+                    "y": -19.740793912905378
+                },
+                "life": 1.3999999999999995,
+                "alpha": 0.8749999999999997,
+                "phase": 0.9713513271988374
+            },
+            {
+                "pos": {
+                    "x": 1603.1399541016804,
+                    "y": 1348.3325771995396
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": -1.152187043665995,
+                    "y": -17.869522978228222
+                },
+                "life": 1.433333333333333,
+                "alpha": 0.895833333333333,
+                "phase": 0.04000129283031362
+            },
+            {
+                "pos": {
+                    "x": 1033.805973984231,
+                    "y": 77.39741360338009
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": -1.2362378941480587,
+                    "y": -21.446557352671732
+                },
+                "life": 1.433333333333333,
+                "alpha": 0.895833333333333,
+                "phase": 0.2955263747647131
+            },
+            {
+                "pos": {
+                    "x": 223.97459902517704,
+                    "y": 3.9462194416573144
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 3.0258514335204634,
+                    "y": -15.878302874020523
+                },
+                "life": 1.433333333333333,
+                "alpha": 0.895833333333333,
+                "phase": 0.06268653474446195
+            },
+            {
+                "pos": {
+                    "x": 1024.0888178874807,
+                    "y": 1403.6888657994007
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 1.9824622793779705,
+                    "y": -15.466776838185755
+                },
+                "life": 1.4666666666666663,
+                "alpha": 0.9166666666666664,
+                "phase": 0.6082760101015324
+            },
+            {
+                "pos": {
+                    "x": 623.8138377802542,
+                    "y": 1447.4477828265328
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 1.4633362853020664,
+                    "y": -20.880874512961913
+                },
+                "life": 1.4666666666666663,
+                "alpha": 0.9166666666666664,
+                "phase": 0.1670712691137629
+            },
+            {
+                "pos": {
+                    "x": 1475.9758907142232,
+                    "y": 607.7142689545693
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 1.1873391925751022,
+                    "y": -17.316419195312406
+                },
+                "life": 1.4666666666666663,
+                "alpha": 0.9166666666666664,
+                "phase": 0.27012616741165874
+            },
+            {
+                "pos": {
+                    "x": 1581.3279888205461,
+                    "y": 1452.9942063120748
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": -0.03098891056083186,
+                    "y": -18.06425941279828
+                },
+                "life": 1.4999999999999998,
+                "alpha": 0.9374999999999998,
+                "phase": 0.6297568513491923
+            },
+            {
+                "pos": {
+                    "x": 2070.6734579456497,
+                    "y": 72.14028101894223
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 3.101892304168042,
+                    "y": -15.974347134758121
+                },
+                "life": 1.5333333333333332,
+                "alpha": 0.9583333333333333,
+                "phase": 0.00533733791438995
+            },
+            {
+                "pos": {
+                    "x": 1742.4750081280845,
+                    "y": 1117.9151207479724
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": -0.4126513257844726,
+                    "y": -18.77295699420138
+                },
+                "life": 1.5333333333333332,
+                "alpha": 0.9583333333333333,
+                "phase": 0.443700742045656
+            },
+            {
+                "pos": {
+                    "x": 221.54920023694672,
+                    "y": 50.805986544561755
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": -0.7758326647659057,
+                    "y": -14.856005824871652
+                },
+                "life": 1.5666666666666667,
+                "alpha": 0.9791666666666666,
+                "phase": 0.24282256197227137
+            },
+            {
+                "pos": {
+                    "x": 1031.4616453049857,
+                    "y": 1405.3159051842504
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": -2.9541726933087844,
+                    "y": -16.922750288682014
+                },
+                "life": 1.5666666666666667,
+                "alpha": 0.9791666666666666,
+                "phase": 0.6401640005137578
+            },
+            {
+                "pos": {
+                    "x": 785.8999351927858,
+                    "y": 708.2177075824219
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 3.0919192469475822,
+                    "y": -17.443205838859072
+                },
+                "life": 1.5666666666666667,
+                "alpha": 0.9791666666666666,
+                "phase": 0.11899060788803273
+            },
+            {
+                "pos": {
+                    "x": 1034.320563114167,
+                    "y": 80.28869784865643
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 3.0481973678766128,
+                    "y": -19.388848750906202
+                },
+                "life": 1.5666666666666667,
+                "alpha": 0.9791666666666666,
+                "phase": 0.4905733081929431
+            },
+            {
+                "pos": {
+                    "x": 637.3168770346784,
+                    "y": 1447.2949820402782
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": 2.139682935010584,
+                    "y": -18.147248457468457
+                },
+                "life": 1.5666666666666667,
+                "alpha": 0.9791666666666666,
+                "phase": 0.0013354127652690506
+            },
+            {
+                "pos": {
+                    "x": 208.0927356493732,
+                    "y": 7.4979347683367035
+                },
+                "radius": 1.1,
+                "vel": {
+                    "x": -0.4594048411199356,
+                    "y": -17.293008718285417
+                },
+                "life": 1.5666666666666667,
+                "alpha": 0.9791666666666666,
+                "phase": 0.3241700257286021
+            }
+        ],
+        "tick": 51864
+    }
+}

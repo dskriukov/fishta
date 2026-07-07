@@ -3,7 +3,7 @@
 
 provides: fixed-step-game-loop
 
-pattern:
+implementation_contract:
   name: "pure domain step + render"
   shape: |
     state = init()
@@ -12,11 +12,17 @@ pattern:
       state   = step(state, input, dt)   # PURE, no I/O, no canvas
       render(state)                       # read-only over state
 
-requirements:
-  - "step() is deterministic given (state, input, dt)."
-  - "dt is clamped (e.g. <= 1/30 s) to keep integration stable."
-  - "render layer never mutates domain state."
+  instructions:
+    - "Keep input collection outside step(); pass a complete input value into step()."
+    - "Clamp dt before calling step(); use a project constant such as LOOP.maxDt."
+    - "Step functions may mutate the domain state object they receive, but must not read DOM, canvas, sockets, timers, or process globals."
+    - "Render functions receive already prepared render state and must not mutate domain state arrays or entities."
+    - "When interpolation is needed, build a derived render state outside the authoritative state object."
+
+verification:
+  - "A step module can be imported in Node without DOM/canvas globals."
+  - "Render can be called repeatedly with the same state without changing entity count, positions, velocities, sizes, or protocol fields."
 
 rationale_source:
-  - main.air#ia:web-canvas.loop   # continuous time -> fixed step
-  - "workspace.air: domain stays render-agnostic"
+  - @ia:c9d0e1f2
+  - @ia:e5f60718

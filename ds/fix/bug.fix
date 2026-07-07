@@ -1,0 +1,57 @@
+# Bugs
+
+- [x] **[bug:user-color-not-full-body]**\
+  пользовательский цвет рыбы применяется не ко всей рыбе ![alt text](fish-color.png) - декор на теле можно сделать через наложение полупрозрачных черных и белых фрагментов, чтобы фон просвечивал через них - тогда не надо будет подбирать цвета каждый раз
+  Source: user report 2026-07-03; affected DSR/code: `ds/dsr/imp/web-canvas.dsr#join_identity`, `ds/dsr/imp/web-canvas.dsr#fish_body_color_visual`, `render.js#drawFish`.
+
+- [x] **[bug:client-bubbles-ds-mismatch]**\
+  Генерация пузырей на клиенте не соответствует DS-требованиям: декоративные пузыри должны быть клиентским эффектом с устойчивым локальным состоянием генерации для видимых рыб, а не зависеть от серверного состояния или сбрасываться сетевыми снимками.
+  Source: user report 2026-07-03; affected DSR/code: `ds/dsr/imp/web-canvas.dsr#client_prediction_and_render`, `main.js#advanceClientBubbles`, `world.js#emitBubble`.
+
+- [x] **[bug:client-ping-too-frequent]**\
+  Ping-запросы отправляются слишком часто; при неизменном управлении клиент должен отправлять `p:${N}` один раз в секунду.
+  Source: user report 2026-07-03; affected DSR/code: `ds/dsr/imp/web-canvas.dsr#input_latency`, `main.js#sendInputIfChanged`, `client-net.js#createClientNet`.
+
+- [x] **[bug:remote-fish-flicker]**\
+  Периодически на мгновение мелькают рыбы в неожиданных местах.
+  Source: user report 2026-07-03; affected DSR/code: `protocol.js#applyWorldSync`, `main.js#interpolateWorld`, `predation.js#resolveWorldEating`.
+
+- [x] **[bug:keyboard-control-lag-sticky]**\
+  Управление с кнопок работает непонятно, как будто с задержкой или залипанием.
+  Source: user report 2026-07-03; affected DSR/code: `controls.js#keySteer`, `client-net.js#sendInput`, `main.js#buildInputPayload`.
+
+- [x] **[bug:client-renders-stale-fish-positions]**\
+  Клиент некорректно отображает позиции рыб: вместо текущей оценки позиции по последнему серверному `pos + moving angle/speed` он постоянно рисует интерполированное состояние в прошлом, из-за чего NPC-рыбы могут визуально пропадать или отставать от серверной истины.
+  Source: user report 2026-07-04; affected DSR/code: `ds/dsr/imp/web-canvas.dsr#client_prediction_and_render`, `main.js#renderState`, `client-net.js#logAbsolutePositionDrift`, `protocol.js#applyWorldSync`.
+
+- [x] **[bug:toroidal-viewport-projection]**\
+  Рыбы, находящиеся около противоположной стороны toroidal-границы, рисуются в канонических координатах мира и поэтому исчезают из окна просмотра пользовательской рыбы. Для viewport пользователя нужно рисовать ближайший toroidal-образ каждой рыбы относительно позиции пользователя: при ширине мира 100, пользовательской x=90 и NPC x=10 рыба должна отображаться около x=110, а после перехода пользователя к x=2 тот же NPC-образ должен отображаться около x=10/22 в ближайшей видимой копии, а не оставаться на далекой копии.
+  Source: user report 2026-07-05; affected DSR/code: `ds/dsr/imp/web-canvas.dsr#client_prediction_and_render`, `render.js#render`, `render.js#worldToViewport`, `render.js#viewportToWorld`, `main.js#handleInspectClick`.
+
+- [x] **[bug:duplicate-user-fish-after-rejoin]**\
+  После входа на экран могут одновременно отображаться две пользовательские рыбы с именами, хотя один клиент должен контролировать только одну user fish. Наблюдение: на скриншоте одновременно видны `fish-116` и `fish-203`.
+  Source: user report 2026-07-05; affected DSR/code: `ds/dsr/imp/web-canvas.dsr#join_identity`, `ds/dsr/imp/web-canvas.dsr#reconnect_and_timeout`, `server.js#handleJoin`, `server.js#handleReconnectGrace`, `server.js#restoreByConnectionCode`, `client-net.js#createClientNet`, `main.js#onIdentity`.
+
+- [x] **[bug:user-respawn-control-binding]**\
+  Когда пользовательскую рыбу съедает хищник, respawn должен оставаться привязанным к текущему управлению клиента; клиент не должен продолжать слать управление на старую неподконтрольную рыбу.
+  Source: user report 2026-07-05; affected DSR/code: `ds/dsr/imp/web-canvas.dsr#eating_resolution`, `predation.js#respawnUserFishAfterEating`.
+
+- [x] **[bug:burst-energy-and-size-speed-regression]**\
+  Размер рыбы тратится слишком быстро при форсаже, а крупная рыба движется почти как мелкая; расход burst должен быть в 10 раз медленнее текущей реализации, а крупная рыба должна получать более заметное ограничение скорости/сопротивление.
+  Source: user report 2026-07-05; affected DSR/code: `ds/dsr/imp/web-canvas.dsr#movement_and_energy`, `constants.js#ENERGY`, `constants.js#FISH`, `world.js#applyDrag`, `fish.js#integrate`, `fish.js#spendEnergy`.
+
+- [x] **[bug:missing-control-mode-switch]**\
+  В интерфейсе нет явного переключателя режимов управления: клавиши, мышь/указатель, тач и визуальный джойстик.
+  Source: user report 2026-07-05; affected DSR/code: `ds/dsr/imp/web-canvas.dsr#player_input`, `index.html#control-modes`, `controls.js#createControlModeState`, `main.js#setupControlModes`, `main.js#setupJoystickControls`.
+
+- [x] **[bug:server-sync-swim-animation-state]**\
+  При переходе на серверную механику пропала анимация плавников: при крейсерской скорости и при burst клиент обновляет позицию рыбы из серверного sync, но не продвигает визуальное состояние плавания между snapshot-ами.
+  Source: user report 2026-07-05; affected DSR/code: `ds/dsr/imp/web-canvas.dsr#client_prediction_and_render`, `main.js#extrapolateFish`, `fish.js#updateSwimMotion`, `render.js#drawFish`.
+
+- [x] **[bug:hunt-speed-floor-too-low]**\
+  В режиме охоты рыба любого размера может ускоряться только до скорости, которая чуть больше или даже ниже максимальной крейсерской скорости самой маленькой обычной NPC-рыбы; burst/hunt должен иметь нижний предел скорости выше этого крейсерского ориентира.
+  Source: user report 2026-07-05; affected DSR/code: `ds/dsr/imp/web-canvas.dsr#movement_and_energy`, `constants.js#FISH`, `fish.js#maxSpeedOf`, `prey.js#capPreySpeed`.
+
+- [x] **[bug:hunt-cannot-catch-accelerating-small-prey]**\
+  Все еще невозможно догнать большой рыбой маленькую NPC-рыбу. В режиме охоты это должно быть возможно: в burst даже самая большая пользовательская рыба должна двигаться быстрее, чем самая маленькая NPC-рыба в режиме ускорения/бегства.
+  Source: user report 2026-07-05; affected DSR/code: `ds/dsr/imp/web-canvas.dsr#movement_and_energy`, `constants.js#FISH`, `constants.js#PREY`, `fish.js#maxSpeedOf`, `fish.js#integrate`, `prey.js#capPreySpeed`.

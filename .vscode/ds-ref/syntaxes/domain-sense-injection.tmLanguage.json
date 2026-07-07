@@ -11,7 +11,7 @@
       "patterns": [
         {
           "name": "meta.definition.marker.domain-sense",
-          "begin": "\\[(ds|ia|fn|it|do|eg):",
+          "begin": "\\[(ds|ia|fix|fn|it|do|eg):",
           "beginCaptures": {
             "1": { "name": "keyword.control.marker-kind.domain-sense" }
           },
@@ -29,7 +29,7 @@
       "patterns": [
         {
           "name": "meta.reference.domain-sense",
-          "match": "(@)(ds|ia|fn|it|do|eg)(:)([A-Za-z0-9_.-]+)",
+          "match": "(@)(ds|ia|fix|fn|it|do|eg)(:)([A-Za-z0-9_.-]+)",
           "captures": {
             "2": { "name": "keyword.control.marker-kind.domain-sense" },
             "4": { "name": "entity.name.function.marker.domain-sense" }

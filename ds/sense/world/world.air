@@ -1,16 +1,23 @@
 # world.air — Agent Interpretation Reference
 
 rationale_notes:
-  - "Clamp at world edges is preferred over bounce to keep behaviour deterministic and simple."
+  - "World edges use toroidal wrap, not clamp or bounce; fish positions transfer to the opposite side without stopping."
   - "Linear drag is sufficient for water-like feel at current scope."
+  - "World coordinates are game units; client pixels are a viewport projection."
+  - "World resizing scales fish coordinates, not fish sizes."
+  - "Spawn and respawn low-density areas are computed over all fish, not only dangerous fish."
   - "Bubble decor should remain subtle and asynchronous to avoid visual noise."
   - "Bubble rise speed should stay near-constant and close to median cruise fish speed, so decor pacing remains readable across fish sizes."
   - "Bubble radius cap is relative to fish radius: bubbleRadius <= 0.10 * fish.radius."
   - "Do not multiply bubble target radius by extra size terms (for example sqrt(size)); fish.radius already includes fish size scaling."
-  - "Automatic exhale belongs to the start of acceleration, while the player hotkey is a separate trigger path."
+  - "Bubble and exhale decor are client-only visual effects; server state and WS sync do not carry them."
+  - "Client-only bubble generation still needs stable per-fish local emission timers keyed by fish ID; server snapshots are visual inputs only and must not be the owner of bubble timer state."
+  - "Automatic exhale may be triggered locally at the start of acceleration."
+  - "Toroidal wrap has two separate concerns: canonical simulation coordinates remain inside [0,width) x [0,height), while viewport rendering may draw a nearby copied image of the same entity outside that canonical rectangle so motion appears continuous around the followed fish."
+  - "A render fix for wraparound must not change authoritative fish positions, protocol rows, or client prediction state; it belongs in the viewport projection layer."
 
 units:
-  position: pixels
+  position: game-world-units
   time: seconds (dt per frame)
 
 constraints:

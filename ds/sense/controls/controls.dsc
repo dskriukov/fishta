@@ -1,49 +1,103 @@
 # controls.dsc — Formal Domain Model (generated from controls.ds)
-# Status: FROZEN
+# Status: coducted
 
 module: controls
 
 player:
   from: ds:controls.player
-  rule: "exactly one Fish is tagged as player"
+  rule: "each connected client instance controls exactly its own user fish; other user fish and NPC fish are not controlled by this client"
+
+join_world:
+  from: ds:controls.join-world
+  contract:
+    name: joinWorldForm
+    inputs: [generatedName, generatedColor, userTierToggle]
+    output: joinRequest
+    fields:
+      - name
+      - color
+      - userTier
+    rule: "client shows a prefilled join form; user may keep or override generated name/color and choose paid/free type before connecting"
+
+no_vulnerability_control:
+  from: ds:controls.no-vulnerability-control
+  rule: "UI and control input do not expose a separate user-fish vulnerability toggle; victim eligibility is derived from paid/free user tier rules"
+
+leave_game:
+  from: ds:controls.leave-game
+  contract:
+    name: leaveGameCommand
+    inputs: [currentUserFish, attackBlockState]
+    output: leaveRequest?
+    rule: "explicit UI command requests conversion of current user fish to NPC through multiplayer.leave-game unless predation attack-block rule denies it"
 
 input:
+  device:
+    from: ds:controls.device-type
+    contract:
+      name: detectControlDeviceType
+      inputs: [clientCapabilities]
+      output: deviceType
+      allowed: [pointer, touch]
+      rule: "client detects ordinary pointer vs mobile/touch device to select available input modes; this does not change fish movement rules"
+  mode_select:
+    from: ds:controls.mode-select
+    contract:
+      name: selectControlMode
+      inputs: [deviceType, selectedMode]
+      output: activeControlMode
+      allowed_by_device:
+        pointer: [keyboard, pointer]
+        touch: [touch, joystick]
+      rule: "client uses an explicit control-mode switch; only input belonging to the selected mode is processed"
+      automatic_last_input_switching: false
   pointer:
     from: ds:controls.pointer
     contract:
       name: pointerSteer
-      inputs: [playerPos, pointerPos]
+      inputs: [activeControlMode, userFishPos, pointerPos]
       output: acceleration
-      rule: "accel toward pointer; magnitude grows with distance, capped"
-    primary: true
+      rule: "when activeControlMode == pointer, accelerate current client's user fish toward pointer; magnitude grows with distance, capped"
   keys:
-    from: ds:controls.keys
+    from: [ds:controls.keys, ia:controls.key-layout-equivalents, ia:controls.key-combo-compose]
     contract:
       name: keySteer
-      inputs: [keysDown]
+      inputs: [activeControlMode, keysDown]
       output: acceleration
       mapping: { ArrowUp/W: up, ArrowDown/S: down, ArrowLeft/A: left, ArrowRight/D: right }
       compose: "simultaneous movement keys compose one acceleration vector"
       layout_equivalents: "where possible, keyboard-layout equivalents are accepted"
-      priority_rule: "movement keys override pointer steering while active"
-      pointer_reactivation: "after movement-key input, pointer steering resumes only after pointer position changes"
-    primary: false
+      rule: "when activeControlMode == keyboard, movement keys produce one composed acceleration vector; pointer input is ignored in this mode"
+  mobile_touch:
+    from: ds:controls.mobile-touch
+    contract:
+      name: touchSteer
+      inputs: [activeControlMode, primaryTouch, userFishPos]
+      output: acceleration
+      rule: "when activeControlMode == touch, the first active touch defines movement from current client's user fish toward that touch point; releasing the primary touch stops directed movement"
+  mobile_joystick:
+    from: ds:controls.mobile-joystick
+    contract:
+      name: joystickSteer
+      inputs: [activeControlMode, joystickVector]
+      output: acceleration
+      rule: "when activeControlMode == joystick, the screen joystick defines the movement vector; releasing it stops directed movement"
   hunt:
-    from: ds:controls.hunt
+    from: [ds:controls.hunt, ds:controls.mobile-hunt, ds:controls.mobile-joystick-hunt, ia:controls.hunt-binding]
     contract:
       name: huntMode
-      inputs: [keysDown, pointerDown, touchDown]
+      inputs: [activeControlMode, keysDown, pointerDown, touches, joystickHuntControl]
       output: mode                 # burst while Space or mouse held, else cruise
-      rule: "mode = (Space in keysDown OR pointerDown OR touchDown) ? burst : cruise; steering unchanged"
-    status: added
-  exhale_hotkey:
-    from: ds:controls.exhale-hotkey
-    contract:
-      name: exhaleHotkey
-      inputs: [keysDown]
-      output: exhaleRequest
-      rule: "pressing O or Щ requests @fn:exhale for player only; this hotkey path is separate from auto-triggers"
-    status: added
+      rule: >
+        for current client's user fish: Space enables burst in every active
+        control mode; pointer mode also uses held mouse button, touch mode also
+        uses the second simultaneous touch, and joystick mode also uses a
+        separate on-screen hunt control. The joystick hunt control is placed on
+        the left side of the screen so movement can be handled with the right
+        hand and burst with the left. Hunt switches only cruise/burst regime;
+        steering remains defined by the active movement mode. In touch mode,
+        releasing the primary touch stops directed movement but can preserve
+        burst while the second touch is still held.
   inspect_click:
     from: ds:controls.inspect-click
     contract:
@@ -55,7 +109,7 @@ input:
 
 camera:
   from: ds:controls.camera
-  model: fixed-fit            # весь мир виден целиком
+  model: follow-user-fish
   zoom: none
   scroll: none
-  boundary: "world fits on screen (controls.air)"
+  boundary: "viewport is centered around current client's user fish; full world need not fit on screen"

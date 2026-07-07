@@ -2,11 +2,127 @@
   "name": "ds-ref",
   "displayName": "DS Ref",
   "publisher": "local",
-  "version": "0.0.1",
+  "version": "0.0.6",
   "engines": { "vscode": "^1.80.0" },
   "activationEvents": ["onStartupFinished"],
   "main": "./extension.js",
+  "icon": "images/IA-logo.png",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "domain-sense",
+          "title": "Domain Sense",
+          "icon": "images/IA-logo.svg"
+        }
+      ]
+    },
+    "views": {
+      "domain-sense": [
+        {
+          "id": "domain-sense.requirements",
+          "name": "Sense Requirements"
+        },
+        {
+          "id": "domain-sense.panel",
+          "name": "Domain Panel",
+          "type": "webview"
+        },
+        {
+          "id": "domain-sense.stage",
+          "name": "Current Stage",
+          "type": "webview"
+        },
+        {
+          "id": "domain-sense.actions",
+          "name": "DS Actions",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "domain-sense.refresh",
+        "title": "Domain Sense: Refresh"
+      },
+      {
+        "command": "domain-sense.openMainSense",
+        "title": "Domain Sense: Open Main Sense"
+      },
+      {
+        "command": "domain-sense.openDsMap",
+        "title": "Domain Sense: Open .dsmap"
+      },
+      {
+        "command": "domain-sense.openContract",
+        "title": "Domain Sense: Open Contract"
+      },
+      {
+        "command": "domain-sense.openConfig",
+        "title": "Domain Sense: Open Workspace Config"
+      },
+      {
+        "command": "domain-sense.generateAgents",
+        "title": "Domain Sense: Generate/Update AGENTS.md"
+      },
+      {
+        "command": "domain-sense.fixCodeLinks",
+        "title": "Domain Sense: Try to Fix Code Links"
+      },
+      {
+        "command": "domain-sense.runDS",
+        "title": "Domain Sense: Prepare DS"
+      },
+      {
+        "command": "domain-sense.runDSC",
+        "title": "Domain Sense: Prepare DSC"
+      },
+      {
+        "command": "domain-sense.runDSR",
+        "title": "Domain Sense: Prepare DSR"
+      },
+      {
+        "command": "domain-sense.runIMP",
+        "title": "Domain Sense: Prepare IMP"
+      },
+      {
+        "command": "domain-sense.runFIX",
+        "title": "Domain Sense: Prepare FIX"
+      },
+      {
+        "command": "domain-sense.runREF",
+        "title": "Domain Sense: Prepare REF"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "domain-sense.refresh",
+          "when": "view == domain-sense.requirements || view == domain-sense.panel || view == domain-sense.stage || view == domain-sense.actions",
+          "group": "navigation"
+        },
+        {
+          "command": "domain-sense.openMainSense",
+          "when": "view == domain-sense.requirements",
+          "group": "navigation"
+        },
+        {
+          "command": "domain-sense.openDsMap",
+          "when": "view == domain-sense.stage || view == domain-sense.panel",
+          "group": "navigation"
+        },
+        {
+          "command": "domain-sense.openContract",
+          "when": "view == domain-sense.stage || view == domain-sense.panel || view == domain-sense.actions",
+          "group": "navigation"
+        },
+        {
+          "command": "domain-sense.openConfig",
+          "when": "view == domain-sense.stage || view == domain-sense.panel || view == domain-sense.actions",
+          "group": "navigation"
+        }
+      ]
+    },
     "languages": [
       {
         "id": "domain-sense",

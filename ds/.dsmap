@@ -1,26 +1,44 @@
-ds/sense/controls/controls.ds#9b08cabb - 323e0d97
-ds/sense/controls/controls.ia#233ee10d - 3ab6da12
-ds/sense/fish/fish.ds#0536c4a5 - 0e1af7e8
-ds/sense/fish/fish.ia#526a7577 - 2b751007
-ds/sense/main.ds#4f98671a - d3cd9207
-ds/sense/main.ia#0cc4078e - feab7d75
-ds/sense/predation/predation.ds#bee4eecb - c4f0fe31
-ds/sense/prey/prey.ds#5b79d193 - 3fbd0a6d
-ds/sense/prey/prey.ia#d3b93b72 - b73de1c3
-ds/sense/world/world.ds#8fab7fac - 0c44252a
-ds/sense/world/world.ia#d8f06cec - a45699db
+ds/sense/controls/controls.ds#9069f40f - 323e0d97
+ds/sense/controls/controls.ia#3eb8e8e5 - 3ab6da12
+ds/sense/fish/fish.ds#e9b56e3b - 0e1af7e8
+ds/sense/fish/fish.ia#5f3a7dac - 2b751007
+ds/sense/main.ds#3e9a7447 - d3cd9207
+ds/sense/main.ia#55b6bde5 - feab7d75
+ds/sense/multiplayer/multiplayer.ds#380fdb81 - 021f8c6b
+ds/sense/multiplayer/ws-protocol.ds#9c9a61e3 - 9c9a61e3
+ds/sense/predation/predation.ds#de2dea4b - c4f0fe31
+ds/sense/prey/prey.ds#7223c1f0 - 3fbd0a6d
+ds/sense/prey/prey.ia#d538d91e - b73de1c3
+ds/sense/world/world.ds#4ce07f27 - 0c44252a
+ds/sense/world/world.ia#d1b53549 - a45699db
 
 ds:controls.camera - 7b9a7984 323e0d97
-ds:controls.exhale-hotkey - d9fc8d9c 323e0d97
+ds:controls.device-type - cf6ad7d6 323e0d97
 ds:controls.hunt - 22fd3ab4 323e0d97
 ds:controls.inspect-click - 2e1570ed 323e0d97
+ds:controls.join-world - 34ba255b 323e0d97
 ds:controls.keys - 10baf178 323e0d97
+ds:controls.leave-game - fb11044e 323e0d97
+ds:controls.mobile-hunt - 27129cfa 323e0d97
+ds:controls.mobile-joystick - b43d2f95 323e0d97
+ds:controls.mobile-joystick-hunt - cd1c5776 323e0d97
+ds:controls.mobile-touch - 3c41aad0 323e0d97
+ds:controls.mode-select - 70871bc5 323e0d97
+ds:controls.no-vulnerability-control - 5377d065 323e0d97
 ds:controls.player - 91e32235 323e0d97
 ds:controls.pointer - 55c13a4f 323e0d97
 ds:domain.modules - ec8cb052 d3cd9207
+ds:debug.mode - 59c118f5 d3cd9207
+ds:debug.fish-minimap - 8f2c91ad d3cd9207
+ds:debug.fish-collision-radius - 6b4e90d2 d3cd9207
+ds:debug.position-traces - 727e9afe d3cd9207
+ds:debug.world-repeat-bounds - 7435b6ce d3cd9207
+ds:fish.decor.abandoned-gradient - c3708d14 0e1af7e8
 ds:fish.decor.fear_eye - 906be50b 0e1af7e8
 ds:fish.decor.mouth - 975ca168 0e1af7e8
+ds:fish.decor.size-delta-label - c2d7f4a1 0e1af7e8
 ds:fish.decor.swim_motion - bd354b7a 0e1af7e8
+ds:fish.decor.user-label - c5a92431 0e1af7e8
 ds:fish.energy - f51831f5 0e1af7e8
 ds:fish.entity - 1f3abc43 0e1af7e8
 ds:fish.facing - 8d0ca6a8 0e1af7e8
@@ -30,60 +48,90 @@ ds:fish.movement.swim - 7ce238da 0e1af7e8
 ds:fish.regime - 8869f043 0e1af7e8
 ds:fish.size - cbc1225a 0e1af7e8
 ds:fish.thrust - ee07d6da 0e1af7e8
+ds:fish.user-min-size - 6aa7c828 0e1af7e8
 fn:exhale - a9a3ed12 0e1af7e8
 do:serialize - a7a50f7b 0e1af7e8
 ds:goal.growth - b433f1bc d3cd9207
 ds:intent.game - 27fa3caa d3cd9207
-ds:main - b28b7af6 d3cd9207
+ds:multiplayer.abandoned-fish-visual - bfd5a97a 021f8c6b
+ds:multiplayer.color-palettes - f883f90c 021f8c6b
+ds:multiplayer.connection-fish - 4bfe0352 021f8c6b
+ds:multiplayer.disconnect-to-npc - eba75588 021f8c6b
+ds:multiplayer.identity - 58050922 021f8c6b
+ds:multiplayer.leave-game - 704ab317 021f8c6b
+ds:multiplayer.local-server - f359ebf2 021f8c6b
+ds:multiplayer.name-generation - 0d692a59 021f8c6b
+ds:multiplayer.reconnect-grace - 93a64773 021f8c6b
+ds:multiplayer.server-authority - e4d375ed 021f8c6b
+ds:multiplayer.server-memory - 4c2c7ba3 021f8c6b
+ds:multiplayer.shared-world - 9ed7e713 021f8c6b
+ds:multiplayer.socket-sync - e559831a 021f8c6b
 ds:predation.contact - a3e394a8 c4f0fe31
-ds:predation.hunt - d4f6a1c2 c4f0fe31
 ds:predation.effect - e9fb3705 c4f0fe31
+ds:predation.hunt - d4f6a1c2 c4f0fe31
+ds:predation.leave-blocked-by-user-attack - 8917ad63 c4f0fe31
+ds:predation.player-respawn - 39305789 c4f0fe31
 ds:predation.rule - 98224ab9 c4f0fe31
+ds:predation.server-authority - 75a5aa4f c4f0fe31
 ds:predation.symmetry - fcdfb2b7 c4f0fe31
+ds:predation.user-tier-eligibility - 32745a4f c4f0fe31
 ds:prey.entity - ad8d81d8 3fbd0a6d
 ds:prey.flee - 579e4888 3fbd0a6d
 ds:prey.flee.effort - e699c42d 3fbd0a6d
+ds:prey.npc-fish - 534bb18b 3fbd0a6d
 ds:prey.spawn - e6ecfbdd 3fbd0a6d
 ds:prey.variety - 1e66d817 3fbd0a6d
 ds:prey.wander - 31cb7a0d 3fbd0a6d
 ds:world.bounds - c83f4c1e 0c44252a
+ds:world.coordinates - 459e191b 0c44252a
 ds:world.decor.bubbles - d6cebf86 0c44252a
 ds:world.drag - ca07d970 0c44252a
+ds:world.dynamic-size - 19c14fea 0c44252a
 ds:world.exhale.accel-start-trigger - 67f150ce 0c44252a
+ds:world.exhale.burst-start-trigger - 3ddf8f67 0c44252a
 ds:world.flat - c95ca496 d3cd9207
 ds:world.medium.water - d2e8a84c 0c44252a
+ds:world.npc-density - 53db39eb 0c44252a
 ds:world.surface.flat - 5fb1ff09 0c44252a
-ds:world.spawn.from-edge - 89b9124f 0c44252a
 ds:world.time - 48c4fc99 d3cd9207
-ia:controls.camera-fixed - 0f1a2b3c 3ab6da12
+ds:ws-protocol.client-delta-input - 671e9773 9c9a61e3
+ds:ws-protocol.client-messages - 5a4d3d6d 9c9a61e3
+ds:ws-protocol.encoding - 839f8cd0 9c9a61e3
+ds:ws-protocol.events - a16328a6 9c9a61e3
+ds:ws-protocol.fish-row - ea18a088 9c9a61e3
+ds:ws-protocol.handshake-state - 4fad33f8 9c9a61e3
+ds:ws-protocol.server-sync - 682570c7 9c9a61e3
+ds:ws-protocol.state-mods - f51a5030 9c9a61e3
 ia:controls.hunt-binding - 6b7c8d9e 3ab6da12
 ia:controls.key-combo-compose - 0a7383b1 3ab6da12
 ia:controls.key-layout-equivalents - aae3d11a 3ab6da12
 ia:fish.decor.fear-eye-state - 7d8e9f0a 2b751007
 ia:fish.decor.mouth-state - 9c0d1e2f 2b751007
 ia:fish.decor.swim-state - 3a4b5c6e 2b751007
+ia:fish.decor.user-color-body - 32288dfb 2b751007
 ia:fish.energy.burst-only - 7c8d9e0f 2b751007
 ia:fish.exhale.bubble-displacement - 617964be 2b751007
 ia:fish.exhale.bubble-inhale-order - 0adbe79e 2b751007
 ia:fish.exhale.visual-scale - 4a2ebf0d 2b751007
+ia:fish.client-visual-facing-mouth - 0bdc556b 2b751007
 ia:fish.facing-threshold - 9a0b1c2d 2b751007
 ia:fish.growth-formula - 5c6d7e8f 2b751007
 ia:fish.radius-formula - 1e2f3a4b 2b751007
 ia:fish.regime.cruise-factor - 5e6f7a8b 2b751007
 ia:fish.speed-formula - 3e4f5a6b 2b751007
 ia:fish.thrust.emergent-ramp - 1a2b3c4d 2b751007
-ia:player.immune - 82e62c5e feab7d75
+ia:player.predation-eligibility - 01fe68fa feab7d75
 ia:prey.flee-proximity - 1b2c3d4e b73de1c3
 ia:prey.flee-vain-skip - 5f6a7b8c b73de1c3
 ia:prey.size-bias - 7f8a9b0c b73de1c3
-ia:prey.spawn-from-edge - 3b4c5d6e b73de1c3
+ia:prey.spawn-low-density-entry - 2740e55e b73de1c3
 ia:prey.speed-cap - 2d3e4f5a b73de1c3
 ia:prey.wander-cruise - 9d0e1f2a b73de1c3
 ia:web-canvas.canvas-2d - 3a4b5c6d feab7d75
 ia:web-canvas.ecs-arch - e5f60718 feab7d75
 ia:web-canvas.loop - c9d0e1f2 feab7d75
 ia:web-canvas.vec - a1b2c3d4 feab7d75
-ia:world.bounds.clamp - 7e8f9a0b a45699db
+ia:world.bounds.wrap - dd909d1a a45699db
 ia:world.bubble.animation - 3c4d5e6f a45699db
 ia:world.bubble.burst-sequence - 7a8b9c0d a45699db
 ia:world.bubble.radius-formula - 9e0f1a2b a45699db

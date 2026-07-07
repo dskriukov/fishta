@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- imp/web-canvas/index.html
      Derived from: dsr/imp/web-canvas.dsr (entry)
-     Source of truth lives in sense/*.ds — this file is a generated artifact. -->
+     IMP stage source of truth: ds/dsr/imp/web-canvas.dsr. -->
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
@@ -11,10 +11,44 @@
 </head>
 <body>
     <canvas id="game"></canvas>
+    <div id="join">
+        <form id="join-form">
+            <label>
+                <span>Имя</span>
+                <input id="join-name" type="text" maxlength="24" autocomplete="off">
+            </label>
+            <label>
+                <span>Цвет</span>
+                <input id="join-color" type="color">
+            </label>
+            <label class="toggle">
+                <input id="join-tier" type="checkbox">
+                <span>paid fish</span>
+            </label>
+            <button type="submit">Войти</button>
+        </form>
+    </div>
     <div id="hud">
-        <span id="size">size: 1.0</span>
-        <span id="eaten">eaten: 0</span>
-        <span class="hint">мышь / WASD — плыть, Space/мышь — форсаж, O/Щ — exhale, клик по рыбе — serialize</span>
+        <div class="hud-row">
+            <span id="size">size: 1.0</span>
+            <span id="eaten">eaten: 0</span>
+            <span id="status">alive</span>
+            <button id="debug-toggle" type="button">Debug</button>
+            <button id="leave-game" type="button">Выйти</button>
+        </div>
+        <div id="control-modes" class="hud-row">
+            <button type="button" data-control-mode="keyboard">Клавиши</button>
+            <button type="button" data-control-mode="pointer">Мышь</button>
+            <button type="button" data-control-mode="touch">Тач</button>
+            <button type="button" data-control-mode="joystick">Джойстик</button>
+        </div>
+        <span class="hint">Space/мышь/второй палец/Burst — форсаж, клик по рыбе — serialize</span>
+    </div>
+    <div id="joystick-panel" hidden>
+        <div id="joystick-base" aria-label="joystick">
+            <div id="joystick-knob"></div>
+        </div>
+        <button id="joystick-hunt" type="button" aria-pressed="false">Burst</button>
     </div>
     <script type="module" src="./src/main.js"></script>
 </body>

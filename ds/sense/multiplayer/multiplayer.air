@@ -1,0 +1,8 @@
+# multiplayer.air — Agent Interpretation Reference
+
+rationale_notes:
+  - "Multiplayer is the base domain model; single-user play is only a one-user case of the same server-authoritative world."
+  - "The temporary connection code is scoped to the current client instance and brief socket reconnects, not long-term account recovery."
+  - "Automatic reconnect and manual join are alternative ways to bind the current client instance to one user fish; a successful reconnect must not leave the join form able to create a second user fish for the same socket/client instance."
+  - "Paid/free user type is a local join-form attribute for current requirements, not a billing or authentication system."
+  - "Client-side movement simulation is visual prediction only; domain events from the server win on disagreement."

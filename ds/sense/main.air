@@ -6,10 +6,15 @@ terminology:
   "поверхность": surface (2D plane), not 3D terrain
   "ловит": predation by overlap + size rule, not aiming/projectiles
   "растёт": size increases, radius derived from size
-  "песочница": no lose condition; open-ended
+  "песочница": no persistent fail state by default; open-ended growth
 
 accepted_interpretations:
-  - decision: "No fail state in sandbox mode."
+  - decision: "Default sandbox mode has no fail state."
+    confidence: high
+  - decision: "There is no separate player vulnerability state; paid/free user tier determines whether a user fish is eligible as prey."
+    confidence: high
+    rationale: "The current predation model removed the older vulnerability toggle in favor of join-time paid/free rules."
+  - decision: "When a user fish is eaten under paid/free predation rules, being eaten is resolved as a respawn, not permanent removal."
     confidence: high
   - decision: "Prefer pure vec helpers for geometry-heavy modules."
     confidence: high
@@ -18,13 +23,17 @@ accepted_interpretations:
   - decision: "Keep render separate from pure domain step."
     confidence: high
     rationale: "Entities are plain data; behaviours are functions over data (ECS-lite)."
-  - decision: "Browser Canvas 2D target with minimal runtime friction."
+  - decision: "Browser Canvas 2D remains the client rendering target, but the shared world is server-authoritative."
     confidence: high
-    rationale: "Lowest friction to opens-in-browser constraints."
+    rationale: "Multiplayer is the base model; a single user is a single-player experience over the same local-server world."
+  - decision: "Debug mode is a client-owned render overlay, not a simulation or protocol mode."
+    confidence: high
+    rationale: "The requested world bounds and coordinate traces are visual diagnostics for server/client drift and must not affect authoritative gameplay."
 
 architectural_assumptions:
-  - "Pure-function domain step: world' = step(world, input, dt). Render is separate."  # ia:web-canvas.ecs-arch
+  - "Server owns authoritative world step; client render/prediction remains separate." # ia:web-canvas.ecs-arch
   - "Entities are plain data; behaviours are functions over data (ECS-lite)."          # ia:web-canvas.ecs-arch
+  - "Debug overlays are produced from already available client render state and latest server sync diagnostics."
 
 open_questions:
-  - "Should bigger prey ever threaten the player later? Deferred (symmetry noted)."
+  - "Should player respawn have any penalty beyond returning to the player's start size? Deferred."

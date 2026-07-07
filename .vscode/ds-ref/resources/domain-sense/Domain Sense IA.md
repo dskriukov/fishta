@@ -100,6 +100,21 @@ IMP
 
 Each stage is invoked through a command name, with aliases accepted by the agent.
 
+### Contract Resolution
+
+Before applying any command gate, the AI agent and supporting tools must resolve the active Domain Sense contract and workspace configuration.
+
+Resolution order:
+
+1. Read `AGENTS.md` when present.
+2. If `AGENTS.md` declares `DS contract: vscode-extension:domain-sense/Domain Sense IA.md`, use the bundled contract supplied by the Domain Sense VS Code extension.
+3. If `AGENTS.md` declares another `DS contract:` URI or path, resolve it only when the current environment explicitly supports that source.
+4. If `AGENTS.md` declares `DS config: <path>`, read that workspace file as the local configuration layer.
+5. Apply local configuration only for project-specific mode, paths, executable boundaries, verification commands, exclusions, and explicitly allowed local deviations.
+6. If the bundled contract and local configuration conflict, the bundled contract wins unless the contract explicitly permits that override.
+
+The bundled contract defines the framework, command gates, invariants, and stage semantics. The local configuration must not silently redefine Domain Sense philosophy or command behavior.
+
 #### INIT - initialize Domain Sense
 
 Command: `INIT`
@@ -109,6 +124,7 @@ Purpose:
 - detect whether the workspace already contains an executable implementation;
 - create the initial Domain Sense folder structure for a new or existing project;
 - prepare `./ds/sense/main.ds` as the entry point for future `DS`, `DSC`, `DSR`, `IMP`, `REF`, `FIX`, and `GO` flows;
+- prepare `./ds.config.md` as the local workspace configuration layer when the project uses a bundled or external DS contract;
 - do not generate executable implementation code;
 - do not rewrite or restructure an existing project.
 
@@ -122,6 +138,7 @@ Behavior when no executable implementation exists:
 
 - create `./ds/sense/`;
 - create `./ds/sense/main.ds`;
+- create `./ds.config.md` when local workspace configuration is needed;
 - fill `main.ds` with a minimal starter structure for the coductor to complete:
   - domain/project brief;
   - intended platform;
@@ -136,13 +153,19 @@ Behavior when an executable implementation already exists:
 - perform a lightweight reverse-engineering pass over the existing project;
 - create `./ds/sense/`;
 - create `./ds/sense/main.ds`;
+- create `./ds.config.md` when local workspace configuration is needed;
 - fill only the basic facts that can be inferred with reasonable confidence:
   - project brief;
   - platform/runtime;
   - stack/frameworks/languages;
   - main entry points;
-  - visible modules or feature areas;
   - known constraints from manifests/configuration;
+- create a basic executable implementation boundary in `ds.config.md` so the agent knows, once, where executable files live and which files must not be scanned as implementation during later code analysis;
+- keep that boundary structural and operational, not architectural:
+  - include the executable code root or roots;
+  - include the local verification command when it is known;
+  - include currently excluded generated, temporary, build, package, or publish artifacts when relevant;
+  - do not list internal source files and their responsibilities unless the coductor explicitly makes that layout a requirement;
 - mark the project as `incremental` and state that Domain Sense is being added for ongoing improvement, not as a full ownership migration of all existing code;
 - avoid exhaustive reverse engineering during `INIT`; deeper modeling belongs to later explicit `DS`, `DSC`, or `REF` work.
 
@@ -187,6 +210,31 @@ This project is being improved incrementally through Domain Sense. Existing impl
 <known uncertainties for later clarification>
 ```
 
+Suggested `ds.config.md` shape:
+
+```markdown
+# Domain Sense Workspace Config
+
+## Project Mode
+
+DS mode: standard | incremental.
+
+## Executable Implementation Boundary
+
+**[ds:project.source-files-boundary]**\
+<where executable source files live; which paths are outside implementation analysis unless a later sense requirement expands the boundary>
+
+## Local Verification
+
+**[ds:project.local-test-command]**\
+<known console command for local verification, or an explicit unknown/pending marker if not yet agreed>
+
+## Generated / Temporary Artifacts
+
+**[ds:project.publish-artifacts]**\
+<whether generated, temporary, build, package, or publish artifacts are part of the implementation model; default to excluded unless explicitly required>
+```
+
 Aliases:
 
 - `init`
@@ -202,7 +250,10 @@ Command: `DS`
 
 Purpose:
 
-- analyze newly added and changed requirements in `.ds` files before coduction;
+- discuss new or changed features, behavior, and improvements when the developer wants to formulate requirements together with the AI before writing them down;
+- in discussion mode, first reach shared understanding with the developer through dialogue, then update DS requirements only after the developer explicitly confirms with "Зафиксируй" or a similar instruction;
+- analyze newly added and changed requirements in `.ds`, `.ia`, and permanent `fix:*` requirement sources before coduction;
+- treat open bug and bugfix intake as valid requirement-sense input: bugs are not permanent sense requirements by themselves, but they must be considered when evaluating whether the current requirement set is coherent and sufficient for the next stages;
 - provide requirement-level feedback only, focused on wording quality and domain coherence;
 - evaluate correctness, clarity, completeness, and relation to other requirements;
 - suggest improvements, risks, and quality score directions;
@@ -214,8 +265,20 @@ Aliases:
 
 - `ds`
 - `sense`
+- `Обсудим предметную область`
+- `Сформулируем требования`
+- `Давай сформулируем требования`
 - `Посмотри новые требования`
 - similar requests with the same intent.
+
+DS discussion mode:
+
+- If the `DS` request is a discussion request for new or changed functionality, the AI must not edit files immediately.
+- The AI must ask clarifying questions when behavior, scope, affected requirements, or requirement type is ambiguous.
+- The AI should propose candidate requirement wording in chat and revise it with the developer until there is shared understanding.
+- The AI may identify whether the result belongs in `ds:*`, `ia:*`, or permanent `fix:*` requirements, but must not write it until explicit fixation.
+- Fixation requires a clear developer instruction such as `Зафиксируй`, `Запиши в требования`, `Сохрани DS`, or a similar phrase.
+- After fixation, the AI may add or update the relevant `.ds`, `.ia`, or `.fix` requirement files, but must not proceed to `DSC`, `DSR`, or `IMP` unless separately requested.
 
 DS refinement modes:
 
@@ -247,10 +310,11 @@ Command: `DSC`
 
 Purpose:
 
-- read all `.ds`, `.ia`, and normalized `fix:*` requirement sources;
+- read all `.ds`, `.ia`, normalized `fix:*` requirement sources, and open `bug:*` audit items that may drive repairs;
 - find new requirements and changes;
 - groom `.dsc`, `.air`, and `.ia` files;
 - for `fix:*` requirements, use the current implementation context discovered in the workspace as part of coduction instead of relying only on the text of the fix requirement;
+- for `bug:*` audit items, use the bug as an input driver to locate the affected requirement, interpretation, rendition, or implementation mismatch; if the repair belongs in a durable requirement, derive or refine a `fix:*`, `ds:*`, or `ia:*` requirement rather than treating the bug item as an implementation source;
 - keep `.air` strictly interpretational: store rationale/decisions and IA-level clarifications, and avoid duplicating raw requirement bindings from `.ds` that are not interpretation artifacts;
 - give feedback to the developer;
 - surface Domain Sense Errors;
@@ -270,11 +334,30 @@ Command: `DSR`
 
 Purpose:
 
-- form implementation plans;
+- form concrete implementation instructions;
 - groom `.dsr` files;
 - register all `ds | ia | fix | fn | eg | it | do` requirements in `.dsmap`;
 - do not modify requirement or interpretation source files (`.ds`, `.ia`, `.fix`, `.air`);
 - provide feedback to the developer in chat when needed.
+
+DSR semantic boundary:
+
+- `DS`, `.ia`, and `fix:*` describe **what must be true** in the domain or product behavior.
+- `.dsc` records the stabilized interpretation of those requirements.
+- `.dsr` describes **how the interpreted requirements must be realized** in a specific implementation stack.
+- A `.dsr` entry must not merely restate, paraphrase, or summarize a sense requirement.
+- A `.dsr` entry is valid only when it gives enough implementation direction for `IMP` to change code without rereading `.ds`, `.ia`, `.fix`, or inventing design decisions.
+- Required DSR content should be concrete at the level of modules, functions, state ownership, data shapes, algorithms, message formats, update order, edge cases, and verification hooks.
+- Requirement-like acceptance statements may appear only as secondary checks. They must never substitute for implementation instructions.
+- If the implementation approach is still ambiguous, DSR must stop with a concrete blocker or record the smallest explicit implementation choice needed; it must not hide the gap behind broad product wording.
+- A useful DSR instruction can be translated into code mechanically by a weaker coding model. If the instruction still asks the model to decide architecture, ownership, protocol shape, or update order, the DSR is incomplete.
+
+Ordinary DS route repair handling:
+
+- `DS`, `DSC`, `DSR`, `DS~R`, and `GO` include the same intake-normalization and open bug/fix audit responsibilities needed for their stage scope.
+- An ordinary route must not tell the developer to run `FIX` merely because bug/fix intake exists; it must perform the applicable normalization or audit itself before continuing.
+- If the required bug/fix decision is ambiguous, the active stage reports the concrete blocker in its own output instead of switching modes.
+- `FIX` is a specialized command for choosing a repair-only scope, not a prerequisite for ordinary requirements, coduction, rendition, or implementation routes.
 
 DSR trace rules:
 
@@ -291,15 +374,25 @@ Execution checklist (in order):
   - For `.ds` and `.ia` files, checksum the whole file.
   - For `*.fix` files, checksum only normalized `fix:*` requirement blocks; `bug:*` audit items must not affect `.dsmap`.
   - `./ds/fix/bug.fix` is never listed in `.dsmap`.
-  - If any `bug:*` item is found outside `./ds/fix/bug.fix`, or any `[bug]:` / `[fix]:` intake marker remains unnormalized, stop and request `FIX` normalization before continuing.
+  - Before checksumming, normalize any in-scope `bug:*` item found outside `./ds/fix/bug.fix` and any in-scope `[bug]:` / `[fix]:` intake marker using the same normalization rules as the repair intake flow.
+  - If normalization cannot be completed because the target, meaning, or required developer choice is ambiguous, stop with a concrete blocker; do not request a separate `FIX` pass just to perform normalization.
 2. Update `.dsmap` file index (`<path>#<consumedDigest> - <sourceSha>`) for changed/new requirement files.
   - Update only `consumedDigest` for existing files.
   - Keep the right-side `sourceSha` stable for existing files; do not regenerate it from checksum.
   - Assign a new `sourceSha` only once when a file first appears in `.dsmap`.
 3. Ensure all new/changed slugs (`ds|ia|fix|fn|eg|it|do`) are present in `.dsmap` slug index with stable `slugSha` linked to the file `sourceSha` from the top block (reuse existing `sourceSha`; never derive it from checksum).
 4. Update `.dsr` files to reference affected requirements via `.dsmap` slug entries (`slugSha`), where applicable.
-5. Update `.dsr` `contract_map` and `implementation_notes` sections to include new/changed requirement references.
+5. Update `.dsr` `contract_map` and implementation-instruction sections to include new/changed requirement references.
 6. Verify: `.ds`, `.ia`, `.fix`, and `.air` remain unchanged; only `.dsmap` and `.dsr` are modified.
+
+DSR quality checklist:
+
+- Every changed requirement reference is attached to a target code element or implementation block.
+- Every implementation block states where the state lives and which layer owns mutations.
+- Every protocol or persistence block states exact data shape, encode/decode behavior, and compatibility/default behavior.
+- Every game-loop, UI, or workflow block states update order and timing.
+- Every repair-driven DSR change states the failure mechanism and the implementation correction, not just the desired final behavior.
+- Remove or rewrite text that only says what users should observe unless it is paired with concrete construction steps.
 
 DSR comment format guidance:
 
@@ -401,6 +494,9 @@ Command: `FIX`
 
 Purpose:
 
+- enter a repair-only workflow scoped to bug audit items, fix intake, and permanent `fix:*` requirements;
+- use the same intake normalization, stage audit, and downstream correction mechanics that ordinary `DS`, `DSC`, `DSR`, `DS~R`, and `GO` routes also perform when bug/fix inputs are in scope;
+- do not process unrelated new feature requirements except where they are necessary to understand or repair the selected bug/fix item;
 - discover all `bug` and `fix` intake markers across the workspace;
 - move discovered bug intake markers into `./ds/fix/bug.fix`;
 - move discovered fix intake markers into the most appropriate `*.fix` file under `./ds`, creating a new semantic fix file when no existing file fits;
@@ -418,14 +514,15 @@ Intake marker formats:
 
 Intake discovery:
 
-- `FIX` must use regular-expression search tools, such as `rg` or an equivalent file-search API, to find `[bug]:` and `[fix]:` markers in executable files;
+- Repair intake normalization must use regular-expression search tools, such as `rg` or an equivalent file-search API, to find `[bug]:` and `[fix]:` markers in executable files;
 - the AI model must not load the whole project into context to discover intake markers;
 - after regex search finds candidate matches, the AI model may read only the matched lines plus the minimal surrounding context needed to understand scope, source element, and whether the match is real;
 - false positives, such as documentation examples or escaped text that is not an active intake marker, must be filtered during this contextual review.
 
 Intake normalization:
 
-- `FIX` must search the workspace for all `[bug]:` and `[fix]:` markers before stage analysis;
+- A `FIX` command searches the workspace for all `[bug]:` and `[fix]:` markers before stage analysis because its scope is repair-only.
+- Ordinary `DS`, `DSC`, `DSR`, `DS~R`, and `GO` routes apply the same normalization rules to the bug/fix inputs that are in scope for the current work.
 - every discovered `[bug]:` marker is moved into `./ds/fix/bug.fix`;
 - every discovered `[fix]:` marker is moved into the most appropriate semantic `*.fix` file under `./ds`;
 - if no existing `*.fix` file is semantically appropriate for a discovered `[fix]:` marker, the AI agent creates a new focused `*.fix` file under `./ds/fix/` or a more specific `./ds/**` subfolder;
@@ -438,7 +535,7 @@ Intake normalization:
 - markers already located under `./ds` are normalized in place only when they are already in the correct target file;
 - bug markers found outside `./ds/fix/bug.fix` are moved into `./ds/fix/bug.fix` before `.dsmap` is updated;
 - fix markers found in `./ds/fix/bug.fix` are moved into an appropriate semantic fix file before `.dsmap` is updated.
-- intake normalization is completed before `DSR`; `DSR` must not move bug or fix items and must stop if normalization is incomplete.
+- intake normalization is completed before `.dsmap` checksums and DSR requirement registration; the active route performs it directly or stops with a blocker if the normalization requires developer judgment.
 
 Stage behavior:
 
@@ -582,6 +679,8 @@ The distinction between bug and fix is:
 - `bug:*` items are temporary audit records and are not registered in `.dsmap`;
 - bugs may lead to new or refined `fix:*`, `ds:*`, or `ia:*` requirements, but the bug item itself remains a workflow artifact.
 
+Despite their different lifecycle, `fix:*` requirements and `bug:*` audit items are valid inputs to `DS` and `DSC`. Leaving known open bugs outside the sense and coduction passes before implementation is invalid unless the developer explicitly scopes them out. A `fix:*` requirement is effectively a normal sense requirement with an allowed reference to current implementation context; a `bug:*` item is a repair driver that must be investigated until it is either resolved, converted into durable requirements, or reported as blocked.
+
 Handling for a `fix:*` requirement follows the same stage discipline as for `ds:*` and `ia:*`: investigate the requirement through `DS -> DSC -> DSR -> IMP`, fix the first stage where the mismatch appears, and keep implementation links attached to the stable sense requirement rather than to a temporary bug record.
 
 ### 4. Domain Sense Coduction
@@ -629,8 +728,8 @@ Fix files are split by role:
 - `./ds/fix/bug.fix` is the fixed central file for all `bug:*` audit items;
 - `./ds/fix/bug.fix` is created on demand when the first bug item is captured; it is not required to exist in projects with no bugs;
 - other `*.fix` files contain permanent `fix:*` requirements grouped by meaning;
-- if a user writes a bug into another file, `FIX` moves it to `./ds/fix/bug.fix` before checksum or DSR work;
-- if a user writes a fix into `./ds/fix/bug.fix`, `FIX` moves it to an appropriate semantic fix file before checksum or DSR work.
+- if a user writes a bug into another file, repair intake normalization moves it to `./ds/fix/bug.fix` before checksum or DSR work;
+- if a user writes a fix into `./ds/fix/bug.fix`, repair intake normalization moves it to an appropriate semantic fix file before checksum or DSR work.
 
 Checklist items use this state model:
 
@@ -640,8 +739,8 @@ Checklist items use this state model:
 Bug and fix item format:
 
 - a new user-entered item may start as plain checklist text or as `[bug]:` / `[fix]:` intake text without a slug;
-- on the first `FIX` pass, every open bug receives a stable marker in the form `**[bug:slug]**\`;
-- on the first `FIX` pass, every open fix receives a stable marker in the form `**[fix:slug]**\`;
+- on the first repair intake normalization pass, every open bug receives a stable marker in the form `**[bug:slug]**\`;
+- on the first repair intake normalization pass, every open fix receives a stable marker in the form `**[fix:slug]**\`;
 - the marker stays with the checklist item until the item is removed or superseded;
 - `bug:*` markers are workflow slugs and are not sense requirement slugs;
 - `fix:*` markers are permanent sense requirement slugs and must be registered in `.dsmap`.

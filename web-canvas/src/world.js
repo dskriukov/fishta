@@ -1,22 +1,23 @@
 // imp/web-canvas/src/world.js
 // Implements: world.dsc#keepInsideBounds, world.dsc#applyDrag, world.dsc#emitBubbles, world.dsc#advanceBubbles
-// Decisions: world.air#ia:world.bounds.clamp (clamp, not bounce), ia:world.drag.linear (linear damping)
+// Decisions: world.air#ia:7e8f9a0b (clamp, not bounce), ia:1c2d3e4f (linear damping)
 // @ds c83f4c1e ca07d970 d6cebf86
 
 import { WORLD, BUBBLE } from './constants.js';
 
 // ds:c83f4c1e
-export function clampToBounds(fish, world){
-    const r = fish.radius;
-    if( fish.pos.x < r ){ fish.pos.x = r; fish.vel.x = Math.max(0, fish.vel.x); }
-    if( fish.pos.x > world.width - r ){ fish.pos.x = world.width - r; fish.vel.x = Math.min(0, fish.vel.x); }
-    if( fish.pos.y < r ){ fish.pos.y = r; fish.vel.y = Math.max(0, fish.vel.y); }
-    if( fish.pos.y > world.height - r ){ fish.pos.y = world.height - r; fish.vel.y = Math.min(0, fish.vel.y); }
+export function wrapPosition(fish, world){
+    fish.pos.x = ((fish.pos.x % world.width) + world.width) % world.width;
+    fish.pos.y = ((fish.pos.y % world.height) + world.height) % world.height;
 }
 
+// Compatibility name retained for callers; DSR now requires wrapping, not clamping.
+export const clampToBounds = wrapPosition;
+
 // ds:ca07d970
-export function applyDrag(vel, dt){
-    const factor = Math.max(0, 1 - WORLD.drag * dt);
+export function applyDrag(vel, dt, size = 1){
+    const sizeDrag = 1 + Math.max(0, size - 1) * WORLD.sizeDrag;
+    const factor = Math.max(0, 1 - WORLD.drag * sizeDrag * dt);
     return { x: vel.x * factor, y: vel.y * factor };
 }
 
@@ -80,7 +81,58 @@ export function advanceBubbles(bubbles, world, dt){
     }
 }
 
+// @ds:19c14fea
+export function nextWorldSize(userFishCount, current){
+    const step = Math.max(0, Math.ceil((userFishCount - WORLD.resizeHysteresisUsers) / 3));
+    return {
+        width: WORLD.initialWidth + step * 480,
+        height: WORLD.initialHeight + step * 320,
+    };
+}
+
+// @ds:19c14fea
+export function scaleWorldEntities(world, nextSize){
+    const sx = nextSize.width / world.width;
+    const sy = nextSize.height / world.height;
+    for( const fish of world.fish || [] ){
+        fish.pos.x *= sx;
+        fish.pos.y *= sy;
+    }
+    world.width = nextSize.width;
+    world.height = nextSize.height;
+    world.nextSizeStep = { ...nextSize };
+}
+
+// @ds:53db39eb
+export function targetNpcCount(world){
+    return Math.max(6, Math.floor(world.width * world.height * WORLD.npcDensity));
+}
+
+// @ds:53db39eb
+export function findLowestDensitySpawn(world, rng){
+    let best = null;
+    let bestScore = Infinity;
+    const fish = world.fish || [];
+    for( let i = 0; i < WORLD.densitySamples; i++ ){
+        const candidate = {
+            x: rng() * world.width,
+            y: rng() * world.height,
+        };
+        let score = 0;
+        for( const other of fish ){
+            const dx = candidate.x - other.pos.x;
+            const dy = candidate.y - other.pos.y;
+            score += 1 / Math.max(80, Math.hypot(dx, dy));
+        }
+        if( score < bestScore ){
+            bestScore = score;
+            best = candidate;
+        }
+    }
+    return best || { x: world.width / 2, y: world.height / 2 };
+}
+
 // @ia 5a6b7c8d
-export function makeWorld(width, height){
-    return { width, height };
+export function makeWorld(width = WORLD.initialWidth, height = WORLD.initialHeight){
+    return { width, height, nextSizeStep: null, fish: [], bubbles: [], tick: 0 };
 }

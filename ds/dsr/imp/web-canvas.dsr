@@ -1,415 +1,594 @@
 # web-canvas.dsr — Implementation Contract (dsr/imp)
 # Generated from: sense/*.dsc + sense/*.air
-# Target: runnable browser app. This is NOT code — it is the contract for imp/.
+# Target: local server-authoritative multiplayer Canvas game. This is NOT code.
 
 stack:
   language: javascript (ES modules)
-  runtime: browser
+  client_runtime: browser
+  server_runtime: Node.js local server
+  server_transport: WebSocket
   rendering: Canvas 2D
-  build: none (open index.html or serve statically)
-  entry: imp/web-canvas/index.html
+  client_entry: web-canvas/index.html
+  server_entry: web-canvas/server.js
 
 references:
   use:
-    - dsr/use/ecs-loop.dsr        # imp may reference use/*
+    - dsr/use/ecs-loop.dsr
   domain:
     - sense/main.dsc
-    - sense/world.dsc
-    - sense/fish.dsc
-    - sense/prey.dsc
-    - sense/predation.dsc
-    - sense/controls.dsc
+    - sense/world/world.dsc
+    - sense/fish/fish.dsc
+    - sense/prey/prey.dsc
+    - sense/predation/predation.dsc
+    - sense/controls/controls.dsc
+    - sense/multiplayer/multiplayer.dsc
+    - sense/multiplayer/ws-protocol.dsc
   air:
     - sense/main.air
-    - sense/world.air
-    - sense/fish.air
-    - sense/prey.air
-    - sense/predation.air
-    - sense/controls.air
+    - sense/world/world.air
+    - sense/fish/fish.air
+    - sense/prey/prey.air
+    - sense/predation/predation.air
+    - sense/controls/controls.air
+    - sense/multiplayer/multiplayer.air
+    - sense/multiplayer/ws-protocol.air
+
+dsr_generation_rules:
+  - "This DSR is an implementation contract: write module/function/state/protocol instructions, not product-level requirement paraphrases."
+  - "Every implementation_instructions block must say what code owns state, what function mutates it, what message or data shape is used, and what edge case is handled."
+  - "Verification text is only a check aid; IMP must implement from contract_map, data_model, implementation_instructions, and protocol algorithms."
 
 file_plan:
-  imp/web-canvas/index.html:        "canvas + module script bootstrap"
-  imp/web-canvas/style.css:         "fullscreen canvas, HUD"
-  imp/web-canvas/src/constants.js:  "tunables; each traceable to an .air id"
-  imp/web-canvas/src/vec.js:        "vec2 helpers"
-  imp/web-canvas/src/world.js:      "bounds clamp + drag"
-  imp/web-canvas/src/fish.js:       "fish data + swim/grow/facing + exhale + serialize (fish.dsc)"
-  imp/web-canvas/src/prey.js:       "wander/flee/spawn (prey.dsc)"
-  imp/web-canvas/src/predation.js:  "overlaps/isEdibleBySize/canEat/resolveEating (predation.dsc)"
-  imp/web-canvas/src/controls.js:   "pointer/keys steering (controls.dsc)"
-  imp/web-canvas/src/step.js:       "pure step(state,input,dt) = compose behaviours"
-  imp/web-canvas/src/render.js:     "draw world + fish (read-only)"
-  imp/web-canvas/src/main.js:       "init + game loop (dsr/use/ecs-loop)"
+  web-canvas/package.json:          "local server scripts and WebSocket dependency"
+  web-canvas/server.js:             "static file server, WebSocket endpoint, authoritative world loop"
+  web-canvas/index.html:            "join form, HUD, canvas, module bootstrap"
+  web-canvas/style.css:             "fullscreen canvas, compact join/HUD controls"
+  web-canvas/src/client-net.js:     "WebSocket client, reconnect code, server snapshots/events"
+  web-canvas/src/protocol.js:       "compact socket protocol encoding/decoding and world sync row codec"
+  web-canvas/src/constants.js:      "world, fish, regime, density, sync, visual tunables"
+  web-canvas/src/vec.js:            "vec2 helpers"
+  web-canvas/src/world.js:          "wrap bounds, drag, resize, density field, bubbles"
+  web-canvas/src/fish.js:           "fish data, identity fields, swim/grow/facing/decor/serialize"
+  web-canvas/src/prey.js:           "NPC wander/flee/density spawn/fry growth"
+  web-canvas/src/predation.js:      "eligibility, attack window, overlaps/canEat/resolveEating"
+  web-canvas/src/controls.js:       "join form, mode selection, pointer/keys/touch/joystick/hunt/leave input"
+  web-canvas/src/hunt.js:           "NPC/user-fish pursuit steering"
+  web-canvas/src/step.js:           "authoritative pure-ish server step plus client prediction helper"
+  web-canvas/src/render.js:         "viewport-follow render over latest client world view"
+  web-canvas/src/main.js:           "client init, join flow, render loop, input send"
 
-contract_map:                       # dsc contract  -> imp symbol
-  world.keepInsideBounds:  world.js#clampToBounds
-  world.applyDrag:         world.js#applyDrag
-  world.emitBubbles:       world.js#emitBubble
-  world.advanceBubbles:    world.js#advanceBubbles  # @ds:d6cebf86 @ia:3c4d5e6f @ia:f4604af3
-  world.triggerExhaleOnAccelStart: step.js#triggerExhaleOnAccelStart  # @ds:67f150ce @ia:d87fe07b
-  fish.integrateMotion:    fish.js#integrate        # now takes mode (cruise|burst)
-  fish.grow:               fish.js#grow
-  fish.updateFacing:       fish.js#updateFacing
-  fish.spendEnergy:        fish.js#spendEnergy       # refined: charges only when mode==burst
-  fish.runExhaleCycle:     fish.js#runExhaleCycle  # @fn:a9a3ed12
-  fish.serializeFish:      fish.js#serializeFish   # @do:a7a50f7b
-  # fish.thrust: already satisfied by fish.js#integrate (no new symbol)
-  prey.wanderSteer:        prey.js#wanderSteer       # returns { accel, mode:'cruise' }
-  prey.fleeSteer:          prey.js#fleeSteer         # returns { accel, mode }
-  prey.maintainPopulation: prey.js#maintainPopulation
-  predation.overlaps:      predation.js#overlaps
-  predation.isEdibleBySize: predation.js#isEdibleBySize  # @ds:98224ab9
-  predation.canEat:        predation.js#canEat       # @ds:98224ab9
-  predation.resolveEating: predation.js#resolveEating
-  predation.hunt:          hunt.js#huntSteer  # @ds:d4f6a1c2
-  controls.pointerSteer:   controls.js#pointerSteer
-  controls.keySteer:       controls.js#keySteer
-  controls.huntMode:       controls.js#huntMode      # burst while Space/mouse/touch held
-  controls.exhaleHotkey:   controls.js#createInput   # @ds:d9fc8d9c
-  controls.inspectClick:   main.js#(canvas click handler)  # @ds:2e1570ed
+contract_map:
+  main.serverModel:                         server.js#startServerWorld  # @ds:27fa3caa @ds:ec8cb052
+  multiplayer.localServer:                  server.js#startLocalServer  # @ds:f359ebf2
+  multiplayer.connectClientInstance:        server.js#handleJoin  # @ds:4bfe0352 @ds:58050922
+  multiplayer.reconnectGrace:               server.js#handleReconnectGrace  # @ds:93a64773
+  multiplayer.convertDisconnectedUserFishToNpc: server.js#convertUserFishToNpc  # @ds:eba75588
+  multiplayer.leaveGame:                    server.js#handleLeaveGame  # @ds:704ab317
+  multiplayer.syncWorld:                    server.js#broadcastWorldSync  # @ds:e559831a @ds:e4d375ed
+  wsProtocol.encoding:                       protocol.js#encodeName protocol.js#decodeName  # @ds:839f8cd0
+  wsProtocol.clientMessages:                 protocol.js#encodeClientJoin protocol.js#parseClientMessage  # @ds:5a4d3d6d
+  wsProtocol.clientDeltaInput:               client-net.js#sendInput  # @ds:671e9773
+  wsProtocol.handshakeState:                 client-net.js#connect server.js#handleMessage  # @ds:4fad33f8
+  wsProtocol.serverSync:                     protocol.js#encodeWorldSync protocol.js#applyWorldSync  # @ds:682570c7
+  wsProtocol.fishRow:                        protocol.js#encodeFishRow protocol.js#parseFishRow  # @ds:ea18a088
+  wsProtocol.stateMods:                      protocol.js#stateMods  # @ds:f51a5030
+  wsProtocol.removedFishRows:                 protocol.js#encodeRemovedFishRow protocol.js#applyWorldSync  # @ds:f51a5030 @ds:a16328a6
+  wsProtocol.events:                         protocol.js#encodeEvent protocol.js#parseEvent  # @ds:a16328a6
+  controls.joinWorldForm:                   controls.js#createJoinFormState  # @ds:34ba255b @ds:58050922
+  controls.noVulnerabilityControl:          controls.js#createJoinFormState controls.js#createInput  # @ds:5377d065
+  controls.deviceType:                      controls.js#detectControlDevice  # @ds:cf6ad7d6
+  controls.modeSelect:                      controls.js#createControlModeState  # @ds:70871bc5
+  controls.leaveGameCommand:                controls.js#createInput  # @ds:fb11044e
+  controls.pointerSteer:                    controls.js#pointerSteer  # @ds:55c13a4f
+  controls.keySteer:                        controls.js#keySteer  # @ds:10baf178
+  controls.immediateInputFlush:              main.js#sendInputIfChanged client-net.js#sendInput  # @ds:10baf178 @ds:22fd3ab4 @ds:671e9773
+  controls.touchSteer:                      controls.js#touchSteer  # @ds:3c41aad0
+  controls.joystickSteer:                   controls.js#joystickSteer  # @ds:b43d2f95
+  controls.huntMode:                        controls.js#huntMode  # @ds:22fd3ab4 @ds:27129cfa @ds:cd1c5776 @ia:6b7c8d9e
+  controls.joystickHuntPlacement:           style.css##joystick-panel style.css##joystick-hunt  # @ds:cd1c5776
+  controls.inspectClick:                    main.js#handleInspectClick  # @ds:2e1570ed
+  controls.camera:                          render.js#worldToViewport  # @ds:7b9a7984
+  controls.toroidalViewportProjection:      render.js#buildToroidalRenderWorld render.js#nearestToroidalCoordinate  # @ds:7b9a7984 @ds:c83f4c1e @ia:dd909d1a
+  client.decorState:                         main.js#applyClientFishDecor main.js#updateClientDecorState  # @ds:975ca168 @ds:bd354b7a @ds:3ddf8f67 @fn:a9a3ed12 @ia:9c0d1e2f @ia:3a4b5c6e
+  debug.toggleMode:                         main.js#toggleDebugMode  # @ds:59c118f5
+  debug.drawWorldRepeatBounds:              render.js#drawDebugWorldRepeatBounds  # @ds:7435b6ce
+  debug.recordPositionTraces:               main.js#recordDebugPositionTraces protocol.js#applyWorldSync  # @ds:727e9afe
+  debug.drawPositionTraces:                 render.js#drawDebugPositionTraces  # @ds:727e9afe
+  debug.drawFishMinimap:                    render.js#drawDebugFishMinimap  # @ds:8f2c91ad
+  debug.drawFishCollisionRadius:            render.js#drawDebugFishCollisionRadius  # @ds:6b4e90d2 @ds:a3e394a8
+  world.wrapPosition:                       world.js#wrapPosition  # @ds:c83f4c1e @ia:dd909d1a
+  world.applyDrag:                          world.js#applyDrag  # @ds:ca07d970
+  world.resizeWorld:                        world.js#nextWorldSize  # @ds:19c14fea
+  world.scaleFishCoordinatesForWorldResize: world.js#scaleWorldEntities  # @ds:19c14fea
+  world.playWorldResize:                    render.js#interpolateWorldResize  # @ds:19c14fea
+  world.maintainNpcDensity:                 world.js#targetNpcCount  # @ds:53db39eb
+  world.findLowestFishDensityArea:          world.js#findLowestDensitySpawn  # @ds:53db39eb
+  world.emitBubbles:                        world.js#emitBubble  # @ds:d6cebf86
+  world.advanceBubbles:                     world.js#advanceBubbles  # @ds:d6cebf86 @ia:3c4d5e6f
+  world.clientLocalBubbles:                  main.js#advanceClientBubbles render.js#drawBubble  # @ds:d6cebf86 @ia:3c4d5e6f
+  world.triggerExhaleOnAccelStart:          step.js#triggerExhaleOnAccelStart  # @ds:67f150ce @ia:d87fe07b
+  world.triggerExhaleOnBurstStart:          main.js#updateClientDecorState main.js#applyClientFishDecor  # @ds:3ddf8f67 @fn:a9a3ed12
+  fish.makeFish:                            fish.js#makeFish  # @ds:1f3abc43 @ds:58050922 @ia:32288dfb
+  fish.integrateMotion:                     fish.js#integrate  # @ds:7ce238da @ds:8869f043
+  fish.wrapInWorld:                         fish.js#integrate  # @ds:c4073e51
+  fish.grow:                                fish.js#grow  # @ds:d867989f
+  fish.updateFacing:                        fish.js#updateFacing  # @ds:8d0ca6a8 @ia:0bdc556b
+  fish.spendEnergy:                         fish.js#spendEnergy  # @ds:f51831f5 @ds:6aa7c828
+  fish.maxSpeedOf:                          fish.js#maxSpeedOf prey.js#capPreySpeed  # @ds:8869f043 @ds:d4f6a1c2
+  fish.updateMouth:                         fish.js#updateMouth  # @ds:975ca168 @ia:9c0d1e2f @ia:0bdc556b
+  fish.updateSwimMotion:                    fish.js#updateSwimMotion  # @ds:bd354b7a @ia:3a4b5c6e
+  fish.updateFearEye:                       fish.js#updateFearEye  # @ds:906be50b @ia:7d8e9f0a
+  fish.updateUserLabel:                     fish.js#updateUserLabel  # @ds:c5a92431
+  fish.updateAbandonedGradient:             fish.js#updateAbandonedGradient  # @ds:c3708d14 @ds:bfd5a97a
+  fish.updateSizeDeltaLabels:                main.js#updateSizeDeltaLabels render.js#drawSizeDeltaLabel  # @ds:c2d7f4a1
+  fish.bodyColorVisual:                     render.js#drawFish  # @ia:32288dfb @ds:f883f90c
+  fish.runExhaleCycle:                      fish.js#runExhaleCycle  # @fn:a9a3ed12
+  fish.serializeFish:                       fish.js#serializeFish  # @do:a7a50f7b
+  prey.wanderSteer:                         prey.js#wanderSteer  # @ds:31cb7a0d
+  prey.fleeSteer:                           prey.js#fleeSteer  # @ds:579e4888 @ds:e699c42d
+  prey.maintainPopulation:                  prey.js#maintainPopulation  # @ds:e6ecfbdd @ds:53db39eb
+  prey.growSpawnedFryToNominalSize:         prey.js#advanceFryGrowth  # @ds:e6ecfbdd
+  predation.overlaps:                       predation.js#overlaps  # @ds:a3e394a8
+  predation.isEdibleBySize:                 predation.js#isEdibleBySize  # @ds:98224ab9
+  predation.canBeVictimOf:                  predation.js#canBeVictimOf  # @ds:32745a4f @ia:01fe68fa
+  predation.canEat:                         predation.js#canEat  # @ds:98224ab9 @ds:32745a4f
+  predation.isLeaveBlockedByUserAttack:     predation.js#isLeaveBlockedByUserAttack  # @ds:8917ad63
+  predation.resolveEating:                  predation.js#resolveEating  # @ds:e9fb3705 @ds:75a5aa4f
+  predation.respawnPlayerAfterEating:       predation.js#respawnUserFishAfterEating  # @ds:39305789 @ds:53db39eb
+  predation.hunt:                           hunt.js#huntSteer  # @ds:d4f6a1c2
 
-data_model_notes:                   # for the implementer
-  - "Every fish carries a 'mode' field: 'cruise' (default) or 'burst'."
-  - "Player mode set by controls.huntMode each tick; prey mode set by huntSteer/fleeSteer/wanderSteer."
-  - "integrate() clamps speed to (mode==='burst' ? maxSpeedOf(size) : cruiseSpeedOf(size))."
-  - "World keeps a bubbles[] decor layer; bubbles are not part of fish/predation state."
-  - "Each fish maintains hidden bubble-burst state so emission can produce 2-5 bubbles in a short sequence."
-  - "Exhale is a reusable action API on fish; gameplay systems may trigger it from different scenarios."
-  - "serializeFish() is read-only and returns structured fish info as text for console/info panel."
-  - "Predation steering uses size eligibility before it selects burst; eating resolution uses canEat after mode is set."
-  - "Prey fear must start before contact pressure is visually obvious: use the prey.air flee radius and acceleration tunables, not a short collision-near radius."
+data_model:
+  world:
+    fields:
+      width: number
+      height: number
+      nextSizeStep: "optional server resize target"
+      fish: "array of all fish, user and NPC"
+      bubbles: "server-side legacy field only; server sync does not transmit bubbles"
+      tick: integer
+  client_render:
+    fields:
+      snapshotBuffer: "recent authoritative world snapshots with receivedAt timestamps"
+      clientBubbles: "client-owned bubble array; never assigned from protocol snapshots"
+      clientBubbleEmitters: "Map fishId -> { bubbleTimer, bubbleBurstRemaining } for client-only decorative bubble generation"
+      debugMode: "boolean toggled by client UI/keyboard; never sent to server"
+      debugPositionTraces: "array of { kind:'relative'|'absolute', pos:{x,y}, createdAt, fadeStartAt, alpha?, fishId? }"
+      debugFishMinimap: "render-only 200x200 px overlay computed from current world.fish positions; never stored in world state"
+      latestAbsoluteServerPositions: "Map fishId -> absolute server pos captured from absolute sync diagnostics"
+      lastDebugTraceAt: "timestamp of last debug trace sample, used to cap trace density"
+      lastSentInputKey: "encoded comparison key for immediate input flush"
+      lastInputFlushAt: "timestamp for unchanged-input idle cadence"
+  fish:
+    common_fields:
+      - id
+      - ownerKind              # user|npc
+      - pos
+      - vel
+      - size
+      - radius
+      - facing
+      - mode                   # cruise|burst
+      - age
+      - eatenFishCount
+      - visual/decor state
+    user_fields:
+      - clientId
+      - temporaryConnectionCode
+      - userName
+      - userColor
+      - userTier               # paid|free
+    npc_fields:
+      - npcRole                # prey|abandoned-user-fish
+      - formerUserColor?
+      - fryAge?
+      - nominalStartSize?
+  server_client_state:
+    server_owns:
+      - fish existence and ownerKind
+      - eating and respawn events
+      - NPC motivations
+      - synchronizing coordinates
+      - world resize steps
+    client_owns:
+      - current input
+      - join form draft values
+      - render interpolation and prediction cache
+      - decorative bubble emission, advancement, and rendering
+      - size delta label accumulation, lifetime, and rendering for the current user fish only
 
-implementation_notes:               # explicit pseudocode — do not improvise beyond this
-  speed_caps: |
-    maxSpeedOf(size)    = FISH.baseSpeed * max(FISH.speedFloor, 1 - FISH.speedDecay*(size-1))
-    cruiseSpeedOf(size) = REGIME.cruiseFactor * maxSpeedOf(size)
-  integrate: |
-    function integrate(fish, accel, dt, world){
-      fish.velocity += accel * dt
-      cap = fish.mode === 'burst' ? maxSpeedOf(fish.size) : cruiseSpeedOf(fish.size)
-      fish.velocity = clampMagnitude(fish.velocity, cap)
-      fish.velocity = applyDrag(fish.velocity, world)   // @ds:ca07d970
-      const dist = magnitude(fish.velocity) * dt
-      fish.position += fish.velocity * dt
-      spendEnergy(fish, dist)                            // gated inside
-      return dist
+implementation_instructions:
+  local_server: |
+    server.js serves static files from web-canvas/ and opens a WebSocket endpoint.
+    The server runs the authoritative world step at a fixed tick rate.
+    Connected clients send compact input messages for their own user fish only.
+    Server broadcasts compact state strings shared by all clients; per-client messages are limited to identity and events.  # @ds:e559831a
+  join_identity: |
+    Join form starts with generated name and generated user color.
+    It includes a paid/free toggle. The toggle is only a local domain attribute,
+    not account or billing integration. User fish body fill starts from the selected
+    user color, with visual overlays preserving that base color.
+    The compact join message is n:${colorHexNoHash}:${base64urlName}:${u|p}.  # @ds:58050922 @ia:32288dfb @ds:5a4d3d6d
+    handleJoin must not create a second user fish for a socket that already controls
+    a restored user fish. If meta.fishId already points to an ownerKind='user' fish,
+    update that fish's userName, userColor, and userTier from the join profile, send
+    identity/world-size/absolute-sync for that same fish, and return without pushing
+    a new fish into world.fish.
+    Otherwise handleJoin creates exactly one user fish with ownerKind='user', userName,
+    userColor, userTier, and a temporaryConnectionCode scoped to this client instance.
+    main.js must hide the join panel after any identity message, not only after a
+    manual join submit, so an automatic reconnect cannot leave an active join form
+    that creates a duplicate user fish.
+  reconnect_and_timeout: |
+    On unexpected socket break, keep the user fish as ownerKind='user' for 3 seconds.
+    During the grace window, continue the last input action.
+    If the same temporaryConnectionCode reconnects in time, restore control by setting
+    fish.clientId to the new socket clientId, setting meta.fishId to fish.id, preserving
+    the existing temporaryConnectionCode, deleting the pending disconnect entry, and
+    sending identity/world-size/absolute-sync for that same fish.
+    A successful reconnect must leave exactly one ownerKind='user' fish for that
+    temporaryConnectionCode and client instance.
+    Otherwise convert the fish to ownerKind='npc', npcRole='abandoned-user-fish',
+    remove userName and userTier, keep formerUserColor, and apply abandoned gradient.  # @ds:93a64773 @ds:eba75588
+  explicit_leave: |
+    handleLeaveGame first calls isLeaveBlockedByUserAttack.
+    If blocked, server rejects the leave command and fish remains user-owned.
+    If allowed, convert immediately to NPC without the 3 second grace.  # @ds:704ab317 @ds:8917ad63
+  world_resize: |
+    nextWorldSize(userFishCount) changes size only across thresholds with hysteresis.
+    When size changes, scale every fish position proportionally:
+      x' = x * newWidth / oldWidth
+      y' = y * newHeight / oldHeight
+    Do not scale fish.size or radius from resize itself.
+    Broadcast the world-size step so clients interpolate coordinate stretching.  # @ds:19c14fea
+  wrap_position: |
+    function wrapPosition(fish, world){
+      fish.pos.x = ((fish.pos.x % world.width) + world.width) % world.width
+      fish.pos.y = ((fish.pos.y % world.height) + world.height) % world.height
     }
-  spendEnergy: |
-    function spendEnergy(fish, dist){
-      if (fish.mode !== 'burst') return                 // cruise/drift are free
-      const ref = ENERGY.refSizes * fish.size           // = 10*size px
-      fish.size *= (1 - ENERGY.lossPerRef * (dist / ref))
-      if (fish.size < ENERGY.minSize) fish.size = ENERGY.minSize
-    }
-  huntMode: |
-    function huntMode(keysDown, pointerDown, touchDown){
-      return (keysDown.has(' ') || pointerDown || touchDown) ? 'burst' : 'cruise'
-    }
-    // steering direction still from pointerSteer/keySteer; huntMode only sets the regime
-  keySteer: |
-    function keySteer(keysDown){
-      // Arrow/WASD with layout-aware equivalents where available
-      // Multiple keys compose one direction vector (e.g. up+left)
-      // If any movement key was active, pointer control remains suppressed
-      // until pointer position changes.
-    }
-  exhaleHotkey: |
-    // input layer sets input.exhaleRequested = true on non-repeat O/Щ keydown
-    // simulation step consumes flag and calls requestExhale(player) only
-  triggerExhaleOnAccelStart: |
-    function triggerExhaleOnAccelStart(fish, accel, prevAccel){
-      // auto-trigger for any fish only on acceleration-start edge  # @ds:67f150ce @ia:d87fe07b
-      // (prev magnitude <= eps && current magnitude > eps)
-      // this scenario is independent from player hotkey exhale
-    }
-  inspectClick: |
-    // on canvas click, find fish under clickPos
-    // if found, log serializeFish(fish)
-  fleeSteer: |
-    function fleeSteer(self, threats){
-      const nearest = nearest threat t where isEdibleBySize(t, self) AND dist(t,self) <= PREY.fleeRadius
-      if (!nearest) return { accel: ZERO, mode: 'cruise' }
-      if (speed(self) > speed(nearest) + PREY.speedMargin) return { accel: ZERO, mode: 'cruise' }
-      const proximity = clamp01((PREY.fleeRadius - dist(nearest,self)) / PREY.fleeRadius)
-      const dir = normalize(self.position - nearest.position)
-      return { accel: dir * (PREY.fleeAccel * proximity), mode: 'burst' }
-    }
-  isEdibleBySize: |
-    function isEdibleBySize(predator, prey){
-      return predator.size > prey.size * PREDATION.eatRatio
-    }
-  canEat: |
-    function canEat(predator, prey){
-      // eating requires the predator to be in burst mode  # @ds:98224ab9
-      return predator.mode === 'burst' && isEdibleBySize(predator, prey)
-    }
-  hunt: |
-    function huntSteer(hunter, targets){
-      const nearest = nearest target t where t !== hunter AND isEdibleBySize(hunter, t) AND dist(hunter,t) <= PREY.fleeRadius
-      if (!nearest) return { accel: ZERO, mode: 'cruise' }
-      if (speed(hunter) > speed(nearest) + PREY.speedMargin) return { accel: ZERO, mode: 'cruise' }
-      const proximity = clamp01((PREY.fleeRadius - dist(hunter,nearest)) / PREY.fleeRadius)
-      const dir = normalize(nearest.position - hunter.position)
-      return { accel: dir * (PREY.fleeAccel * proximity), mode: 'burst' }
-    }
-  emitBubble: |
-    function emitBubble(fish, dt, rng){
-      fish.bubbleTimer -= dt
-      if (fish.bubbleTimer > 0) return null
-      if (fish.bubbleBurstRemaining <= 0) fish.bubbleBurstRemaining = randInt(BUBBLE.burstMinCount, BUBBLE.burstMaxCount)
-      const base = fish.radius * BUBBLE.maxRatio
-      const radius = max(BUBBLE.minRadius, base * (0.6 + 0.4 * rng()))
-      return {
-        pos: { x: fish.pos.x - fish.facing * fish.radius * 0.15, y: fish.pos.y + fish.radius * 0.05 },
-        radius,
-        vel: { x: (rng() - 0.5) * BUBBLE.drift, y: -BUBBLE.riseSpeed * (0.8 + 0.4 * rng()) },
-        life: BUBBLE.life,
-      }
-    }
-  advanceBubbles: |
-    function advanceBubbles(bubbles, dt, world){
-      for each bubble in bubbles:
-        bubble.pos += bubble.vel * dt
-        bubble.life -= dt
-        bubble.alpha = clamp01(bubble.life / BUBBLE.life)
-      remove bubbles with life <= 0 or y + radius < 0 or x outside world by margin
-  runExhaleCycle: |
-    function runExhaleCycle(fish, bubbles, rng, dt){
-      // visual-only effect: never mutate fish.size here
-      // stage machine: idle -> inhale -> exhale -> idle
-      // inhale (0.18s): raise exhaleScale to EXHALE.inhaleScale and pull existing nearby bubbles to mouth
-      // exhale: return exhaleScale to 1.0, emit 9..16 bubbles sequentially with 50ms spacing, and push nearby existing bubbles from mouth
-      // bubble emission in exhale is staggered by EXHALE.emitInterval; emission is not a single bulk spawn
-      // - displacement force uses distance falloff and is zero beyond fish.size radius
-      // - exhale has no time cap; advance to idle only after all planned emissions finish
-    }
-  serializeFish: |
-    function serializeFish(fish){
-      return {
-        type: fish.isPlayer ? 'user' : 'npc',
-        size: fish.size,
-        age: fish.age,
-        eatenFishCount: fish.eatenFishCount
-      }
-    }
-  step_threading: |
-    // in step.js, per fish, each tick:
-    //   player.mode = huntMode(input.keysDown, input.pointerDown)
-    //   if input.exhaleRequested: requestExhale(player) and clear flag  // @ds:d9fc8d9c
-    //   for each prey: try huntSteer first; if no hunt accel, use fleeSteer/wanderSteer; prey.mode = mode
-    //   integrate(fish, accel, dt, world)  // uses fish.mode for cap + energy
-    //   triggerExhaleOnAccelStart(fish, accel, prevAccel) for any fish  // @ds:67f150ce @ia:d87fe07b
-    //   runExhaleCycle(fish, world.bubbles, rng, dt) when a scenario triggers exhale
-    //   emit/advance bubbles as world decor
-    // on canvas click: find fish under cursor, if found log serializeFish(fish)  // @ds:2e1570ed
+    Velocity is not reflected or stopped.  # @ds:c83f4c1e
+  density_spawn: |
+    targetNpcCount = floor(world.width * world.height * WORLD.npcDensity)
+    findLowestDensitySpawn samples candidate cells/points and scores each by
+    distance-weighted count of all fish. Use the lowest score for NPC spawn and
+    user respawn. Density includes user fish and NPC fish.  # @ds:53db39eb
+  npc_spawn_and_growth: |
+    maintainPopulation compares current ownerKind='npc' count to targetNpcCount.
+    New NPC fish spawn at lowest-density areas as fry:
+      size starts at FRY.startSize
+      nominalStartSize = sampleSize(rng)
+      fryAge increases for 10 seconds
+      size interpolates to nominalStartSize during those 10 seconds
+    After fry growth completes, further growth only comes from eating.  # @ds:e6ecfbdd
+  movement_and_energy: |
+    integrate uses mode to select cruiseSpeedOf(size) or maxSpeedOf(size).
+    applyDrag is linear damping.
+    maxSpeedOf(size, ownerKind) computes the size-decayed burst cap, then applies a predator hunt floor, not a fleeing-prey floor:
+      - for ownerKind==='user', the returned burst cap must be at least FISH.minBurstSpeed;
+      - FISH.minBurstSpeed must be greater than PREY.maxSpeed + PREY.speedMargin, so even the largest depleted user fish in burst has a speed advantage over the smallest ordinary NPC prey while that prey is fleeing/accelerating;
+      - ordinary NPC prey remains capped by PREY.maxSpeed in prey.js#capPreySpeed even when mode==='burst';
+      - capPreySpeed must not raise fleeing prey to FISH.minBurstSpeed; that floor belongs to hunter/predator burst movement, not prey escape movement.
+    spendEnergy runs only in burst; cruise and drift preserve size.
+    spendEnergy clamps NPC fish to ENERGY.minSize and user fish to ENERGY.userMinSize.
+    ENERGY.userMinSize must be greater than PREY.minSize * PREDATION.eatRatio, with a small margin, so the smallest fully grown ordinary NPC remains edible by a maximally depleted user fish.  # @ds:f51831f5 @ds:6aa7c828 @ds:d4f6a1c2
+  player_input: |
+    Pointer, keyboard, touch, and joystick input affect only the current client's user fish.
+    The active control-mode switch selects which movement source is processed.
+    Ordinary pointer devices can use pointer or keyboard modes.
+    Mobile/touch devices can use touch or joystick modes.
+    Hunt/burst comes from Space in every selected control mode, or from mouse/touch hold, or from joystick hunt state.
+    No separate vulnerability toggle exists in UI or input state.
+    Implement buildInputPayload() in main.js:
+      - read keySteer(input.keys) first;
+      - if keySteer returns a vector, use it and ignore pointer steering for that frame;
+      - otherwise use pointerSteer only when pointer.active and not pointer.lockedByKeyboard;
+      - normalize the selected vector before sending;
+      - set hunt=true when huntMode(input)==='burst'.
+    controls.js#huntMode must check Space before mode-specific controls so Space can enable burst in keyboard, pointer, touch, and joystick modes.
+    Implement sendInputIfChanged(now):
+      - compute payload = buildInputPayload();
+      - compute key = signed-thousand x/y plus hunt flag, using the same quantization as protocol.encodeClientControl;
+      - if key differs from lastSentInputKey, call net.input(payload) immediately and update lastSentInputKey/lastInputFlushAt;
+      - otherwise call net.idle() only when now-lastInputFlushAt >= 1000ms.
+    Implement controls.js key state cleanup:
+      - keydown adds normalized movement keys and Space to input.keys, and prevents default browser scrolling for those controls;
+      - keyup removes normalized keys;
+      - window blur and document visibilitychange clear input.keys, pointerDown, and touchDown so lost keyup events cannot leave movement or burst stuck;
+      - when any movement key is pressed, pointer.lockedByKeyboard=true until an explicit pointer/touch move unlocks it.
+    Client input is encoded as cXXYYmods where X/Y are signed thousandths
+    of normalized steering and b in mods means burst.  # @ds:91e32235 @ds:70871bc5 @ds:cf6ad7d6 @ds:5377d065 @ds:671e9773
+  mobile_joystick_layout: |
+    style.css owns the on-screen joystick layout.
+    #joystick-panel remains fixed near the bottom of the viewport and keeps pointer-events enabled.
+    #joystick-base is positioned on the right side so the right thumb controls steering.
+    #joystick-hunt is positioned on the left side so the left thumb controls burst.
+    The button must remain press-and-hold: pointerdown sets input.joystick.hunt=true and pointerup/pointercancel/pointerleave clears it.  # @ds:cd1c5776
+  predation_eligibility: |
+    canEat(predator, victim) requires burst, size eligibility, and canBeVictimOf.
+    canBeVictimOf rules:
+      - NPC and abandoned user fish have no user-tier protection.
+      - paid user fish can be eaten only by another paid user fish.
+      - free user fish can be eaten by any ordinary eligible predator.
+    There is no separate player vulnerability mode.  # @ds:32745a4f @ia:01fe68fa @ds:5377d065
+  user_attack_window: |
+    isLeaveBlockedByUserAttack returns true when another user fish is in burst,
+    moving toward current user fish, and distance / currentBurstSpeed < 2.
+    This rule blocks explicit leave only. Socket disconnect still follows
+    reconnect grace then NPC conversion.  # @ds:8917ad63
+  eating_resolution: |
+    resolveWorldEating(world,rng) runs on the server after all fish integration for the tick.
+    For each predator/victim pair:
+      - skip same object and already removed victims;
+      - call canReachForEating(predator,victim) before canEat(predator,victim);
+      - canEat requires predator.mode==='burst', isEdibleBySize, and canBeVictimOf.
+    canReachForEating(predator,victim):
+      - return true when center distance < predator.radius + victim.radius;
+      - otherwise require predator.mode==='burst' and speed > 1e-3;
+      - compute alignment = dot(normalize(predator.vel), normalize(victim.pos-predator.pos));
+      - reject when alignment < 0.55;
+      - allow reach when distance < contactDistance + contactDistance * PREDATION.attackReachRatio.
+    On NPC victim: grow predator, splice victim from world.fish, and adjust outer loop index when needed.
+    On user victim: grow predator and respawnUserFishAfterEating(world,victim,rng) in place, preserving clientId, temporaryConnectionCode, userName, userColor, and userTier.  # @ds:75a5aa4f @ds:39305789 @ds:a3e394a8 @ds:98224ab9
+  client_prediction_and_render: |
+    main.js owns snapshotBuffer and clientBubbles outside state.world.
+    main.js also owns debugMode, debugPositionTraces, and latestAbsoluteServerPositions outside state.world.
+    createClientNet.onSnapshot pushes structuredClone(world) into snapshotBuffer; it must not copy or reset clientBubbles.
+    renderState(now) returns a derived current-position estimate from the newest authoritative snapshot, not an intentionally delayed past snapshot.
+    extrapolateWorld(snapshot,elapsedSeconds):
+      - copy width/height and all non-position fish fields from the newest snapshot;
+      - for each fish, compute visual position as fish.pos + fish.vel * elapsedSeconds;
+      - do not compute mouth, teeth, fin, swim phase, or burst kick as protocol-controlled snapshot fields;
+      - wrap extrapolated positions back into world bounds on both axes;
+      - clamp elapsedSeconds to a short maximum so a stalled socket cannot send fish flying indefinitely;
+      - never invent fish that are absent from the newest snapshot.
+    Client decor:
+      - main.js owns a clientFishDecor Map keyed by fish id;
+      - after extrapolation and before render, applyClientFishDecor advances swimPhase, burstKick, mouthOpen, mouth hold timers, and local exhale cycles using dt;
+      - the input facts for decor are synchronized fish velocity, mode, size, and eatenFishCount deltas;
+      - protocol rows must not encode or decode mouthOpen, teeth state, swimPhase, burstKick, mouth timers, or any other visual-only fish decor field;
+      - server authority over movement must not become server authority over mouth, teeth, or fin animation.
+      - clientFishDecor stores an exhale state object per fish id with the same shape as fish.js#makeFish.exhale; this state is client-only and removed when the fish id is absent from the newest visible world.
+      - updateClientDecorState tracks previous displayed mode separately from burstSwimming; when fish.mode transitions from any non-burst value to 'burst', call requestExhale on the decor exhale state once for that edge. Do not require speed > FISH.facingThreshold for this trigger.
+      - applyClientFishDecor attaches decor.exhale to the temporary visible fish, calls runExhaleCycle(fish, clientBubbles, rng, dt), then copies fish.visualScale from the exhale cycle back into rendered fish state. The cycle may push bubbles into clientBubbles and displace existing client bubbles, but must not write to world.bubbles or protocol fields.
+    frame(now):
+      - compute dt from previous animation frame and clamp with LOOP.maxDt;
+      - const visibleState = renderState(now);
+      - call applyClientFishDecor(visibleState.world, clientBubbles, dt, clientRng) before render and before client bubble emission;
+      - call updateSizeDeltaLabels(visibleState.world, dt) after decor and before render so labels use the same visible current-user size as the frame;
+      - call advanceClientBubbles(clientBubbles, clientBubbleEmitters, visibleState.world, dt, clientRng);
+      - call recordDebugPositionTraces(now, visibleState.world) only when debugMode is true;
+      - call render(ctx, { ...visibleState, clientBubbles, sizeDeltaLabels, debug: { enabled: debugMode, positionTraces: debugPositionTraces } });
+      - call sendInputIfChanged(now) independently from render interpolation.
+    updateSizeDeltaLabels(visibleWorld, dt):
+      - main.js owns `sizeDeltaLabelState = { fishId, lastSize, remainder, labels }` outside state.world;
+      - find the current user fish by visibleWorld fish id;
+      - when no current user fish exists or the id changes, reset fishId, lastSize, remainder, and labels without emitting a catch-up label;
+      - compute sizeDelta = fish.size - lastSize, add it to remainder, then update lastSize to fish.size;
+      - while Math.abs(remainder) >= 0.1, emit one label step with value = sign(remainder) * 0.1 and subtract that step from remainder;
+      - if a single frame contains multiple steps in the same direction, coalesce them into one label whose value is the total emitted amount rounded to one decimal;
+      - labels store `{ fishId, value, age, life, yOffset }`, where value > 0 renders green with a leading plus and value < 0 renders red;
+      - each frame increases age, removes labels with age >= life, and computes yOffset from age/life so the label rises slightly while fading;
+      - labels are client-render-only and must not be written to protocol rows, world.fish, fish.size, or server state.
+    render(ctx,state) projects sizeDeltaLabels through the same toroidal render world as fish: each label attaches to the projected current-user fish position and draws above it with alpha from remaining lifetime.  # @ds:c2d7f4a1
+    advanceClientBubbles(clientBubbles, clientBubbleEmitters, world, dt, rng):
+      - remove emitter entries whose fish ID is absent from world.fish;
+      - for each fish in world.fish, read or create emitter state `{ bubbleTimer: 0, bubbleBurstRemaining: 0 }` from clientBubbleEmitters by fish.id;
+      - call emitBubble with a temporary fish object that combines current visual fish geometry with the local emitter fields;
+      - after emitBubble, write the updated bubbleTimer and bubbleBurstRemaining back to the emitter entry;
+      - push non-null emitted bubbles into clientBubbles;
+      - call advanceBubbles(clientBubbles, world, dt);
+      - do not store these bubbles in world.bubbles.
+    render(ctx,state) reads bubbles from state.clientBubbles first, then state.world.bubbles only for legacy single-process mode.
+    Camera viewport follows current client user fish via worldToViewport(world, followed, canvas).
+    Rendering projects game-world units to canvas pixels.  # @ds:e559831a @ds:7b9a7984 @ds:d6cebf86 @ia:3c4d5e6f @ia:5a6b7c8d
+  toroidal_viewport_projection: |
+    render.js owns viewport projection only; it must not mutate state.world, fish.pos, protocol rows, or snapshotBuffer.
+    worldToViewport(world, followed, canvas) keeps the followed fish's canonical position as the viewport focus.
+    Before drawing fish, bubbles, labels, hit-test overlays, and debug relative/absolute traces, render.js builds a derived render world:
+      - choose anchor = followed.pos when a followed user fish exists, otherwise world center;
+      - for every drawable point p, compute projected p' independently per axis with nearestToroidalCoordinate(pAxis, anchorAxis, worldAxisSize);
+      - nearestToroidalCoordinate(value, anchor, size):
+          candidates = [value - size, value, value + size]
+          return the candidate with the smallest absolute distance to anchor
+      - for fish, copy the fish object shallowly and replace only pos with the projected pos;
+      - for bubbles and debug traces, copy the item shallowly and replace only pos with the projected pos;
+      - keep velocity, facing, size, owner, user identity, and decor fields unchanged.
+    render(ctx,state) draws the projected copies, not canonical state.world.fish positions.
+    drawDebugWorldRepeatBounds draws at least the canonical rectangle and the neighboring repeated rectangles around the anchor so the dashed boundary remains meaningful when the viewport is centered near an edge.
+    viewportToWorld(point, world, followed, canvas) returns the inverse projected coordinate in continuous viewport space; callers that need canonical simulation coordinates must wrap the result back into [0,width) x [0,height).
+    main.js#handleInspectClick must hit-test against the same projected fish copies used by render, then report serializeFish for the original canonical fish object.
+    main.js#buildInputPayload may use the continuous pointer coordinate relative to the followed fish for steering, but must not write that coordinate into world state.
+    Edge examples:
+      - width=100, anchor x=90, fish x=10 => projected fish x=110.
+      - width=100, anchor x=2, fish x=22 => projected fish x=22.
+      - width=100, anchor x=2, fish x=90 => projected fish x=-10.
+    This fixes visual continuity only; canonical wrapPosition remains the simulation authority.  # @ds:7b9a7984 @ds:c83f4c1e @ia:dd909d1a
+  debug_visualization: |
+    main.js owns a client-only debugMode boolean and a debugPositionTraces array.
+    main.js owns lastDebugTraceAt and samples trace points no more often than DEBUG.traceSampleMs, so long sessions cannot append one trace per animation frame per fish.
+    toggleDebugMode() flips debugMode from a local UI control or debug key; it must not send any socket message and must not alter state.world.
+    protocol.js#applyWorldSync already identifies absolute sync messages; extend its diagnostics so each absolute parsed fish row exposes `{ id, pos }` using the server absolute position before client extrapolation.
+    main.js stores those absolute server positions in latestAbsoluteServerPositions during onSnapshot/onDiagnostics handling.
+    recordDebugPositionTraces(now, visibleWorld):
+      - return immediately when now-lastDebugTraceAt < DEBUG.traceSampleMs; otherwise set lastDebugTraceAt=now;
+      - for each fish in visibleWorld.fish, append `{ kind:'relative', fishId: fish.id, pos: { ...fish.pos }, createdAt: now, fadeStartAt: now + 3000 }`;
+      - for each latestAbsoluteServerPositions entry, append `{ kind:'absolute', fishId, pos, createdAt: now, fadeStartAt: now + 3000 }`;
+      - prune traces after fade completes; alpha remains 1 until fadeStartAt, then decreases smoothly to 0 over DEBUG.traceFadeMs.
+    render.js#render passes the active viewport transform to debug drawing after bubbles/fish so overlays are visible.
+    drawDebugWorldRepeatBounds(ctx, world) draws a rectangular stroke from (0,0) to (world.width,world.height).
+    drawDebugFishCollisionRadius(ctx, renderWorld.fish) runs while the viewport transform is active, after fish are drawn and before position traces; it iterates every displayed fish in the projected render world and draws a translucent circular halo centered on fish.pos with radius fish.radius. Use the unscaled collision/contact radius, not fish.radius * visualScale, because predation contact uses fish.radius. The overlay is read-only and must not mutate fish, world, protocol, or server state.
+    drawDebugPositionTraces(ctx, traces, now) draws relative traces as yellow dots and absolute traces as green dots using each trace alpha.
+    drawDebugFishMinimap(ctx, world, currentUserFishId) runs after restoring the viewport transform so its geometry is screen-space UI, not world-space geometry.
+    It draws a 200x200 px square overlay anchored to the top-left debug area using DEBUG.minimapSizePx.
+    It maps each canonical fish position to minimap coordinates:
+      pointSize = fish.id === currentUserFishId ? DEBUG.minimapCurrentUserPointPx : fish.ownerKind === 'user' ? DEBUG.minimapUserPointPx : DEBUG.minimapNpcPointPx
+      minimapX = left + clamp(fish.pos.x / world.width, 0, 1) * (DEBUG.minimapSizePx - pointSize)
+      minimapY = top + clamp(fish.pos.y / world.height, 0, 1) * (DEBUG.minimapSizePx - pointSize)
+    The mapping may read float fish coordinates and must not round or write them back to fish.pos.
+    NPC fish are rendered as 1 px points, other user fish as 3 px points, and the current user's fish as a 5 px point.
+    Point color is derived from the fish's rendered body color: userColor for user fish, formerUserColor for abandoned former user fish, otherwise the NPC hue color.
+    These overlays are render-only diagnostics and must not mutate world, fish, protocol rows, or server state.  # @ds:59c118f5 @ds:7435b6ce @ds:727e9afe @ds:8f2c91ad
+  compact_protocol: |
+    Protocol payloads are ASCII strings over WebSocket with first-character dispatch.
+    Implement client message codecs:
+      - encodeClientJoin({userColor,userName,userTier}) => n:${hexNoHash}:${base64urlName}:${u|p}
+      - encodeClientReconnect(token) => r:${token}
+      - encodeClientPing(n) => p:${n}
+      - encodeClientControl({accel,hunt}) => c${signedThousandX}${signedThousandY}${hunt?'b':''}
+      - parseClientMessage mirrors these shapes and clamps invalid control digits to 0.
+    Implement server message codecs:
+      - encodeIdentity(id,token) => i:${id}:${token}
+      - encodeEvent(type,data) => e:${type}:${data}
+      - encodeWorldSync(world, previousById, absolute) returns { message, state }.
+    encodeWorldSync algorithm:
+      - create nextById from current world.fish snapshots;
+      - emit one encodeFishRow(fish, previousById.get(fish.id), absolute) for each current fish;
+      - when absolute=false, for every id in previousById that is not in nextById, append encodeRemovedFishRow(id);
+      - return message prefix 'a|' for absolute and '|' for delta;
+      - return state=nextById for the caller to store as lastWorldSyncState.
+    Fish row shape:
+      ID:TYPE EATEN_OPT:SIZE_ABS:COLOR1_OPT:COLOR2_OPT:NAME_OPT POS_X_OPT:POS_Y_OPT MOVING_ANG:MOVING_SPEED STATE_MODS
+    encodeRemovedFishRow(id):
+      - output a syntactically valid fish row with id, type n, unchanged/default metadata and state mod e;
+      - parseFishRow must set parsed.eaten=true when mods contains e.
+    applyWorldSync(world,message):
+      - parse absolute flag from prefix;
+      - collect sync diagnostics for absolute messages before mutating existing fish: for each parsed non-eaten row, record fish id, owner kind, previous client position/velocity when present, and parsed absolute server position;
+      - for absolute, start nextFish=[];
+      - for delta, start nextFish as existing world.fish copy;
+      - when parsed.eaten, remove existing fish with that id from nextFish immediately and continue;
+      - when parsed.eaten appears in an absolute message, do not add that row to nextFish;
+      - when parsed id exists, Object.assign parsed fields into the existing object and preserve object identity;
+      - when parsed id is new, push parsed;
+      - assign world.fish to nextFish;
+      - do not clear, create, or mutate client-owned bubble arrays.
+    client-net.js logs absolute-position drift diagnostics after absolute syncs:
+      - select the current user fish plus the first two NPC fish from the diagnostic rows;
+      - use the elapsed time since the previous sync and the previous client velocity to predict the client-side current position at receive time;
+      - print a compact console table with id, role, previous client position, predicted client position, absolute server position, elapsed ms, error dx/dy, and error distance;
+      - skip rows with no previous client position.
+    State mods include a, b, f, e. Names use base64url; colors use hex without #; type is u/p/n.
+    State mods are domain/network facts only. Do not add protocol fields or mods for visual-only mouth, teeth, fin, swim phase, burst kick, or mouth hold state.  # @ds:839f8cd0 @ds:5a4d3d6d @ds:671e9773 @ds:4fad33f8 @ds:682570c7 @ds:ea18a088 @ds:f51a5030 @ds:a16328a6
+  input_latency: |
+    Do not throttle changed input in client-net.js.
+    client-net exposes:
+      - input(payload): sends encodeClientControl(payload) immediately when joined;
+      - idle(): sends encodeClientPing(++pingCounter) when joined.
+    client-net must not run a separate ping setInterval while main.js owns the idle cadence.
+    main.js owns throttling:
+      - changed key/control state sends input() on the same animation frame;
+      - unchanged state sends idle() at 1000ms cadence.
+    Reset lastSentInputKey after identity i:${ID}:${token}.  # @ds:10baf178 @ds:22fd3ab4 @ds:671e9773
+  fish_body_color_visual: |
+    render.js#drawFish resolves the base body fill before drawing any user fish decoration.
+    For ownerKind='user':
+      - body silhouette fill must use fish.userColor directly for the whole fish body base;
+      - shadows, belly, gill lines, fins, highlights, and decorative fragments must be drawn as transparent black/white overlays on top of the base fill, using rgba/globalAlpha or compositing that lets userColor remain visible;
+      - do not use fixed replacement colors such as hard-coded cyan shadow/light fills for user-fish body regions;
+      - mouth cavity, teeth, eyes, and text label may keep semantic non-body colors because they are not body-color decoration.
+    For ordinary NPC fish, keep yellow-toned HSL palette.
+    For abandoned former user fish, draw the existing former-user-color to NPC-yellow gradient as the base and apply the same transparent overlay policy to decoration.  # @ia:32288dfb @ds:f883f90c @ds:bfd5a97a
+  fish_mouth_visual: |
+    render.js#drawFish draws the body silhouette before drawing the mouth.
+    For mouthOpenRatio > 0:
+      - use the legacy snout-mounted curved cavity proportions: mouthX = snoutX - r*0.1, mouthWidth = r*(0.22 + mouthOpenRatio*0.16), mouthHeight = r*(0.45 + mouthOpenRatio*0.8);
+      - draw a dark filled cavity with quadratic curves from the snout contour toward mouthX so the open mouth reads as a curved cut in the head;
+      - draw the lip as a stroked curved contour over the cavity.
+    Teeth:
+      - render only when 0 < mouthOpenRatio < MOUTH.chaseOpenRatio + 0.05;
+      - use the legacy sparse predator accent: five small triangular teeth per jaw, placed along the upper and lower cavity edges;
+      - keep the teeth small enough to remain an accent on the mouth shape.  # @ds:975ca168 @ia:9c0d1e2f
+  fish_facing_and_burst_mouth_state: |
+    fish.js#updateFacing derives visual facing from fish.vel.x with FISH.facingThreshold hysteresis; do not add a server protocol field for facing direction.
+    protocol.js may preserve previous client facing while decoding rows, but the client fish update/render path must be able to derive facing from movement.
+    In multiplayer rendering, main.js#updateClientDecorState computes chaseOpen on the client when fish.mode==='burst' and synchronized speed is above FISH.facingThreshold.
+    Do not encode mouthOpen over the protocol; derive the toothed chase mouth locally from synchronized mode and speed.
+    Do not open toothed chase mouth for ordinary direction changes, cruise movement, or inertial movement.
+    Eating can still open the mouth through the existing mouthHold/mouthEatenSize path.  # @ds:8d0ca6a8 @ds:975ca168 @ia:0bdc556b
+  serialization: |
+    serializeFish returns structured text.
+    Always include type, size, age, eatenFishCount.
+    For user fish also include userName, userColor, userTier.  # @do:a7a50f7b
+  inspect_click: |
+    Convert canvas click to world coordinates using the current viewport transform.
+    Find any fish under the click and log serializeFish(fish).  # @ds:2e1570ed
 
-new_constants:
-  FISH.baseRadius:    16            # @ia:1e2f3a4b
-  REGIME.cruiseFactor: 0.55         # @ia:5e6f7a8b
-  BUBBLE.maxRatio:     0.08         # @ia:9e0f1a2b
-  BUBBLE.minRadius:    1.1          # @ia:9e0f1a2b
-  BUBBLE.baseInterval:  0.8         # @ia:3c4d5e6f
-  BUBBLE.intervalJitter: 0.8        # @ia:3c4d5e6f
-  BUBBLE.life:         1.6          # @ia:3c4d5e6f
-  BUBBLE.riseSpeed:    18           # @ia:f4604af3
-  BUBBLE.drift:        8            # @ia:3c4d5e6f
-  BUBBLE.burstMinCount: 2           # @ia:7a8b9c0d
-  BUBBLE.burstMaxCount: 5           # @ia:7a8b9c0d
-  BUBBLE.gapMinPx:     2            # @ia:7a8b9c0d
-  BUBBLE.gapMaxRatio:  1            # @ia:7a8b9c0d
-  EXHALE.inhaleScale:  1.10         # @fn:a9a3ed12
-  EXHALE.emitInterval: 0.05         # @fn:a9a3ed12
-  EXHALE.emitMinCount: 9            # @fn:a9a3ed12
-  EXHALE.emitMaxCount: 16           # @fn:a9a3ed12
-  EXHALE.influenceRadiusSizes: 1    # @ia:617964be
-  PREY.fleeRadius:     240           # @ds:579e4888 @ds:e6ecfbdd
-  PREY.fleeAccel:      760           # @ds:579e4888 @ds:e6ecfbdd
-  PREY.speedMargin:    35            # @ia:5f6a7b8c
-  # reuse existing: ENERGY.lossPerRef=0.10, ENERGY.refSizes=10, ENERGY.minSize=0.2
+new_or_changed_constants:
+  SERVER.tickRate: 30                 # @ds:e4d375ed
+  SYNC.snapshotHz: 10                 # @ds:e559831a @ds:682570c7
+  SYNC.maxExtrapolationMs: 180        # @ds:e559831a @ds:7b9a7984
+  RECONNECT.graceSeconds: 3           # @ds:93a64773
+  LEAVE.attackWindowSeconds: 2        # @ds:8917ad63
+  WORLD.initialViewportScale: 1.5     # @ds:19c14fea
+  WORLD.resizeHysteresisUsers: 1      # @ds:19c14fea
+  WORLD.npcDensity: "tunable per area" # @ds:53db39eb
+  FRY.startSize: "below nominal spawn size" # @ds:e6ecfbdd
+  FRY.growthSeconds: 10               # @ds:e6ecfbdd
+  REGIME.cruiseFactor: 0.55           # @ia:5e6f7a8b
+  PLAYER.startSize: 1                 # @ds:39305789
+  FISH.minBurstSpeed: "greater than PREY.maxSpeed + PREY.speedMargin; predator/user hunt floor, not fleeing-prey cap" # @ds:8869f043 @ds:d4f6a1c2 @ia:2d3e4f5a
+  ENERGY.userMinSize: "greater than PREY.minSize * PREDATION.eatRatio" # @ds:6aa7c828
+  BUBBLE.maxRatio: 0.08               # @ia:9e0f1a2b
+  BUBBLE.minRadius: 1.1               # @ia:9e0f1a2b
+  EXHALE.inhaleScale: 1.10            # @fn:a9a3ed12
+  EXHALE.emitInterval: 0.05           # @fn:a9a3ed12
+  EXHALE.emitMinCount: 9              # @fn:a9a3ed12
+  EXHALE.emitMaxCount: 16             # @fn:a9a3ed12
+  DEBUG.traceVisibleMs: 3000          # @ds:727e9afe
+  DEBUG.traceFadeMs: "short smooth fade, e.g. 700ms" # @ds:727e9afe
+  DEBUG.traceSampleMs: 150            # @ds:727e9afe
+  DEBUG.relativeTraceColor: "yellow"  # @ds:727e9afe
+  DEBUG.absoluteTraceColor: "green"   # @ds:727e9afe
+  DEBUG.minimapSizePx: 200             # @ds:8f2c91ad
+  DEBUG.minimapNpcPointPx: 1           # @ds:8f2c91ad
+  DEBUG.minimapUserPointPx: 3          # @ds:8f2c91ad
+  DEBUG.minimapCurrentUserPointPx: 5   # @ds:8f2c91ad
+  SIZE_DELTA_LABEL.step: 0.1           # @ds:c2d7f4a1
+  SIZE_DELTA_LABEL.lifeSeconds: "short temporary fade, about 1s" # @ds:c2d7f4a1
+  SIZE_DELTA_LABEL.risePx: "small upward movement while fading" # @ds:c2d7f4a1
+  SIZE_DELTA_LABEL.gainColor: "green"  # @ds:c2d7f4a1
+  SIZE_DELTA_LABEL.lossColor: "red"    # @ds:c2d7f4a1
 
-fish_mouth:
-  # Three states drive the mouth; stored as plain numbers on each fish object.
-  # mouthOpen    : 0..1  — current open ratio; 0 = fully closed, 1 = fully agape
-  # mouthHold    : seconds remaining in the post-eat hold; drives eat state
-  # mouthEatenSize: size of the last eaten prey, decays back to 0 over time
+verification_checks:
+  - "A local server is the source of truth even with one connected user."
+  - "Join form allows generated/overridden name and color plus paid/free toggle."
+  - "Each client controls only its own user fish."
+  - "After automatic reconnect, pressing or exposing the join flow cannot create a second ownerKind='user' fish for the same client instance or temporaryConnectionCode."
+  - "Unexpected socket break has a 3 second reconnect grace, then fish becomes NPC."
+  - "Explicit leave immediately converts to NPC unless active user-vs-user attack window blocks it."
+  - "Server broadcasts world events and coordinate corrections; client prediction cannot override server events."
+  - "World edges wrap horizontally and vertically without stopping fish."
+  - "World resize scales fish coordinates but not fish sizes; clients animate resize playback."
+  - "NPC count follows target density over world area."
+  - "NPC spawn and user respawn choose areas with lowest current density over all fish."
+  - "New NPC fish appear as fry and grow to nominal start size over 10 seconds."
+  - "Paid user fish can be eaten only by paid user fish; free user fish can be eaten by any ordinary eligible predator."
+  - "The UI has no separate user-fish vulnerability toggle; eligibility comes from paid/free tier."
+  - "Abandoned former user fish loses user-tier protection and uses former color to NPC-yellow gradient."
+  - "Predation still requires contact, larger predator, and predator burst mode."
+  - "A burst attack that visually reaches an eligible smaller fish triggers eating without requiring pixel-perfect center overlap."
+  - "Remote fish motion is rendered smoothly between authoritative snapshots."
+  - "Remote fish crossing a world edge interpolates through the nearest toroidal path instead of flashing across the center of the map."
+  - "When the followed fish is near a wrapped edge, NPC fish near the opposite canonical edge are drawn at the nearest toroidal image relative to the followed fish, for example x=10 as x=110 when the followed fish is at x=90 in width=100."
+  - "Decorative bubbles are generated, advanced, and rendered client-side from visible fish state."
+  - "Removed fish disappear on clients immediately after an e tombstone delta row."
+  - "Keyboard key-down/key-up and burst transitions are sent without waiting for the idle input cadence."
+  - "Space enables burst in keyboard, pointer, touch, and joystick modes."
+  - "In joystick mode, the steering joystick is on the right side of the screen and the Burst press-and-hold control is on the left."
+  - "Losing focus clears local key and pointer/touch pressed state so movement and burst cannot remain stuck."
+  - "Unchanged input sends p:${N} at one-second cadence, with no faster ping heartbeat."
+  - "User fish body decoration preserves the selected user color across the full body through transparent overlays."
+  - "An open mouth uses the legacy curved snout cavity and small predator teeth."
+  - "Only the current client's own user fish shows green +0.1-step size gain labels and red -0.1-step size loss labels; continuous losses accumulate discretely and labels fade while rising."
+  - "User respawn preserves paid/free type."
+  - "The WebSocket protocol uses ASCII string messages, base64url names, delta controls, handshake setup, shared absolute/delta world sync, compact fish rows, state mods, and specific client events."
+  - "Camera follows the current client's user fish."
+  - "serializeFish includes user name/color/tier only for user fish."
+  - "Debug mode can be toggled locally and has no server/protocol side effect."
+  - "Debug mode draws the repeating world rectangle at the current world min/max bounds."
+  - "Debug position traces show client-computed points in yellow and absolute server points in green; each point stays visible for 3 seconds and then fades out."
+  - "Fish visual facing is derived from movement, while toothed chase mouth opens only for burst/hunt, not ordinary steering or cruise movement."
+  - "Remote fish tail/fin animation continues during server-authoritative rendering at cruise speed and during burst."
+  - "A large user fish in hunt/burst can reach at least FISH.minBurstSpeed, which is greater than PREY.maxSpeed + PREY.speedMargin, while ordinary NPC prey remains capped by PREY.maxSpeed even during flee acceleration."
+  - "A user fish depleted by burst remains larger than PREY.minSize by the predation margin and can still eat the smallest fully grown ordinary NPC."
 
-  data_model_fields:
-    mouthOpen: 0
-    mouthHold: 0
-    mouthEatenSize: 0
-
-  contract_map:
-    fish.decor.mouth.update:  fish.js#updateMouth   # call at end of integrate()
-    fish.decor.mouth.eatHook: fish.js#grow           # grow() already fires on eat; add 2 lines there
-
-  updateMouth: |
-    # Call: updateMouth(fish, accel, dt)
-    # Must be called AFTER spendEnergy, BEFORE updateFacing.
-
-    function updateMouth(fish, accel, dt):
-      # decay post-eat state
-      if fish.mouthHold > 0:
-        fish.mouthHold = max(0, fish.mouthHold - dt)
-      if fish.mouthEatenSize > 0:
-        fish.mouthEatenSize = max(0, fish.mouthEatenSize - dt * fish.size * 2)
-
-      # eat open: mouth tracks prey size relative to predator size
-      eatOpen = 0
-      if fish.mouthHold > 0:
-        eatOpen = clamp01(fish.mouthEatenSize / max(1, fish.size))
-
-      # chase open: any active burst thrust => slight open (fixed ratio)
-      isBursting = fish.mode === 'burst' AND magnitude(accel) > 1e-3
-      chaseOpen  = isBursting ? MOUTH.chaseOpenRatio : 0
-
-      fish.mouthOpen = max(chaseOpen, eatOpen)
-
-  eatHook: |
-    # Add 2 lines at the END of fish.js#grow (called on predation overlap):
-    fish.mouthEatenSize = max(fish.mouthEatenSize, preySize)
-    fish.mouthHold      = max(fish.mouthHold, MOUTH.holdDuration)
-
-  render_mouth: |
-    # All drawing inside drawFish(), inside the save()/restore() block,
-    # AFTER the body ellipse fill, BEFORE the tail.
-    # Coordinate space: fish already translated + scaled by facing.
-
-    function drawMouth(ctx, f, mouthOpen):
-      if mouthOpen <= 0: return
-      r = f.radius
-
-      # The mouth arc sits on the right (snout) side of the body ellipse.
-      cx = r * 0.42                # x center of mouth on the snout
-      cy = -r * 0.1                # slightly above mid-height
-      # Arc half-angle: 0 = closed line, π*0.85 = fully agape
-      halfAngle = clamp(mouthOpen * Math.PI * 0.85, 0.01, Math.PI * 0.85)
-
-      # Dark inner cavity
-      ctx.fillStyle = '#1a0a0a'
-      ctx.beginPath()
-      ctx.moveTo(cx, cy)
-      ctx.arc(cx, cy, r * 0.32, -halfAngle, halfAngle)
-      ctx.closePath()
-      ctx.fill()
-
-      # Lip outline
-      ctx.strokeStyle = f.isPlayer ? '#3ab0e0' : `hsl(${f.hue}, 55%, 40%)`
-      ctx.lineWidth   = max(1, r * 0.06)
-      ctx.stroke()
-
-      # Teeth visible only in chase mode (mouthOpen < MOUTH.chaseOpenRatio + small margin)
-      # i.e. teeth appear when burst-open but NOT when wide-open from eating
-      showTeeth = mouthOpen < (MOUTH.chaseOpenRatio + 0.05)
-      if showTeeth:
-        ctx.fillStyle = '#f3fbff'
-        # upper row: 2 small triangles along the top arc
-        const toothCount = 2
-        for i in [0, 1]:
-          angle = -halfAngle * 0.7 + i * halfAngle * 0.7
-          tx = cx + r * 0.28 * cos(angle)
-          ty = cy + r * 0.28 * sin(angle) - r * 0.06
-          ctx.beginPath()
-          ctx.arc(tx, ty, max(1, r * 0.04), 0, Math.PI * 2)
-          ctx.fill()
-
-  render_call_site: |
-    # In render.js#drawFish, just after body ellipse fill and before the tail block:
-    drawMouthIfOpen(ctx, f)
-
-    # Inline helper inside render.js (or inline in drawFish):
-    function drawMouthIfOpen(ctx, f):
-      const open = Math.max(0, Math.min(1, f.mouthOpen || 0))
-      if (open <= 0) return
-      # … use render_mouth pseudocode above …
-
-new_constants_mouth:
-  MOUTH:
-    chaseOpenRatio: 0.22            # @ia:9c0d1e2f
-    holdDuration:   0.40            # @ia:9c0d1e2f
-    # mouthEatenSize decays at rate (fish.size * 2) per second
-
-fish_swim_motion:
-  data_model_fields:
-    swimPhase: 0                    # radians; drives tail/fin oscillation
-    burstKick: 0                    # 0..1 temporary wider swing after burst starts
-    wasBurstThrusting: false        # edge detector for burst start
-
-  contract_map:
-    fish.decor.swimMotion.update: fish.js#updateSwimMotion
-
-  updateSwimMotion: |
-    function updateSwimMotion(fish, accel, dt){
-      const speed = magnitude(fish.velocity)
-      const thrusting = magnitude(accel) > 1e-3
-      const burstThrusting = thrusting && fish.mode === 'burst'
-      if (burstThrusting && !fish.wasBurstThrusting) fish.burstKick = 1
-      fish.wasBurstThrusting = burstThrusting
-      fish.burstKick = max(0, fish.burstKick - dt * SWIM.kickDecay)
-      fish.swimPhase += dt * (SWIM.basePhaseRate + speed * SWIM.speedPhaseRate)
-    }
-
-  render_motion: |
-    # render.js#drawFish reads swimPhase/burstKick only; it does not mutate state.
-    # tailWave = sin(swimPhase) * radius * (baseTail + burstTail + kickTail)
-    # finWave  = sin(swimPhase + phaseOffset) * radius * (baseFin + burstFin + kickFin)
-    # Apply tailWave to tail control points and finWave to fin control points.
-
-new_constants_swim:
-  SWIM:
-    basePhaseRate: 4.5              # radians/s idle swim motion
-    speedPhaseRate: 0.045           # extra radians/s per px/s
-    tailBaseSwing: 0.18             # calm tail swing in radii
-    tailBurstSwing: 0.28            # burst/kick tail addition in radii
-    finBaseSwing: 0.12              # calm fin swing in radii
-    finBurstSwing: 0.18             # burst/kick fin addition in radii
-    kickDecay: 4.5                  # seconds^-1 decay after burst starts
-
-fish_fear_eye:
-  data_model_fields:
-    eyeFear: 0                      # 0..1 visual fear value; renderer scales eye
-
-  contract_map:
-    fish.decor.fearEye.update: fish.js#updateFearEye
-
-  updateFearEye: |
-    function updateFearEye(fish, accel, dt){
-      const thrusting = magnitude(accel) > 1e-3
-      const fleeing = !fish.isPlayer && fish.mode === 'burst' && thrusting
-      const target = fleeing ? 1 : 0
-      const rate = fleeing ? FEAR_EYE.riseRate : FEAR_EYE.decayRate
-      fish.eyeFear += (target - fish.eyeFear) * min(1, dt * rate)
-    }
-
-  render_eye: |
-    # render.js#drawFish uses eyeFear read-only.
-    # eyeScale = 1 + (FEAR_EYE.maxScale - 1) * clamp01(fish.eyeFear)
-    # apply eyeScale to iris, pupil, and highlight radius.
-
-new_constants_fear_eye:
-  FEAR_EYE:
-    maxScale: 1.35                  # modest eye growth while fleeing
-    riseRate: 7                     # seconds^-1 toward fear
-    decayRate: 4                    # seconds^-1 back to normal
-
-acceptance_rules:
-  - "Player fish follows pointer; capped speed; clamps at world edges."
-  - "A fish eats an overlapping smaller fish only while the predator is in burst mode."
-  - "Eating increases player size with diminishing returns."
-  - "Default regime is cruise: swimming in cruise keeps size constant (no shrink)."
-  - "Player burst on Space or mouse/touch hold => speed up to maxSpeed AND size shrinks."
-  - "Prey wander in cruise (no size cost) and never starve to MIN by wandering."
-  - "Prey burst only when a threat that can eat them is within fleeRadius; strength scales with proximity; skip burst if already outrunning the threat by speedMargin."
-  - "Burst travel of 10*size distance => -1% size; size floored at MIN_SIZE."
-  - "runExhaleCycle has two strict phases: inhale (pull existing bubbles) then exhale (emit 9-16 and push existing bubbles)."
-  - "Exhale emission is sequential: bubbles are released with EXHALE.emitInterval (0.05s / 50ms) spacing, not as a single-frame bulk spawn."
-  - "Auto-exhale is triggered for any fish on acceleration-start edge only; player hotkey exhale remains a separate scenario."
-  - "Exhale scaling is visual-only; fish.size and related gameplay physics stay unchanged by exhale itself."
-  - "serializeFish output always contains exactly: type(user|npc), size, age, eatenFishCount."
-  - "Fish periodically emit bubbles during idle; bubble radius is at least 3px and usually around 7% of the emitter's visual size."
-  - "Bubble emissions happen in short bursts of 2-5 bubbles with a small gap between consecutive bubbles (during idle/cruise emission, not exhale)."
-  - "Bubbles rise, drift, fade, and are culled when they leave the world or expire."
-  - "Prey population auto-refills toward target count."
-  - "No fail state; player never removed (predation.symmetry)."
-  - "Runs at ~60fps on a laptop; opens with a static file server."
-
-preferred_agent: "any code-capable model"
+preferred_agent: "strong coding model for IMP; server/client split is non-trivial"

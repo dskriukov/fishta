@@ -4,9 +4,13 @@
 
 Алгоритм работы агента должен жестко соблюдать правила и сценарии, описанные в Domain Sense.
 
-Единственный нормативный источник концепта, команд и стадий:
+Нормативный источник концепта, команд и стадий поставляется расширением VS Code:
 
-- [ds/Domain Sense IA.md](ds/Domain%20Sense%20IA.md)
+- `vscode-extension:domain-sense/Domain Sense IA.md`
+
+Локальная конфигурация workspace:
+
+- [ds.config.md](ds.config.md)
 
 Демо-реализация:
 

@@ -1,0 +1,7 @@
+# ws-protocol.air — Agent Interpretation Reference
+
+rationale_notes:
+  - "Protocol structure is ASCII so the first-character dispatch and separators remain cheap and unambiguous; user-facing names are base64url encoded when they may contain non-ASCII text."
+  - "The server broadcasts one shared world state stream to all clients; per-client messages are limited to identity and short events."
+  - "Idle clients send periodic ping rather than repeating zero control messages."
+  - "The idle ping period is one second; adding a faster unchanged-input heartbeat violates the protocol even if changed control messages remain immediate."

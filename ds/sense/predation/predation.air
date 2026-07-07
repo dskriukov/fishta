@@ -2,3 +2,7 @@
 
 rationale_notes:
   - "Distinguish size eligibility from immediate eating. Steering decisions may use isEdibleBySize before burst is selected; resolveEating must use canEat so contact eating remains burst-only."
+  - "User-fish victim eligibility is derived from paid/free user tier, not from a separate player vulnerability mode."
+  - "Player respawn is part of predation resolution for any eaten user fish; it preserves user tier, restores the player's start size, and prevents permanent player removal."
+  - "Paid/free protection applies only while a fish is a user fish; after leave or timeout conversion, the fish is NPC and loses user-tier protection."
+  - "Explicit leave blocking is an anti-escape rule for active user-vs-user attacks, based on burst movement toward the target and a time-to-reach window under 2 seconds."

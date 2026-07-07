@@ -2,9 +2,19 @@
 
 rationale_notes:
   - "Hunt input changes movement regime, not steering source."
-  - "Keyboard steering has priority over pointer steering until pointer movement reactivates pointer control."
+  - "Explicit control-mode selection replaces implicit last-input switching and priority rules."
   - "Movement keys support layout equivalents where possible, and simultaneous keys compose direction."
-  - "Fixed camera is a deliberate scope boundary for the current stage."
+  - "There is no separate vulnerability control; paid/free user tier is chosen at join time and predation consumes that tier."
+  - "Camera follows the current client's user fish; the full multiplayer world need not fit on screen."
+  - "Paid/free user type is a temporary join-form choice, not an external account integration."
+  - "Touch movement and touch hunt are separate touch roles: the first touch steers, the second touch enables burst."
 
 input_bindings:
-  hunt: [ "Space", "mouse-button-held", "touch-held" ]
+  control_modes:
+    pointer_device: [ "keyboard", "pointer" ]
+    touch_device: [ "touch", "joystick" ]
+  hunt:
+    keyboard: [ "Space" ]
+    pointer: [ "mouse-button-held" ]
+    touch: [ "second-touch-held" ]
+    joystick: [ "separate-on-screen-hunt-control" ]

@@ -14,8 +14,22 @@ function isMovementKey(key){
         || key === 'a' || key === 'd' || key === 'w' || key === 's';
 }
 
-function isExhaleKey(key){
-    return key === 'o' || key === 'щ';
+function isControlKey(key){
+    return isMovementKey(key) || key === ' ' || key === 'Space';
+}
+
+// @ds:cf6ad7d6
+export function detectControlDevice(){
+    return window.matchMedia?.('(pointer: coarse)').matches ? 'touch' : 'pointer';
+}
+
+// @ds:70871bc5
+export function createControlModeState(initialMode = null){
+    const device = detectControlDevice();
+    return {
+        device,
+        active: initialMode || (device === 'touch' ? 'touch' : 'pointer'),
+    };
 }
 
 // ds:55c13a4f
@@ -39,6 +53,14 @@ export function keySteer(keys){
     return scale(normalize(v(dx, dy)), FISH.accel);
 }
 
+// ds:b43d2f95
+export function joystickSteer(joystick){
+    if( !joystick?.active ) return null;
+    const vector = joystick.vector || v(0, 0);
+    if( len(vector) < 1e-3 ) return v(0, 0);
+    return scale(normalize(vector), FISH.accel * Math.min(1, len(vector)));
+}
+
 // ds:55c13a4f ds:10baf178
 export function playerSteer(player, input){
     const keyAccel = keySteer(input.keys);
@@ -48,8 +70,15 @@ export function playerSteer(player, input){
 }
 
 // ds:22fd3ab4
-export function huntMode(input){
-    return (input.keys.has(' ') || input.keys.has('Space') || input.pointerDown || input.touchDown) ? 'burst' : 'cruise';
+// @ia:6b7c8d9e
+export function huntMode(input, activeControlMode = null){
+    if( input.keys.has(' ') || input.keys.has('Space') ) return 'burst';
+    const mode = activeControlMode || 'auto';
+    if( mode === 'keyboard' ) return 'cruise';
+    if( mode === 'pointer' ) return input.pointerDown ? 'burst' : 'cruise';
+    if( mode === 'touch' ) return input.touchCount >= 2 ? 'burst' : 'cruise';
+    if( mode === 'joystick' ) return input.joystick.hunt ? 'burst' : 'cruise';
+    return (input.keys.has(' ') || input.keys.has('Space') || input.pointerDown || input.touchCount >= 2 || input.joystick.hunt) ? 'burst' : 'cruise';
 }
 
 // @ia 6b7c8d9e
@@ -58,8 +87,9 @@ export function createInput(canvas){
         pointer: { pos: v(0, 0), active: false, lockedByKeyboard: false },
         pointerDown: false,
         touchDown: false,
+        touchCount: 0,
+        joystick: { active: false, vector: v(0, 0), hunt: false },
         keys: new Set(),
-        exhaleRequested: false,
     };
 
     const setPointer = (clientX, clientY, unlockKeyboardLock = false) =>{
@@ -69,30 +99,53 @@ export function createInput(canvas){
         if( unlockKeyboardLock ) input.pointer.lockedByKeyboard = false;
     };
 
+    // @ds:10baf178 @ds:22fd3ab4
+    const clearPressedControls = () =>{
+        input.keys.clear();
+        input.pointerDown = false;
+        input.touchDown = false;
+        input.touchCount = 0;
+        input.joystick.active = false;
+        input.joystick.vector = v(0, 0);
+        input.joystick.hunt = false;
+    };
+
     canvas.addEventListener('mousemove', e => setPointer(e.clientX, e.clientY, true));
     canvas.addEventListener('mouseleave', () =>{ input.pointer.active = false; input.pointerDown = false; });
     canvas.addEventListener('mousedown', e =>{ setPointer(e.clientX, e.clientY); input.pointerDown = true; });
     window.addEventListener('mouseup', () =>{ input.pointerDown = false; });
     canvas.addEventListener('touchstart', e =>{
+        input.touchCount = e.touches.length;
         const touch = e.touches[0];
         if( !touch ) return;
         setPointer(touch.clientX, touch.clientY);
         input.touchDown = true;
     }, { passive: true });
     canvas.addEventListener('touchmove', e =>{
+        input.touchCount = e.touches.length;
         const touch = e.touches[0];
         if( !touch ) return;
         setPointer(touch.clientX, touch.clientY, true);
     }, { passive: true });
-    canvas.addEventListener('touchend', () =>{ input.pointer.active = false; input.touchDown = false; });
+    canvas.addEventListener('touchend', e =>{
+        input.touchCount = e.touches.length;
+        const touch = e.touches[0];
+        input.touchDown = Boolean(touch);
+        if( touch ) setPointer(touch.clientX, touch.clientY);
+        else input.pointer.active = false;
+    });
 
     window.addEventListener('keydown', e =>{
         const key = normalizeKey(e.key);
+        if( isControlKey(key) ) e.preventDefault();
         input.keys.add(key);
         if( isMovementKey(key) ) input.pointer.lockedByKeyboard = true;
-        if( !e.repeat && isExhaleKey(key) ) input.exhaleRequested = true; // ds:d9fc8d9c
     });
     window.addEventListener('keyup', e =>{ input.keys.delete(normalizeKey(e.key)); });
+    window.addEventListener('blur', clearPressedControls);
+    document.addEventListener('visibilitychange', () =>{
+        if( document.hidden ) clearPressedControls();
+    });
 
     return input;
 }

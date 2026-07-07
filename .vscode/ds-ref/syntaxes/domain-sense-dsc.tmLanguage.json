@@ -43,7 +43,7 @@
       "patterns": [
         {
           "name": "meta.reference.domain-sense",
-          "match": "(@)(ds|ia|fn|it|do|eg)(:)([a-zA-Z0-9_.-]+)",
+          "match": "(@)(ds|ia|fix|fn|it|do|eg)(:)([a-zA-Z0-9_.-]+)",
           "captures": {
             "1": { "name": "punctuation.definition.comment.domain-sense" },
             "2": { "name": "keyword.control.marker-kind.domain-sense" },

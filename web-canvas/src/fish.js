@@ -14,13 +14,29 @@ export function radiusOf(size){
 }
 
 // ds:8869f043
-export function maxSpeedOf(size){
+export function maxSpeedOf(size, ownerKind = null){
     const factor = Math.max(FISH.speedFloor, 1 - size * FISH.speedDecay);
-    return FISH.baseSpeed * factor;
+    const sizeCap = FISH.baseSpeed * factor;
+    return ownerKind === 'user' ? Math.max(FISH.minBurstSpeed, sizeCap) : sizeCap;
 }
 
 // ds:1f3abc43
-export function makeFish({ pos, size = 1, isPlayer = false, hue = 200 }){
+export function makeFish({
+    pos,
+    size = 1,
+    isPlayer = false,
+    hue = 200,
+    ownerKind = isPlayer ? 'user' : 'npc',
+    clientId = null,
+    temporaryConnectionCode = null,
+    userName = '',
+    userColor = '#59bcd6',
+    userTier = 'free',
+    npcRole = 'prey',
+    formerUserColor = null,
+    fryAge = null,
+    nominalStartSize = null,
+}){
     return {
         id: nextId++,
         pos: { ...pos },
@@ -50,6 +66,16 @@ export function makeFish({ pos, size = 1, isPlayer = false, hue = 200 }){
         wasBurstThrusting: false,    // @ia 3a4b5c6e
         eyeFear: 0,                  // @ia 7d8e9f0a
         isPlayer,
+        ownerKind,
+        clientId,
+        temporaryConnectionCode,
+        userName,
+        userColor,
+        userTier,
+        npcRole,
+        formerUserColor,
+        fryAge,
+        nominalStartSize,
         hue,
         prevAccel: { x: 0, y: 0 },
         // prey-only steering memory (ignored for player)
@@ -57,14 +83,30 @@ export function makeFish({ pos, size = 1, isPlayer = false, hue = 200 }){
     };
 }
 
+// @ds:c5a92431
+export function updateUserLabel(fish, fields = {}){
+    if( fields.userName !== undefined ) fish.userName = fields.userName;
+    if( fields.userColor !== undefined ) fish.userColor = fields.userColor;
+    if( fields.userTier !== undefined ) fish.userTier = fields.userTier;
+}
+
+// @ds:c3708d14 @ds:bfd5a97a
+export function updateAbandonedGradient(fish){
+    if( fish.ownerKind !== 'npc' || fish.npcRole !== 'abandoned-user-fish' ) return;
+    fish.formerUserColor = fish.formerUserColor || fish.userColor || '#59bcd6';
+    fish.hue = 52;
+}
+
 // ds:7ce238da
 // contract: fish.integrateMotion  (v += a*dt; v = drag(v); p += v*dt)
 export function integrate(fish, accel, world, dt){
     fish.age += dt;
     fish.vel = add(fish.vel, scale(accel, dt));
-    const speedCap = fish.mode === 'burst' ? maxSpeedOf(fish.size) : maxSpeedOf(fish.size) * REGIME.cruiseFactor;  // ds:ee07d6da
+    const speedCap = fish.mode === 'burst'
+        ? maxSpeedOf(fish.size, fish.ownerKind)
+        : maxSpeedOf(fish.size) * REGIME.cruiseFactor;  // ds:ee07d6da
     fish.vel = clampLen(fish.vel, speedCap);
-    fish.vel = applyDrag(fish.vel, dt);
+    fish.vel = applyDrag(fish.vel, dt, fish.size);
     const move = scale(fish.vel, dt);
     fish.pos = add(fish.pos, move);
     spendEnergy(fish, len(move));   // ds:f51831f5
@@ -79,13 +121,30 @@ export function integrate(fish, accel, world, dt){
     updateFacing(fish);
 }
 
-// ds:f51831f5
-// Drift (no thrust) is free; traveling 10*size with thrust => -1% size.
+// @do:a7a50f7b
+export function serializeFish(fish){
+    const base = [
+        `type=${fish.ownerKind === 'user' ? 'user' : fish.npcRole || 'npc'}`,
+        `size=${fish.size.toFixed(2)}`,
+        `age=${fish.age.toFixed(1)}`,
+        `eatenFishCount=${fish.eatenFishCount || 0}`,
+    ];
+    if( fish.ownerKind === 'user' ){
+        base.push(`userName=${fish.userName || ''}`);
+        base.push(`userColor=${fish.userColor || ''}`);
+        base.push(`userTier=${fish.userTier || 'free'}`);
+    }
+    return base.join(' ');
+}
+
+// @ds:f51831f5 @ds:6aa7c828
+// Drift (no thrust) is free; traveling 100*size with thrust => -1% size.
 export function spendEnergy(fish, distance){
     if( fish.mode !== 'burst' || distance <= 0 ) return;
-    const refDist = ENERGY.refSizes * fish.size;            // "10 текущих размеров"
+    const refDist = ENERGY.refSizes * fish.size;            // "100 текущих размеров"
     const lossFrac = ENERGY.lossPerRef * (distance / refDist);
-    fish.size = Math.max(ENERGY.minSize, fish.size * (1 - lossFrac));
+    const minSize = fish.ownerKind === 'user' ? ENERGY.userMinSize : ENERGY.minSize;
+    fish.size = Math.max(minSize, fish.size * (1 - lossFrac));
     fish.radius = radiusOf(fish.size);
 }
 
@@ -256,15 +315,4 @@ export function runExhaleCycle(fish, bubblesAround, rng, dt){
         exhale.emitTotal = 0;
         fish.visualScale = 1;
     }
-}
-
-// do:a7a50f7b
-export function serializeFish(fish){
-    const type = fish.isPlayer ? 'user' : 'npc';
-    return [
-        `type: ${type}`,
-        `size: ${fish.size.toFixed(3)}`,
-        `age: ${fish.age.toFixed(2)}`,
-        `eatenFishCount: ${fish.eatenFishCount}`,
-    ].join('\n');
 }
