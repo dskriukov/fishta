@@ -51,6 +51,13 @@ input:
         touch: [touch, joystick]
       rule: "client uses an explicit control-mode switch; only input belonging to the selected mode is processed"
       automatic_last_input_switching: false
+  initial_mode:
+    from: ds:controls.initial-mode
+    contract:
+      name: initialControlMode
+      inputs: [deviceType]
+      output: activeControlMode
+      rule: "when the web app opens, pointer devices start in keyboard mode and mobile/touch devices start in joystick mode; the explicit control-mode switch can change the mode after join"
   pointer:
     from: ds:controls.pointer
     contract:

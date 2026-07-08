@@ -74,7 +74,7 @@ decor:
     server_responsibility: false
     entity:
       id: Bubble
-      properties: [position, radius, velocity, life, alpha]
+      properties: [position, radius, targetRadius, velocity, life, age, alpha]
     contract:
       name: emitBubbles
       inputs: [fish, dt, rng]
@@ -89,7 +89,7 @@ decor:
       name: advanceBubbles
       inputs: [bubbles[], dt, world]
       output: bubbles[]
-      rule: "bubbles rise upward at near-constant speed close to median fish cruise speed, drift slightly, fade out, and are removed when expired or out of world; the fill is nearly transparent while the contour remains visible and may subtly pulse in the vertical axis"
+      rule: "new bubbles begin with zero alpha and zero current radius, quickly animate alpha and radius up to their normal values, then rise upward at near-constant speed close to median fish cruise speed, drift slightly, fade out, and are removed when expired or out of world; the fill is nearly transparent while the contour remains visible and may subtly pulse in the vertical axis"
     exhale_trigger:
       from: [ds:world.exhale.accel-start-trigger, ds:world.exhale.burst-start-trigger, ia:world.exhale.accel-start-trigger]
       name: triggerExhaleDecor

@@ -32,15 +32,41 @@ behaviours:
         else burst away from nearest: |accel| ∝ proximity (closer -> stronger);
         SKIP burst (mode=cruise, accel:0) if speed(self) > speed(nearest) + SPEED_MARGIN.
     status: refined          # уточнён: форсаж пропорционален близости + «не зря»
+  risk_aware_hunt_choice:
+    from: [ds:npc.risk-aware-hunt-choice, ds:npc.courage-selection, ds:fish.growth, ds:predation.rule]
+    contract:
+      name: chooseNpcIntent
+      inputs: [self, threats[], candidatePrey[], courage, dt]
+      output: { target?, acceleration, mode, intent }
+      rule: >
+        when a NPC can hunt and is also threatened, compare nearest relevant
+        threat, selected prey, estimated time to incoming attack contact,
+        estimated time to own attack, and expected post-eat size. If eating
+        before incoming attack would make the current threat unable to eat this
+        NPC by the predation threshold, the NPC may keep pursuing. If the
+        threat can still eat it or reaches attack contact first, choose between
+        pursuit and fleeing by individual courage. Fleeing moves along the
+        trajectory that most effectively increases separation from the attacker.
+  courage:
+    from: ds:npc.courage-selection
+    range: [0, 100]
+    spawn_rule: "new NPC courage is current live NPC average plus random +/-10%, clamped to 0..100; world start average is 50"
+    diversity_rule: "every tenth new NPC receives fully random courage 0..100"
 
 population:
   spawn:
-    from: [ds:prey.spawn, ia:prey.spawn-low-density-entry]
+    from: [ds:prey.spawn, ds:npc.spawn-safe-water, ia:prey.spawn-low-density-entry]
     contract:
       name: maintainPopulation
       inputs: [npcFishCount, targetNpcFishCount, world, rng]
       output: newNpcFish[]
-      rule: "when NPC count is below target for current world size, spawn NPC fish in lowest-current-density areas computed over all fish"
+      rule: "when NPC count is below target for current world size, spawn NPC fish in lowest-current-density areas that are also free water against current fish positions, sizes, density, and attack zones"
+    safe_water:
+      contract:
+        name: findSafeNpcSpawn
+        inputs: [world, nominalStartSize, rng]
+        output: spawnPoint
+        rule: "chosen start position gives the new NPC time to start moving and run ordinary behaviour selection before the first possible attack contact"
     juvenile_growth:
       name: growSpawnedFryToNominalSize
       inputs: [spawnedNpcFish, dt]

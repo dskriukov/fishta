@@ -36,6 +36,7 @@ export function makeFish({
     formerUserColor = null,
     fryAge = null,
     nominalStartSize = null,
+    courage = null,
 }){
     return {
         id: nextId++,
@@ -76,6 +77,7 @@ export function makeFish({
         formerUserColor,
         fryAge,
         nominalStartSize,
+        courage: courage ?? (ownerKind === 'npc' ? 50 : null),
         hue,
         prevAccel: { x: 0, y: 0 },
         // prey-only steering memory (ignored for player)
@@ -156,12 +158,18 @@ export function updateFacing(fish){
 
 // ds:d867989f
 export function grow(fish, preySize){
-    const gain = preySize * GROWTH.k / (1 + fish.size * GROWTH.decay);
+    const gain = growSizeFromAreas(fish.size, preySize) - fish.size;
     fish.size += gain;
     fish.radius = radiusOf(fish.size);
     fish.eatenFishCount += 1;
     fish.mouthEatenSize = Math.max(fish.mouthEatenSize, preySize);
     fish.mouthHold = Math.max(fish.mouthHold, MOUTH.holdDuration);
+}
+
+// @ds:d867989f @ds:b024b514
+export function growSizeFromAreas(predatorSize, preySize){
+    const gain = preySize * GROWTH.k / (1 + predatorSize * GROWTH.decay);
+    return predatorSize + gain;
 }
 
 // ds:975ca168
@@ -240,13 +248,15 @@ function makeExhaleBubble(fish, rng){
             x: mouth.x + fish.facing * fish.radius * 0.06,
             y: mouth.y,
         },
-        radius,
+        radius: 0,
+        targetRadius: radius,
         vel: {
             x: fish.facing * (BUBBLE.drift * (0.35 + 0.65 * rng())),
             y: -BUBBLE.riseSpeed * (0.8 + 0.4 * rng()),
         },
         life: BUBBLE.life,
-        alpha: 1,
+        age: 0,
+        alpha: 0,
         phase: rng(),
     };
 }

@@ -1,21 +1,22 @@
-ds/sense/controls/controls.ds#9069f40f - 323e0d97
+ds/sense/controls/controls.ds#7d8ce659 - 323e0d97
 ds/sense/controls/controls.ia#3eb8e8e5 - 3ab6da12
-ds/sense/fish/fish.ds#e9b56e3b - 0e1af7e8
+ds/sense/fish/fish.ds#0e8599cb - 0e1af7e8
 ds/sense/fish/fish.ia#5f3a7dac - 2b751007
-ds/sense/main.ds#3e9a7447 - d3cd9207
+ds/sense/main.ds#a5c8fce3 - d3cd9207
 ds/sense/main.ia#55b6bde5 - feab7d75
 ds/sense/multiplayer/multiplayer.ds#380fdb81 - 021f8c6b
 ds/sense/multiplayer/ws-protocol.ds#9c9a61e3 - 9c9a61e3
-ds/sense/predation/predation.ds#de2dea4b - c4f0fe31
-ds/sense/prey/prey.ds#7223c1f0 - 3fbd0a6d
+ds/sense/predation/predation.ds#a243040c - c4f0fe31
+ds/sense/prey/prey.ds#685a15b3 - 3fbd0a6d
 ds/sense/prey/prey.ia#d538d91e - b73de1c3
-ds/sense/world/world.ds#4ce07f27 - 0c44252a
+ds/sense/world/world.ds#6409aac2 - 0c44252a
 ds/sense/world/world.ia#d1b53549 - a45699db
 
 ds:controls.camera - 7b9a7984 323e0d97
 ds:controls.device-type - cf6ad7d6 323e0d97
 ds:controls.hunt - 22fd3ab4 323e0d97
 ds:controls.inspect-click - 2e1570ed 323e0d97
+ds:controls.initial-mode - c2aeb63a 323e0d97
 ds:controls.join-world - 34ba255b 323e0d97
 ds:controls.keys - 10baf178 323e0d97
 ds:controls.leave-game - fb11044e 323e0d97
@@ -36,12 +37,14 @@ ds:debug.world-repeat-bounds - 7435b6ce d3cd9207
 ds:fish.decor.abandoned-gradient - c3708d14 0e1af7e8
 ds:fish.decor.fear_eye - 906be50b 0e1af7e8
 ds:fish.decor.mouth - 975ca168 0e1af7e8
+ds:fish.decor.regime-shape - 1e323735 0e1af7e8
 ds:fish.decor.size-delta-label - c2d7f4a1 0e1af7e8
 ds:fish.decor.swim_motion - bd354b7a 0e1af7e8
 ds:fish.decor.user-label - c5a92431 0e1af7e8
 ds:fish.energy - f51831f5 0e1af7e8
 ds:fish.entity - 1f3abc43 0e1af7e8
 ds:fish.facing - 8d0ca6a8 0e1af7e8
+ds:fish.geometry.collision-area - b024b514 0e1af7e8
 ds:fish.growth - d867989f 0e1af7e8
 ds:fish.movement.bounds - c4073e51 0e1af7e8
 ds:fish.movement.swim - 7ce238da 0e1af7e8
@@ -49,10 +52,12 @@ ds:fish.regime - 8869f043 0e1af7e8
 ds:fish.size - cbc1225a 0e1af7e8
 ds:fish.thrust - ee07d6da 0e1af7e8
 ds:fish.user-min-size - 6aa7c828 0e1af7e8
+ds:fish.visual.geometry-asset - df06827a 0e1af7e8
 fn:exhale - a9a3ed12 0e1af7e8
 do:serialize - a7a50f7b 0e1af7e8
 ds:goal.growth - b433f1bc d3cd9207
 ds:intent.game - 27fa3caa d3cd9207
+ds:project.mode - dd674a52 d3cd9207
 ds:multiplayer.abandoned-fish-visual - bfd5a97a 021f8c6b
 ds:multiplayer.color-palettes - f883f90c 021f8c6b
 ds:multiplayer.connection-fish - 4bfe0352 021f8c6b
@@ -67,6 +72,7 @@ ds:multiplayer.server-memory - 4c2c7ba3 021f8c6b
 ds:multiplayer.shared-world - 9ed7e713 021f8c6b
 ds:multiplayer.socket-sync - e559831a 021f8c6b
 ds:predation.contact - a3e394a8 c4f0fe31
+ds:predation.attack-contact - b39c93a5 c4f0fe31
 ds:predation.effect - e9fb3705 c4f0fe31
 ds:predation.hunt - d4f6a1c2 c4f0fe31
 ds:predation.leave-blocked-by-user-attack - 8917ad63 c4f0fe31
@@ -79,6 +85,9 @@ ds:prey.entity - ad8d81d8 3fbd0a6d
 ds:prey.flee - 579e4888 3fbd0a6d
 ds:prey.flee.effort - e699c42d 3fbd0a6d
 ds:prey.npc-fish - 534bb18b 3fbd0a6d
+ds:npc.courage-selection - e29aeb93 3fbd0a6d
+ds:npc.risk-aware-hunt-choice - d0ef4576 3fbd0a6d
+ds:npc.spawn-safe-water - 7ba4084c 3fbd0a6d
 ds:prey.spawn - e6ecfbdd 3fbd0a6d
 ds:prey.variety - 1e66d817 3fbd0a6d
 ds:prey.wander - 31cb7a0d 3fbd0a6d

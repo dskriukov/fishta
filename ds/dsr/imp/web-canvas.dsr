@@ -78,6 +78,7 @@ contract_map:
   controls.noVulnerabilityControl:          controls.js#createJoinFormState controls.js#createInput  # @ds:5377d065
   controls.deviceType:                      controls.js#detectControlDevice  # @ds:cf6ad7d6
   controls.modeSelect:                      controls.js#createControlModeState  # @ds:70871bc5
+  controls.initialMode:                      controls.js#createControlModeState  # @ds:c2aeb63a
   controls.leaveGameCommand:                controls.js#createInput  # @ds:fb11044e
   controls.pointerSteer:                    controls.js#pointerSteer  # @ds:55c13a4f
   controls.keySteer:                        controls.js#keySteer  # @ds:10baf178
@@ -111,12 +112,14 @@ contract_map:
   fish.makeFish:                            fish.js#makeFish  # @ds:1f3abc43 @ds:58050922 @ia:32288dfb
   fish.integrateMotion:                     fish.js#integrate  # @ds:7ce238da @ds:8869f043
   fish.wrapInWorld:                         fish.js#integrate  # @ds:c4073e51
-  fish.grow:                                fish.js#grow  # @ds:d867989f
+  fish.geometryAsset:                       render.js#loadFishGeometry render.js#drawFish  # @ds:df06827a @ds:b024b514
+  fish.grow:                                fish.js#grow  # @ds:d867989f @ds:b024b514
   fish.updateFacing:                        fish.js#updateFacing  # @ds:8d0ca6a8 @ia:0bdc556b
   fish.spendEnergy:                         fish.js#spendEnergy  # @ds:f51831f5 @ds:6aa7c828
   fish.maxSpeedOf:                          fish.js#maxSpeedOf prey.js#capPreySpeed  # @ds:8869f043 @ds:d4f6a1c2
   fish.updateMouth:                         fish.js#updateMouth  # @ds:975ca168 @ia:9c0d1e2f @ia:0bdc556b
-  fish.updateSwimMotion:                    fish.js#updateSwimMotion  # @ds:bd354b7a @ia:3a4b5c6e
+  fish.updateSwimMotion:                    fish.js#updateSwimMotion render.js#drawFish  # @ds:bd354b7a @ds:df06827a @ia:3a4b5c6e
+  fish.regimeShapeVisual:                   render.js#drawFish  # @ds:1e323735 @ds:df06827a
   fish.updateFearEye:                       fish.js#updateFearEye  # @ds:906be50b @ia:7d8e9f0a
   fish.updateUserLabel:                     fish.js#updateUserLabel  # @ds:c5a92431
   fish.updateAbandonedGradient:             fish.js#updateAbandonedGradient  # @ds:c3708d14 @ds:bfd5a97a
@@ -126,12 +129,14 @@ contract_map:
   fish.serializeFish:                       fish.js#serializeFish  # @do:a7a50f7b
   prey.wanderSteer:                         prey.js#wanderSteer  # @ds:31cb7a0d
   prey.fleeSteer:                           prey.js#fleeSteer  # @ds:579e4888 @ds:e699c42d
-  prey.maintainPopulation:                  prey.js#maintainPopulation  # @ds:e6ecfbdd @ds:53db39eb
+  prey.chooseNpcIntent:                     prey.js#chooseNpcIntent prey.js#assignNpcCourage  # @ds:d0ef4576 @ds:e29aeb93
+  prey.maintainPopulation:                  prey.js#maintainPopulation  # @ds:e6ecfbdd @ds:53db39eb @ds:7ba4084c
   prey.growSpawnedFryToNominalSize:         prey.js#advanceFryGrowth  # @ds:e6ecfbdd
-  predation.overlaps:                       predation.js#overlaps  # @ds:a3e394a8
+  predation.overlaps:                       predation.js#overlaps  # @ds:a3e394a8 @ds:b024b514
+  predation.isAttackContact:                predation.js#isAttackContact  # @ds:b39c93a5 @ds:b024b514
   predation.isEdibleBySize:                 predation.js#isEdibleBySize  # @ds:98224ab9
   predation.canBeVictimOf:                  predation.js#canBeVictimOf  # @ds:32745a4f @ia:01fe68fa
-  predation.canEat:                         predation.js#canEat  # @ds:98224ab9 @ds:32745a4f
+  predation.canEat:                         predation.js#canEat  # @ds:98224ab9 @ds:32745a4f @ds:b39c93a5
   predation.isLeaveBlockedByUserAttack:     predation.js#isLeaveBlockedByUserAttack  # @ds:8917ad63
   predation.resolveEating:                  predation.js#resolveEating  # @ds:e9fb3705 @ds:75a5aa4f
   predation.respawnPlayerAfterEating:       predation.js#respawnUserFishAfterEating  # @ds:39305789 @ds:53db39eb
@@ -182,6 +187,7 @@ data_model:
       - formerUserColor?
       - fryAge?
       - nominalStartSize?
+      - courage                # 0..100 NPC conflict tendency
   server_client_state:
     server_owns:
       - fish existence and ownerKind
@@ -253,12 +259,35 @@ implementation_instructions:
     user respawn. Density includes user fish and NPC fish.  # @ds:53db39eb
   npc_spawn_and_growth: |
     maintainPopulation compares current ownerKind='npc' count to targetNpcCount.
-    New NPC fish spawn at lowest-density areas as fry:
+    New NPC fish spawn at safe lowest-density areas as fry:
       size starts at FRY.startSize
       nominalStartSize = sampleSize(rng)
       fryAge increases for 10 seconds
       size interpolates to nominalStartSize during those 10 seconds
-    After fry growth completes, further growth only comes from eating.  # @ds:e6ecfbdd
+    findSafeNpcSpawn(world, nominalStartSize, rng) must wrap-aware sample candidate
+    positions, score density over all fish, then reject candidates whose canonical
+    circle at nominalStartSize is already inside or immediately entering any fish
+    attack zone. The attack-zone rejection must use current fish positions, radii,
+    burst-capable reach, mouth/head direction, and relative motion where available.
+    If all candidates are risky, choose the candidate with the largest estimated
+    time-to-attack-contact and lowest density as fallback rather than spawning on
+    top of a predator. maintainPopulation passes the chosen position into makeFish
+    and assigns NPC courage before adding the fish to world.fish.
+    New NPC courage is assigned by assignNpcCourage(world,rng): every tenth NPC
+    spawn uses a uniform 0..100 value; otherwise use current live-NPC average
+    courage or 50 when none exists, add random +/-10, then clamp to 0..100.
+    After fry growth completes, further growth only comes from eating.  # @ds:e6ecfbdd @ds:7ba4084c @ds:e29aeb93
+  npc_risk_aware_hunt: |
+    prey.js owns chooseNpcIntent(self, world, rng, dt) before wander/flee output is
+    committed for a NPC. It computes nearest threat able to eat self, selected prey
+    able to be eaten by self, estimated incoming attack-contact time, estimated own
+    attack-contact time, and expected post-eat size via fish.js#growSizeFromAreas
+    without mutating self. If post-eat size would break the current threat's
+    isEdibleBySize before incoming attack contact, keep pursuit. If the threat
+    would still be able to eat self or reaches attack contact first, compare
+    self.courage against a random 0..100 roll to choose pursuit vs flee. Flee uses
+    a separation trajectory that maximizes distance from the attacker, not merely
+    the opposite of the current target direction.  # @ds:d0ef4576 @ds:e29aeb93 @ds:d867989f @ds:98224ab9
   movement_and_energy: |
     integrate uses mode to select cruiseSpeedOf(size) or maxSpeedOf(size).
     applyDrag is linear damping.
@@ -275,6 +304,9 @@ implementation_instructions:
     The active control-mode switch selects which movement source is processed.
     Ordinary pointer devices can use pointer or keyboard modes.
     Mobile/touch devices can use touch or joystick modes.
+    createControlModeState(deviceType) initializes activeControlMode to keyboard
+    for ordinary pointer devices and joystick for mobile/touch devices; later user
+    selection through the existing mode switch owns changes to activeControlMode.
     Hunt/burst comes from Space in every selected control mode, or from mouse/touch hold, or from joystick hunt state.
     No separate vulnerability toggle exists in UI or input state.
     Implement buildInputPayload() in main.js:
@@ -295,7 +327,7 @@ implementation_instructions:
       - window blur and document visibilitychange clear input.keys, pointerDown, and touchDown so lost keyup events cannot leave movement or burst stuck;
       - when any movement key is pressed, pointer.lockedByKeyboard=true until an explicit pointer/touch move unlocks it.
     Client input is encoded as cXXYYmods where X/Y are signed thousandths
-    of normalized steering and b in mods means burst.  # @ds:91e32235 @ds:70871bc5 @ds:cf6ad7d6 @ds:5377d065 @ds:671e9773
+    of normalized steering and b in mods means burst.  # @ds:91e32235 @ds:70871bc5 @ds:c2aeb63a @ds:cf6ad7d6 @ds:5377d065 @ds:671e9773
   mobile_joystick_layout: |
     style.css owns the on-screen joystick layout.
     #joystick-panel remains fixed near the bottom of the viewport and keeps pointer-events enabled.
@@ -318,16 +350,17 @@ implementation_instructions:
     resolveWorldEating(world,rng) runs on the server after all fish integration for the tick.
     For each predator/victim pair:
       - skip same object and already removed victims;
-      - call canReachForEating(predator,victim) before canEat(predator,victim);
-      - canEat requires predator.mode==='burst', isEdibleBySize, and canBeVictimOf.
-    canReachForEating(predator,victim):
-      - return true when center distance < predator.radius + victim.radius;
-      - otherwise require predator.mode==='burst' and speed > 1e-3;
-      - compute alignment = dot(normalize(predator.vel), normalize(victim.pos-predator.pos));
-      - reject when alignment < 0.55;
-      - allow reach when distance < contactDistance + contactDistance * PREDATION.attackReachRatio.
+      - call isAttackContact(predator,victim) before canEat(predator,victim);
+      - canEat requires predator.mode==='burst', isEdibleBySize, canBeVictimOf, and isAttackContact.
+    isAttackContact(predator,victim):
+      - use canonical circles centered at fish.pos with radii derived from collision_area geometry;
+      - require predator.mode==='burst' and speed > 1e-3;
+      - compute mouth/head direction from current facing/velocity and reject victims outside the forward mouth cone;
+      - compute relativeVelocity = predator.vel - victim.vel and separation = victim.pos - predator.pos in the nearest toroidal image;
+      - require dot(relativeVelocity, separation) > 0 so the current motion increases overlap;
+      - allow contact when center distance < predator.radius + victim.radius or when the victim circle intersects the predator mouth/head reach area.
     On NPC victim: grow predator, splice victim from world.fish, and adjust outer loop index when needed.
-    On user victim: grow predator and respawnUserFishAfterEating(world,victim,rng) in place, preserving clientId, temporaryConnectionCode, userName, userColor, and userTier.  # @ds:75a5aa4f @ds:39305789 @ds:a3e394a8 @ds:98224ab9
+    On user victim: grow predator and respawnUserFishAfterEating(world,victim,rng) in place, preserving clientId, temporaryConnectionCode, userName, userColor, and userTier.  # @ds:75a5aa4f @ds:39305789 @ds:a3e394a8 @ds:b39c93a5 @ds:b024b514 @ds:98224ab9
   client_prediction_and_render: |
     main.js owns snapshotBuffer and clientBubbles outside state.world.
     main.js also owns debugMode, debugPositionTraces, and latestAbsoluteServerPositions outside state.world.
@@ -374,9 +407,10 @@ implementation_instructions:
       - for each fish in world.fish, read or create emitter state `{ bubbleTimer: 0, bubbleBurstRemaining: 0 }` from clientBubbleEmitters by fish.id;
       - call emitBubble with a temporary fish object that combines current visual fish geometry with the local emitter fields;
       - after emitBubble, write the updated bubbleTimer and bubbleBurstRemaining back to the emitter entry;
-      - push non-null emitted bubbles into clientBubbles;
+      - push non-null emitted bubbles into clientBubbles; emitted bubble objects must carry `{ pos, radius: 0, targetRadius, vel, life, age: 0, alpha: 0, phase }`, where `targetRadius` is the normal visible radius computed from fish size;
       - call advanceBubbles(clientBubbles, world, dt);
       - do not store these bubbles in world.bubbles.
+    advanceBubbles owns bubble motion and birth/fade animation: increment `age`, decrement `life`, move by velocity, compute `birth = clamp(age / BUBBLE.birthDuration, 0..1)`, compute `fade = clamp(life / BUBBLE.life, 0..1)`, set `radius = targetRadius * easeOut(birth)` and `alpha = min(birth, fade)`. Bounds removal must use the larger of current radius and targetRadius so a just-born zero-radius bubble is not removed incorrectly.
     render(ctx,state) reads bubbles from state.clientBubbles first, then state.world.bubbles only for legacy single-process mode.
     Camera viewport follows current client user fish via worldToViewport(world, followed, canvas).
     Rendering projects game-world units to canvas pixels.  # @ds:e559831a @ds:7b9a7984 @ds:d6cebf86 @ia:3c4d5e6f @ia:5a6b7c8d
@@ -487,6 +521,30 @@ implementation_instructions:
       - mouth cavity, teeth, eyes, and text label may keep semantic non-body colors because they are not body-color decoration.
     For ordinary NPC fish, keep yellow-toned HSL palette.
     For abandoned former user fish, draw the existing former-user-color to NPC-yellow gradient as the base and apply the same transparent overlay policy to decoration.  # @ia:32288dfb @ds:f883f90c @ds:bfd5a97a
+  fish_svg_geometry_visual: |
+    render.js owns loading/parsing the authored ds/assets/fish2.svg geometry into
+    reusable draw paths keyed by semantic SVG ids. The parsed or embedded fallback
+    data must use the exact source SVG viewBox, path/circle coordinates, proportions,
+    element-relative positions, semantic ids, fill styles, fill opacity, stroke
+    styles, linearGradient definitions, gradient stops, stop opacity, and
+    currentColor usage. Canvas drawing resolves currentColor from the current fish
+    color at render time; other SVG paint semantics are preserved from the asset.
+    Canvas drawing may apply visibility, scale, facing, and animation transforms,
+    but must not redraw the fish silhouette or replace authored gradients and fills
+    with hand-authored substitute paint.
+    loadFishGeometry parses SVG elements once into reusable render commands and
+    gradient definitions. drawFish must not create Blob, ObjectURL, Image, DOMParser,
+    XMLSerializer, or generated SVG text while rendering a frame; it draws the
+    already parsed paths/circles synchronously with Canvas 2D. Missing geometry may
+    skip only the fish body for that frame, but a cache miss must never make an
+    otherwise parsed fish disappear.
+    Keep collision_area, shape_cruise, shape_burst, and fin_* ids addressable in code.
+    The renderer anchors the fish at collision_area center, scales fish.size from
+    collision_area diameter, and keeps predation/debug collision radius tied to
+    that canonical circle rather than to decorative fins or mouth reach.
+    drawFish chooses shape_cruise when fish.mode is cruise and shape_burst when
+    fish.mode is burst. fin_* elements receive the current swim phase transform
+    from updateSwimMotion and remain attached to the same fish transform.  # @ds:df06827a @ds:b024b514 @ds:1e323735 @ds:bd354b7a @ia:2f6e7a91
   fish_mouth_visual: |
     render.js#drawFish draws the body silhouette before drawing the mouth.
     For mouthOpenRatio > 0:
@@ -523,10 +581,14 @@ new_or_changed_constants:
   WORLD.npcDensity: "tunable per area" # @ds:53db39eb
   FRY.startSize: "below nominal spawn size" # @ds:e6ecfbdd
   FRY.growthSeconds: 10               # @ds:e6ecfbdd
+  NPC.courageBase: 50                  # @ds:e29aeb93
+  NPC.courageJitter: 10                # @ds:e29aeb93
+  NPC.courageRandomEvery: 10           # @ds:e29aeb93
   REGIME.cruiseFactor: 0.55           # @ia:5e6f7a8b
   PLAYER.startSize: 1                 # @ds:39305789
   FISH.minBurstSpeed: "greater than PREY.maxSpeed + PREY.speedMargin; predator/user hunt floor, not fleeing-prey cap" # @ds:8869f043 @ds:d4f6a1c2 @ia:2d3e4f5a
   ENERGY.userMinSize: "greater than PREY.minSize * PREDATION.eatRatio" # @ds:6aa7c828
+  PREDATION.attackConeDotMin: "forward mouth/head cone threshold" # @ds:b39c93a5
   BUBBLE.maxRatio: 0.08               # @ia:9e0f1a2b
   BUBBLE.minRadius: 1.1               # @ia:9e0f1a2b
   EXHALE.inhaleScale: 1.10            # @fn:a9a3ed12
@@ -560,12 +622,14 @@ verification_checks:
   - "World resize scales fish coordinates but not fish sizes; clients animate resize playback."
   - "NPC count follows target density over world area."
   - "NPC spawn and user respawn choose areas with lowest current density over all fish."
+  - "New NPC spawn positions are free water candidates that account for current fish positions, sizes, density, and attack zones before falling back to the least risky candidate."
   - "New NPC fish appear as fry and grow to nominal start size over 10 seconds."
+  - "New NPC fish receive courage from the live-NPC average plus bounded jitter, with every tenth spawn fully random."
   - "Paid user fish can be eaten only by paid user fish; free user fish can be eaten by any ordinary eligible predator."
   - "The UI has no separate user-fish vulnerability toggle; eligibility comes from paid/free tier."
   - "Abandoned former user fish loses user-tier protection and uses former color to NPC-yellow gradient."
-  - "Predation still requires contact, larger predator, and predator burst mode."
-  - "A burst attack that visually reaches an eligible smaller fish triggers eating without requiring pixel-perfect center overlap."
+  - "Predation requires attack contact: burst predator, size/type eligibility, victim in the head/mouth area, and relative motion increasing canonical circle overlap."
+  - "A burst attack that reaches an eligible smaller fish through the mouth/head area triggers eating without requiring pixel-perfect center overlap."
   - "Remote fish motion is rendered smoothly between authoritative snapshots."
   - "Remote fish crossing a world edge interpolates through the nearest toroidal path instead of flashing across the center of the map."
   - "When the followed fish is near a wrapped edge, NPC fish near the opposite canonical edge are drawn at the nearest toroidal image relative to the followed fish, for example x=10 as x=110 when the followed fish is at x=90 in width=100."
@@ -573,10 +637,12 @@ verification_checks:
   - "Removed fish disappear on clients immediately after an e tombstone delta row."
   - "Keyboard key-down/key-up and burst transitions are sent without waiting for the idle input cadence."
   - "Space enables burst in keyboard, pointer, touch, and joystick modes."
+  - "The initial control mode is keyboard on ordinary pointer devices and visual joystick on mobile/touch devices."
   - "In joystick mode, the steering joystick is on the right side of the screen and the Burst press-and-hold control is on the left."
   - "Losing focus clears local key and pointer/touch pressed state so movement and burst cannot remain stuck."
   - "Unchanged input sends p:${N} at one-second cadence, with no faster ping heartbeat."
   - "User fish body decoration preserves the selected user color across the full body through transparent overlays."
+  - "Fish rendering uses ds/assets/fish2.svg semantic ids for canonical collision_area, cruise/burst shape groups, and animated fin_* parts."
   - "An open mouth uses the legacy curved snout cavity and small predator teeth."
   - "Only the current client's own user fish shows green +0.1-step size gain labels and red -0.1-step size loss labels; continuous losses accumulate discretely and labels fade while rising."
   - "User respawn preserves paid/free type."

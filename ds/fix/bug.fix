@@ -55,3 +55,15 @@
 - [x] **[bug:hunt-cannot-catch-accelerating-small-prey]**\
   Все еще невозможно догнать большой рыбой маленькую NPC-рыбу. В режиме охоты это должно быть возможно: в burst даже самая большая пользовательская рыба должна двигаться быстрее, чем самая маленькая NPC-рыба в режиме ускорения/бегства.
   Source: user report 2026-07-05; affected DSR/code: `ds/dsr/imp/web-canvas.dsr#movement_and_energy`, `constants.js#FISH`, `constants.js#PREY`, `fish.js#maxSpeedOf`, `fish.js#integrate`, `prey.js#capPreySpeed`.
+
+- [ ] **[bug:npc-passive-growth-by-incidental-eating]**\
+  Новые NPC-рыбы могут появляться в опасной зоне рядом с более крупной рыбой и быть съеденными сразу после появления. Ожидаемое поведение: новая NPC-рыба появляется в свободной области воды, где у неё есть возможность начать движение до первого атакующего контакта.
+  Source: user report 2026-07-08; affected requirement/DSR/code: `ds/sense/prey/prey.ds#ds:npc.spawn-safe-water`, `ds/dsr/imp/web-canvas.dsr#npc_spawn_and_growth`, `prey.js#maintainPopulation`, `prey.js#spawnOne`, `world.js#findLowestDensitySpawn`.
+
+- [x] **[bug:fish-svg-paint-styles-regression]**\
+  SVG-рендер рыбы сохраняет авторские стили закраски из `ds/assets/fish2.svg`: элементы с `currentColor` получают текущий цвет рыбы, а `fill`, `fill-opacity`, `url(#linearGradient)`, `stop-color` и `stop-opacity` применяются как paint model исходного SVG.
+  Source: user report 2026-07-08; affected DSR/code: `ds/dsr/imp/web-canvas.dsr#fish_svg_geometry_visual`, `ds/sense/fish/fish.air`, `render.js#parseFishGeometrySvg`, `render.js#drawSvgFish`.
+
+- [x] **[bug:fish-svg-frame-cache-animation-stutter]**\
+  Рендер рыбы должен быть синхронным на каждом кадре: кадр анимации плавников, хвоста и глаза должен отрисовываться из уже загруженной геометрии без создания новых `Blob`, `ObjectURL` или `Image` во время игрового кадра. Цвет, режим формы и SVG paint model сохраняются, а размер и анимационные трансформации применяются непосредственно при canvas-отрисовке или через заранее подготовленные стабильные ресурсы.
+  Source: user report 2026-07-08; affected DSR/code: `ds/dsr/imp/web-canvas.dsr#fish_svg_geometry_visual`, `render.js#parseFishSvgTemplate`, `render.js#drawFish`.

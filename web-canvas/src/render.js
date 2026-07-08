@@ -1,8 +1,301 @@
 // imp/web-canvas/src/render.js
 // Read-only over domain state (workspace.air rule: render never mutates domain).
 // @ds 975ca168 bd354b7a 906be50b d6cebf86 b28b7af6 1f3abc43 8f2c91ad
+// @ia 2f6e7a91
 
-import { BUBBLE, DEBUG, MOUTH, SIZE_DELTA_LABEL, SWIM, FEAR_EYE, WORLD } from './constants.js';
+import { BUBBLE, DEBUG, SIZE_DELTA_LABEL, SWIM, FEAR_EYE, WORLD } from './constants.js';
+
+const DEFAULT_SVG_GEOMETRY = {
+    width: 494,
+    height: 386,
+    centerX: 192.557,
+    centerY: 192.557,
+    collisionRadius: 192.057,
+};
+
+let fishSvgGeometry = DEFAULT_SVG_GEOMETRY;
+let fishSvgRenderTree = null;
+let fishSvgGradients = new Map();
+
+// @ds:df06827a @ds:b024b514 @ia:2f6e7a91
+export async function loadFishGeometry(urls = ['../ds/assets/fish2.svg', './src/_fish_save.svg']){
+    if( typeof fetch !== 'function' || typeof DOMParser === 'undefined' ) return null;
+    for( const url of urls ){
+        try{
+            const response = await fetch(url);
+            if( !response.ok ) continue;
+            const svgText = await response.text();
+            const parsed = parseFishSvgTemplate(svgText);
+            if( parsed ){
+                fishSvgGeometry = parsed.geometry;
+                fishSvgRenderTree = parsed.renderTree;
+                fishSvgGradients = parsed.gradients;
+                return parsed;
+            }
+        }catch{
+            // Keep trying fallback URLs.
+        }
+    }
+    return null;
+}
+
+function parseFishSvgTemplate(svgText){
+    const doc = new DOMParser().parseFromString(svgText, 'image/svg+xml');
+    const svg = doc.documentElement;
+    const collision = doc.getElementById('collision_area');
+    if( !svg || svg.nodeName.toLowerCase() !== 'svg' || !collision ) return null;
+
+    const viewBox = parseViewBox(svg.getAttribute('viewBox'));
+    const width = numberOrDefault(svg.getAttribute('width'), viewBox?.width || DEFAULT_SVG_GEOMETRY.width);
+    const height = numberOrDefault(svg.getAttribute('height'), viewBox?.height || DEFAULT_SVG_GEOMETRY.height);
+    const geometry = {
+        width,
+        height,
+        centerX: numberOrDefault(collision.getAttribute('cx'), DEFAULT_SVG_GEOMETRY.centerX),
+        centerY: numberOrDefault(collision.getAttribute('cy'), DEFAULT_SVG_GEOMETRY.centerY),
+        collisionRadius: numberOrDefault(collision.getAttribute('r'), DEFAULT_SVG_GEOMETRY.collisionRadius),
+    };
+    return {
+        geometry,
+        gradients: parseSvgGradients(doc),
+        renderTree: parseSvgChildren(svg),
+    };
+}
+
+function parseViewBox(value){
+    const parts = String(value || '').trim().split(/\s+/).map(Number);
+    if( parts.length !== 4 || parts.some(part => !Number.isFinite(part)) ) return null;
+    return { x: parts[0], y: parts[1], width: parts[2], height: parts[3] };
+}
+
+function numberOrDefault(value, fallback){
+    if( value == null || value === '' ) return fallback;
+    const number = Number(value);
+    return Number.isFinite(number) ? number : fallback;
+}
+
+function fishBodyColor(f){
+    if( f.ownerKind === 'user' && isCssColor(f.userColor) ) return f.userColor;
+    if( f.ownerKind === 'npc' && f.npcRole === 'abandoned-user-fish' && isCssColor(f.formerUserColor) ) return f.formerUserColor;
+    if( isCssColor(f.userColor) ) return f.userColor;
+    if( Number.isFinite(f.hue) ) return `hsl(${f.hue}, 68%, 58%)`;
+    return '#d6b84f';
+}
+
+function isCssColor(value){
+    return typeof value === 'string' && value.trim().length > 0;
+}
+
+function parseSvgGradients(doc){
+    const gradients = new Map();
+    for( const node of doc.querySelectorAll('linearGradient') ){
+        const id = node.getAttribute('id');
+        if( !id ) continue;
+        gradients.set(id, {
+            x1: numberOrDefault(node.getAttribute('x1'), 0),
+            y1: numberOrDefault(node.getAttribute('y1'), 0),
+            x2: numberOrDefault(node.getAttribute('x2'), 0),
+            y2: numberOrDefault(node.getAttribute('y2'), 0),
+            stops: [...node.querySelectorAll('stop')].map(stop => ({
+                offset: parseGradientOffset(stop.getAttribute('offset')),
+                color: stop.getAttribute('stop-color') || 'black',
+                opacity: numberOrDefault(stop.getAttribute('stop-opacity'), 1),
+            })),
+        });
+    }
+    return gradients;
+}
+
+function parseGradientOffset(value){
+    if( value == null || value === '' ) return 0;
+    const text = String(value).trim();
+    if( text.endsWith('%') ){
+        const percent = Number(text.slice(0, -1));
+        return Number.isFinite(percent) ? clamp01(percent / 100) : 0;
+    }
+    const number = Number(text);
+    return Number.isFinite(number) ? clamp01(number) : 0;
+}
+
+function parseSvgChildren(parent){
+    return [...parent.children].map(parseSvgNode).filter(Boolean);
+}
+
+function parseSvgNode(node){
+    const tag = node.tagName?.toLowerCase();
+    if( tag === 'defs' ) return null;
+    const id = node.getAttribute('id') || '';
+    if( id === 'collision_area' ) return null;
+    if( tag === 'g' ){
+        return {
+            type: 'group',
+            id,
+            visible: node.getAttribute('visibility') !== 'hidden' && node.getAttribute('display') !== 'none',
+            children: parseSvgChildren(node),
+        };
+    }
+    if( tag === 'path' ){
+        const d = node.getAttribute('d');
+        if( !d || typeof Path2D !== 'function' ) return null;
+        return {
+            type: 'path',
+            id,
+            path: new Path2D(d),
+            paint: readSvgPaint(node),
+        };
+    }
+    if( tag === 'circle' ){
+        return {
+            type: 'circle',
+            id,
+            cx: numberOrDefault(node.getAttribute('cx'), 0),
+            cy: numberOrDefault(node.getAttribute('cy'), 0),
+            r: numberOrDefault(node.getAttribute('r'), 0),
+            paint: readSvgPaint(node),
+        };
+    }
+    return null;
+}
+
+function readSvgPaint(node){
+    return {
+        fill: node.getAttribute('fill') || 'black',
+        fillOpacity: numberOrDefault(node.getAttribute('fill-opacity'), 1),
+        stroke: node.getAttribute('stroke') || 'none',
+        strokeOpacity: numberOrDefault(node.getAttribute('stroke-opacity'), 1),
+        strokeWidth: numberOrDefault(node.getAttribute('stroke-width'), 1),
+    };
+}
+
+function drawSvgNodes(ctx, nodes, fish, animation){
+    for( const node of nodes || [] ) drawSvgNode(ctx, node, fish, animation);
+}
+
+function drawSvgNode(ctx, node, fish, animation){
+    if( !node ) return;
+    if( node.id === 'shape_cruise' && fish.mode === 'burst' ) return;
+    if( node.id === 'shape_burst' && fish.mode !== 'burst' ) return;
+    if( node.visible === false && node.id !== 'shape_cruise' && node.id !== 'shape_burst' ) return;
+
+    ctx.save();
+    applySvgAnimationTransform(ctx, node.id, animation);
+    if( node.type === 'group' ){
+        drawSvgNodes(ctx, node.children, fish, animation);
+    }else if( node.type === 'path' ){
+        drawSvgPaintedShape(ctx, node.paint, fish, () => ctx.fill(node.path), () => ctx.stroke(node.path));
+    }else if( node.type === 'circle' ){
+        const draw = () => {
+            ctx.beginPath();
+            ctx.arc(node.cx, node.cy, node.r, 0, Math.PI * 2);
+        };
+        drawSvgPaintedShape(ctx, node.paint, fish, () => {
+            draw();
+            ctx.fill();
+        }, () => {
+            draw();
+            ctx.stroke();
+        });
+    }
+    ctx.restore();
+}
+
+function drawSvgPaintedShape(ctx, paint, fish, fillShape, strokeShape){
+    const fill = resolveSvgPaint(ctx, paint.fill, fish);
+    if( fill ){
+        ctx.save();
+        ctx.globalAlpha *= paint.fillOpacity;
+        ctx.fillStyle = fill;
+        fillShape();
+        ctx.restore();
+    }
+
+    const stroke = resolveSvgPaint(ctx, paint.stroke, fish);
+    if( stroke ){
+        ctx.save();
+        ctx.globalAlpha *= paint.strokeOpacity;
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = paint.strokeWidth;
+        strokeShape();
+        ctx.restore();
+    }
+}
+
+function resolveSvgPaint(ctx, value, fish){
+    if( !value || value === 'none' || value === 'transparent' ) return null;
+    if( value === 'currentColor' ) return fishBodyColor(fish);
+    const gradientMatch = /^url\(#([^)]+)\)$/.exec(value);
+    if( gradientMatch ) return createSvgGradient(ctx, gradientMatch[1], fish);
+    return value;
+}
+
+function createSvgGradient(ctx, id, fish){
+    const source = fishSvgGradients.get(id);
+    if( !source ) return fishBodyColor(fish);
+    const gradient = ctx.createLinearGradient(source.x1, source.y1, source.x2, source.y2);
+    for( const stop of source.stops ){
+        gradient.addColorStop(stop.offset, colorWithOpacity(resolveSvgColor(stop.color, fish), stop.opacity));
+    }
+    return gradient;
+}
+
+function resolveSvgColor(value, fish){
+    if( !value || value === 'currentColor' ) return fishBodyColor(fish);
+    return value;
+}
+
+function colorWithOpacity(color, opacity){
+    if( opacity >= 1 ) return color;
+    if( color.startsWith('#') ){
+        const hex = color.slice(1);
+        if( hex.length === 6 ){
+            const r = parseInt(hex.slice(0, 2), 16);
+            const g = parseInt(hex.slice(2, 4), 16);
+            const b = parseInt(hex.slice(4, 6), 16);
+            return `rgba(${r}, ${g}, ${b}, ${clamp01(opacity)})`;
+        }
+    }
+    if( color === 'white' ) return `rgba(255, 255, 255, ${clamp01(opacity)})`;
+    if( color === 'black' ) return `rgba(0, 0, 0, ${clamp01(opacity)})`;
+    if( color.startsWith('hsl(') ) return color.replace(/^hsl\((.*)\)$/, `hsla($1, ${clamp01(opacity)})`);
+    return color;
+}
+
+function applySvgAnimationTransform(ctx, id, animation){
+    if( id === 'fin_back' ){
+        rotateAround(ctx, animation.tailAngle, 353, 238.205);
+    }else if( id === 'fin_bottom' ){
+        rotateAround(ctx, animation.finAngle, 167.5, 280.21);
+    }else if( id === 'fin_bottom_small' ){
+        rotateAround(ctx, animation.finAngle * 0.65, 285.5, 266.487);
+    }else if( id === 'fin_bottom_top' ){
+        rotateAround(ctx, -animation.finAngle * 0.55, 210.5, 107.102);
+    }else if( id === 'eye' && Math.abs(animation.eyeScale - 1) >= 0.01 ){
+        ctx.translate(85.0001, 138.109);
+        ctx.scale(animation.eyeScale, animation.eyeScale);
+        ctx.translate(-85.0001, -138.109);
+    }
+}
+
+function rotateAround(ctx, degrees, cx, cy){
+    if( Math.abs(degrees) < 0.001 ) return;
+    ctx.translate(cx, cy);
+    ctx.rotate(degrees * Math.PI / 180);
+    ctx.translate(-cx, -cy);
+}
+
+function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+}
+
+function drawFishLabel(ctx, f){
+    if( f.ownerKind !== 'user' || !f.userName ) return;
+    ctx.save();
+    ctx.fillStyle = '#edf8ff';
+    ctx.font = `${Math.max(10, Math.min(16, f.radius * 0.42))}px system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText(f.userName, f.pos.x, f.pos.y - f.radius * 1.35);
+    ctx.restore();
+}
 
 // @ia 3a4b5c6d
 export function render(ctx, state){
@@ -30,14 +323,14 @@ export function render(ctx, state){
     ctx.scale(viewport.scale, viewport.scale);
 
     for( const bubble of renderWorld.bubbles ) drawBubble(ctx, bubble); // ds:d6cebf86
-
     for( const f of renderWorld.fish ) drawFish(ctx, f); // ds:1f3abc43
     for( const label of state.sizeDeltaLabels || [] ){
-        const fishForLabel = renderWorld.fish.find(fish => fish.id === label.fishId);
+        const fishForLabel = renderWorld.fish.find(fishItem => fishItem.id === label.fishId);
         if( fishForLabel ) drawSizeDeltaLabel(ctx, label, fishForLabel);
     }
     if( state.debug?.enabled ){
         drawDebugWorldRepeatBounds(ctx, world, renderWorld.anchor);
+        drawDebugFishCollisionRadius(ctx, renderWorld.fish);
         drawDebugPositionTraces(ctx, renderWorld.debugTraces || [], state.debug.now || performance.now());
     }
     ctx.restore();
@@ -110,7 +403,7 @@ export function buildToroidalRenderWorld(world, followed, debugTraces = []){
 
 // @ia 3c4d5e6f
 function drawBubble(ctx, bubble){
-    const age = 1 - bubble.alpha;
+    const age = bubble.age || 0;
     const pulsePhase = Math.floor((age + bubble.phase) / BUBBLE.pulseStep) % 2;
     const squash = pulsePhase === 0 ? 1 : BUBBLE.pulseSquash;
     ctx.save();
@@ -139,6 +432,20 @@ function drawDebugWorldRepeatBounds(ctx, world, anchor){
         for( let dy = -1; dy <= 1; dy++ ){
             ctx.strokeRect(baseX + dx * world.width, baseY + dy * world.height, world.width, world.height);
         }
+    }
+    ctx.restore();
+}
+
+// @ds:6b4e90d2 @ds:a3e394a8
+function drawDebugFishCollisionRadius(ctx, fish){
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
+    ctx.lineWidth = 1.5;
+    for( const item of fish || [] ){
+        if( !item?.pos || !Number.isFinite(item.radius) ) continue;
+        ctx.beginPath();
+        ctx.arc(item.pos.x, item.pos.y, item.radius, 0, Math.PI * 2);
+        ctx.stroke();
     }
     ctx.restore();
 }
@@ -226,223 +533,33 @@ function drawSizeDeltaLabel(ctx, label, fish){
     ctx.restore();
 }
 
-// @ia 3a4b5c6d
+// @ds:df06827a @ds:bd354b7a @ds:906be50b @ia:2f6e7a91
 function drawFish(ctx, f){
     const visualScale = Math.max(0.5, f.visualScale || 1);
     const r = f.radius * visualScale;
-    const mouthOpen = Math.max(0, Math.min(1, f.mouthOpen || 0));
     const swimPhase = f.swimPhase || 0;
     const burstKick = Math.max(0, Math.min(1, f.burstKick || 0));
     const eyeFear = Math.max(0, Math.min(1, f.eyeFear || 0));
     const eyeScale = 1 + (FEAR_EYE.maxScale - 1) * eyeFear;
     const burstBlend = f.mode === 'burst' ? 1 : 0;
-    const tailWave = Math.sin(swimPhase) * r * (SWIM.tailBaseSwing + SWIM.tailBurstSwing * burstBlend + SWIM.tailBurstSwing * burstKick);
-    const finWave = Math.sin(swimPhase + Math.PI * 0.55) * r * (SWIM.finBaseSwing + SWIM.finBurstSwing * burstBlend + SWIM.finBurstSwing * burstKick);
-    ctx.save();
-    ctx.translate(f.pos.x, f.pos.y);
-    ctx.scale(f.facing, 1);
-
-    const userColor = f.ownerKind === 'user' ? f.userColor : null;
-    const abandonedColor = f.ownerKind === 'npc' && f.npcRole === 'abandoned-user-fish' ? f.formerUserColor : null;
-    const bodyColor = userColor || abandonedColor || `hsl(${f.hue}, 68%, 58%)`;
-    const preserveBaseColor = Boolean(userColor || abandonedColor);
-    const bodyShadow = preserveBaseColor ? 'rgba(0, 0, 0, 0.24)' : `hsl(${f.hue}, 58%, 46%)`;
-    const bodyLight = preserveBaseColor ? 'rgba(255, 255, 255, 0.34)' : `hsl(${f.hue}, 78%, 70%)`;
-    const finAccent = preserveBaseColor ? 'rgba(255, 255, 255, 0.22)' : `hsl(${f.hue}, 66%, 64%)`;
-    const lipColor = preserveBaseColor ? 'rgba(0, 0, 0, 0.34)' : `hsl(${f.hue}, 58%, 36%)`;
-    const snoutX = r * 1.06;
-    const headX = r * 0.78;
-    const tailX = -r * 0.88;
-    const tailY = tailWave * 0.22;
-    const bodyTop = -r * 0.62;
-    const bodyBottom = r * 0.56;
-    let baseFillStyle = bodyColor;
-    if( abandonedColor ){
-        const gradient = ctx.createLinearGradient(-r * 0.9, 0, snoutX, 0);
-        gradient.addColorStop(0, abandonedColor);
-        gradient.addColorStop(1, `hsl(${f.hue}, 68%, 58%)`);
-        baseFillStyle = gradient;
-    }
-
-    // body silhouette
-    ctx.fillStyle = baseFillStyle;
-    ctx.beginPath();
-    ctx.moveTo(tailX, tailY);
-    ctx.bezierCurveTo(-r * 0.55, -r * 0.48, -r * 0.12, bodyTop, r * 0.38, bodyTop * 0.95);
-    ctx.bezierCurveTo(r * 0.74, bodyTop * 0.86, snoutX, -r * 0.42, snoutX, -r * 0.03);
-    ctx.bezierCurveTo(snoutX, r * 0.36, r * 0.68, bodyBottom, r * 0.28, bodyBottom * 0.95);
-    ctx.bezierCurveTo(-r * 0.12, bodyBottom, -r * 0.5, r * 0.42, tailX, tailY);
-    ctx.closePath();
-    ctx.fill();
-
-    // @ia:32288dfb
-    ctx.fillStyle = bodyShadow;
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.45, r * 0.02);
-    ctx.bezierCurveTo(-r * 0.1, r * 0.44, r * 0.28, r * 0.58, r * 0.7, r * 0.24);
-    ctx.bezierCurveTo(r * 0.92, r * 0.06, r * 0.78, -r * 0.08, r * 0.48, -r * 0.04);
-    ctx.bezierCurveTo(r * 0.12, -r * 0.02, -r * 0.2, -r * 0.06, -r * 0.45, r * 0.02);
-    ctx.closePath();
-    ctx.fill();
-
-    ctx.fillStyle = bodyLight;
-    ctx.beginPath();
-    ctx.ellipse(r * 0.15, -r * 0.18, r * 0.42, r * 0.16, -0.2, 0, Math.PI * 2);
-    ctx.fill();
-
-    // fins
-    ctx.fillStyle = bodyShadow;
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.08, -r * 0.52);
-    ctx.quadraticCurveTo(r * 0.08, -r * (0.98 + finWave * 0.02), r * 0.24, -r * 0.58 + finWave * 0.12);
-    ctx.quadraticCurveTo(r * 0.1, -r * 0.58, -r * 0.08, -r * 0.52);
-    ctx.closePath();
-    if( preserveBaseColor ){
-        ctx.fillStyle = baseFillStyle;
-        ctx.fill();
-    }
-    ctx.fillStyle = bodyShadow;
-    ctx.fill();
-
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.1, r * 0.4);
-    ctx.quadraticCurveTo(r * 0.12, r * 0.82 + finWave * 0.28, r * 0.2, r * 0.34 + finWave * 0.1);
-    ctx.quadraticCurveTo(r * 0.02, r * 0.36, -r * 0.1, r * 0.4);
-    ctx.closePath();
-    if( preserveBaseColor ){
-        ctx.fillStyle = baseFillStyle;
-        ctx.fill();
-    }
-    ctx.fillStyle = bodyShadow;
-    ctx.fill();
-
-    ctx.fillStyle = finAccent;
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.08, r * 0.18);
-    ctx.quadraticCurveTo(r * 0.12, r * 0.52 + finWave * 0.3, r * 0.28, r * 0.16 + finWave * 0.08);
-    ctx.quadraticCurveTo(r * 0.08, r * 0.06, -r * 0.08, r * 0.18);
-    ctx.closePath();
-    if( preserveBaseColor ){
-        ctx.fillStyle = baseFillStyle;
-        ctx.fill();
-    }
-    ctx.fillStyle = finAccent;
-    ctx.fill();
-
-    // gill line and eye socket shadow
-    ctx.strokeStyle = bodyShadow;
-    ctx.lineWidth = Math.max(1, r * 0.045);
-    ctx.beginPath();
-    ctx.arc(r * 0.44, -r * 0.02, r * 0.24, -0.8, 0.9);
-    ctx.stroke();
-
-    // ds:975ca168
-    const mouthOpenRatio = Math.max(0, Math.min(1, mouthOpen));
-    const mouthX = snoutX - r * 0.1;
-    const mouthY = r * 0.03;
-    const mouthWidth = r * (0.22 + mouthOpenRatio * 0.16);
-    const mouthHeight = r * (0.45 + mouthOpenRatio * 0.8);
-    const lipStroke = Math.max(1, r * 0.06);
-    const showTeeth = mouthOpenRatio > 0 && mouthOpenRatio < (MOUTH.chaseOpenRatio + 0.05);
-
-    if( mouthOpenRatio > 0 ){
-        // @ia:9c0d1e2f
-        ctx.fillStyle = '#0d0507';
-        ctx.beginPath();
-        ctx.moveTo(snoutX - mouthWidth * 0.1, mouthY - mouthHeight * 0.48);
-        ctx.quadraticCurveTo(snoutX + mouthWidth * 0.3, mouthY, snoutX - mouthWidth * 0.1, mouthY + mouthHeight * 0.48);
-        ctx.quadraticCurveTo(mouthX - mouthWidth * 0.35, mouthY + mouthHeight * 0.18, mouthX - mouthWidth * 0.35, mouthY - mouthHeight * 0.18);
-        ctx.closePath();
-        ctx.fill();
-
-        if( showTeeth ){
-            const topCount = 5;
-            const bottomCount = 5;
-            const topStart = mouthX - mouthWidth * 0.25;
-            const topEnd = snoutX - mouthWidth * 0.12;
-            const bottomStart = mouthX - mouthWidth * 0.24;
-            const bottomEnd = snoutX - mouthWidth * 0.14;
-            ctx.fillStyle = '#f7fbff';
-
-            for( let i = 0; i < topCount; i++ ){
-                const t = topCount === 1 ? 0.5 : i / (topCount - 1);
-                const x = topStart + (topEnd - topStart) * t;
-                const y = mouthY - mouthHeight * (0.26 + 0.03 * (i % 2));
-                ctx.beginPath();
-                ctx.moveTo(x - r * 0.03, y);
-                ctx.lineTo(x + r * 0.002, y + r * 0.075);
-                ctx.lineTo(x + r * 0.03, y);
-                ctx.closePath();
-                ctx.fill();
-            }
-
-            for( let i = 0; i < bottomCount; i++ ){
-                const t = bottomCount === 1 ? 0.5 : i / (bottomCount - 1);
-                const x = bottomStart + (bottomEnd - bottomStart) * t;
-                const y = mouthY + mouthHeight * (0.24 + 0.03 * (i % 2));
-                ctx.beginPath();
-                ctx.moveTo(x - r * 0.03, y);
-                ctx.lineTo(x + r * 0.002, y - r * 0.075);
-                ctx.lineTo(x + r * 0.03, y);
-                ctx.closePath();
-                ctx.fill();
-            }
-        }
-    }
-
-    // visible mouth line: closed mouth line, or lip contour when open
-    ctx.strokeStyle = lipColor;
-    ctx.lineWidth = lipStroke;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    if( mouthOpenRatio > 0 ){
-        ctx.moveTo(snoutX - mouthWidth * 0.12, mouthY - mouthHeight * 0.5);
-        ctx.quadraticCurveTo(mouthX - mouthWidth * 0.35, mouthY, snoutX - mouthWidth * 0.12, mouthY + mouthHeight * 0.5);
-    }else{
-        ctx.moveTo(snoutX - r * 0.18, mouthY);
-        ctx.quadraticCurveTo(snoutX - r * 0.1, mouthY + r * 0.03, snoutX - r * 0.02, mouthY);
-    }
-    ctx.stroke();
-
-    // ds:906be50b
-    ctx.fillStyle = '#f4c41c';
-    ctx.beginPath();
-    ctx.arc(r * 0.42, -r * 0.18, Math.max(2, r * 0.15 * eyeScale), 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = '#04263b';
-    ctx.beginPath();
-    ctx.arc(r * 0.46, -r * 0.17, Math.max(1.5, r * 0.08 * eyeScale), 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.arc(r * 0.49, -r * 0.2, Math.max(1, r * 0.03 * eyeScale), 0, Math.PI * 2);
-    ctx.fill();
-
-    // ds:bd354b7a
-    ctx.fillStyle = bodyShadow;
-    ctx.beginPath();
-    ctx.moveTo(tailX, tailY);
-    ctx.quadraticCurveTo(-r * 1.18, -r * 0.7 + tailWave * 0.35, -r * 1.34, -r * 0.18 + tailWave);
-    ctx.quadraticCurveTo(-r * 1.12, tailWave * 0.55, -r * 1.34, r * 0.18 + tailWave);
-    ctx.quadraticCurveTo(-r * 1.18, r * 0.7 + tailWave * 0.35, tailX, tailY);
-    ctx.closePath();
-    if( preserveBaseColor ){
-        ctx.fillStyle = baseFillStyle;
-        ctx.fill();
-    }
-    ctx.fillStyle = bodyShadow;
-    ctx.fill();
-
-    ctx.restore();
-
-    if( f.ownerKind === 'user' && f.userName ){
+    const tailWave = Math.sin(swimPhase) * (SWIM.tailBaseSwing + SWIM.tailBurstSwing * burstBlend + SWIM.tailBurstSwing * burstKick);
+    const finWave = Math.sin(swimPhase + Math.PI * 0.55) * (SWIM.finBaseSwing + SWIM.finBurstSwing * burstBlend + SWIM.finBurstSwing * burstKick);
+    if( fishSvgRenderTree ){
+        const scale = r / fishSvgGeometry.collisionRadius;
+        const animation = {
+            tailAngle: clamp(tailWave * 30, -10, 10),
+            finAngle: clamp(finWave * 28, -9, 9),
+            eyeScale,
+        };
         ctx.save();
-        ctx.fillStyle = '#edf8ff';
-        ctx.font = `${Math.max(10, Math.min(16, f.radius * 0.42))}px system-ui, sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.fillText(f.userName, f.pos.x, f.pos.y - f.radius * 1.35);
+        ctx.translate(f.pos.x, f.pos.y);
+        // The authored SVG faces left; the domain facing convention is 1 = right.
+        ctx.scale(-f.facing, 1);
+        ctx.scale(scale, scale);
+        ctx.translate(-fishSvgGeometry.centerX, -fishSvgGeometry.centerY);
+        drawSvgNodes(ctx, fishSvgRenderTree, f, animation);
         ctx.restore();
     }
+
+    drawFishLabel(ctx, f);
 }

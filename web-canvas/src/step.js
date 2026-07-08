@@ -5,7 +5,7 @@
 
 import { FISH } from './constants.js';
 import { integrate, runExhaleCycle, requestExhale } from './fish.js';
-import { preySteer, capPreySpeed, maintainPopulation, advanceFryGrowth } from './prey.js';
+import { chooseNpcIntent, preySteer, capPreySpeed, maintainPopulation, advanceFryGrowth } from './prey.js';
 import { huntSteer } from './hunt.js';
 import { playerSteer, huntMode } from './controls.js';
 import { resolveEating } from './predation.js';
@@ -77,10 +77,7 @@ export function stepAuthoritativeWorld(state, inputsByClient, dt, rng){
             accel = input.accel ? scale(normalize(input.accel), FISH.accel) : accel;
         }else{
             advanceFryGrowth(fish, dt);
-            const targets = allFish;
-            const huntTargets = targets.filter(target => target !== fish);
-            const hunt = huntSteer(fish, huntTargets);
-            const steer = hunt.accel ? hunt : preySteer(fish, targets, dt, rng);
+            const steer = chooseNpcIntent(fish, world, rng, dt);
             accel = steer.accel ?? accel;
             fish.mode = steer.mode;
         }

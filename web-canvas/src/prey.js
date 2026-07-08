@@ -2,10 +2,10 @@
 // Implements: prey.dsc (wanderSteer, fleeSteer[status:added], maintainPopulation, variety)
 // @ds 31cb7a0d 579e4888 e699c42d e6ecfbdd 1e66d817 ad8d81d8
 
-import { FRY, PREY } from './constants.js';
-import { v, sub, add, scale, normalize, dist, clampLen } from './vec.js';
-import { makeFish, radiusOf } from './fish.js';
-import { isEdibleBySize } from './predation.js';
+import { FISH, FRY, NPC, PREY, WORLD } from './constants.js';
+import { v, sub, scale, normalize, dist, clampLen } from './vec.js';
+import { growSizeFromAreas, makeFish, radiusOf } from './fish.js';
+import { canBeVictimOf, estimatedAttackContactTime, isAttackContact, isEdibleBySize, nearestToroidalDelta } from './predation.js';
 import { findLowestDensitySpawn, targetNpcCount } from './world.js';
 
 // @ia 7f8a9b0c
@@ -75,7 +75,7 @@ export function maintainPopulation(state, rng){
 // @ia 3b4c5d6e
 function spawnOne(world, rng, densitySpawn){
     const nominalStartSize = sampleSize(rng);
-    const pos = densitySpawn ? findLowestDensitySpawn(world, rng) : edgeSpawn(world, rng);
+    const pos = densitySpawn ? findSafeNpcSpawn(world, nominalStartSize, rng) : edgeSpawn(world, rng);
     const fish = makeFish({
         pos,
         size: densitySpawn ? FRY.startSize : nominalStartSize,
@@ -84,6 +84,7 @@ function spawnOne(world, rng, densitySpawn){
         npcRole: 'prey',
         fryAge: densitySpawn ? 0 : null,
         nominalStartSize,
+        courage: densitySpawn ? assignNpcCourage(world, rng) : NPC.courageBase,
     });
     fish.spawnGrace = densitySpawn ? 0 : PREY.spawnGrace;
 
@@ -95,6 +96,163 @@ function spawnOne(world, rng, densitySpawn){
     fish.heading = { x: dx / lenToCenter, y: dy / lenToCenter };
 
     return fish;
+}
+
+// @ds:7ba4084c @ds:e29aeb93
+export function findSafeNpcSpawn(world, nominalStartSize, rng){
+    let bestSafe = null;
+    let bestSafeScore = Infinity;
+    let bestFallback = null;
+    const samples = Math.max(WORLD.densitySamples, WORLD.densitySamples * 2);
+    for( let i = 0; i < samples; i++ ){
+        const pos = i === 0 ? findLowestDensitySpawn(world, rng) : v(rng() * world.width, rng() * world.height);
+        const candidate = spawnCandidate(pos, nominalStartSize);
+        const densityScore = wrapAwareDensityScore(world, pos);
+        const risk = spawnAttackRisk(world, candidate);
+        if( !risk.risky && densityScore < bestSafeScore ){
+            bestSafe = pos;
+            bestSafeScore = densityScore;
+        }
+        if(
+            !bestFallback
+            || risk.time > bestFallback.risk.time
+            || (risk.time === bestFallback.risk.time && densityScore < bestFallback.densityScore)
+        ){
+            bestFallback = { pos, densityScore, risk };
+        }
+    }
+    return bestSafe || bestFallback?.pos || findLowestDensitySpawn(world, rng);
+}
+
+function spawnCandidate(pos, nominalStartSize){
+    return {
+        id: -1,
+        pos,
+        vel: v(0, 0),
+        size: nominalStartSize,
+        radius: radiusOf(nominalStartSize),
+        ownerKind: 'npc',
+        npcRole: 'prey',
+        mode: 'cruise',
+        facing: 1,
+    };
+}
+
+function wrapAwareDensityScore(world, pos){
+    let score = 0;
+    for( const other of world.fish || [] ){
+        const delta = nearestToroidalDelta(pos, other.pos, world);
+        score += 1 / Math.max(80, Math.hypot(delta.x, delta.y));
+    }
+    return score;
+}
+
+function spawnAttackRisk(world, candidate){
+    let risky = false;
+    let bestTime = Infinity;
+    for( const other of world.fish || [] ){
+        if( !isEdibleBySize(other, candidate) || !canBeVictimOf(other, candidate) ) continue;
+        const predator = burstCapablePredator(other, candidate, world);
+        const time = estimatedAttackContactTime(predator, candidate, world);
+        bestTime = Math.min(bestTime, time);
+        if( isAttackContact(predator, candidate, world) || time < 0.75 ) risky = true;
+    }
+    return { risky, time: Number.isFinite(bestTime) ? bestTime : Infinity };
+}
+
+function burstCapablePredator(fish, candidate, world){
+    const speed = Math.hypot(fish.vel?.x || 0, fish.vel?.y || 0);
+    if( speed > 1e-3 ) return { ...fish, mode: 'burst' };
+    const delta = nearestToroidalDelta(fish.pos, candidate.pos, world);
+    const direction = normalize(delta);
+    return {
+        ...fish,
+        mode: 'burst',
+        vel: scale(direction.x || direction.y ? direction : v(fish.facing || 1, 0), FISH.minBurstSpeed),
+    };
+}
+
+// @ds:e29aeb93
+export function assignNpcCourage(world, rng){
+    world.npcSpawnCount = (world.npcSpawnCount || 0) + 1;
+    if( world.npcSpawnCount % NPC.courageRandomEvery === 0 ) return rng() * 100;
+    const liveNpc = (world.fish || []).filter(fish => fish.ownerKind === 'npc' && Number.isFinite(fish.courage));
+    const average = liveNpc.length
+        ? liveNpc.reduce((sum, fish) => sum + fish.courage, 0) / liveNpc.length
+        : NPC.courageBase;
+    return clamp(average + (rng() * 2 - 1) * NPC.courageJitter, 0, 100);
+}
+
+// @ds:d0ef4576 @ds:e29aeb93 @ds:d867989f @ds:98224ab9
+export function chooseNpcIntent(self, world, rng, dt){
+    const nearestThreat = findNearestThreat(self, world);
+    const selectedPrey = findSelectedPrey(self, world);
+    if( !nearestThreat && selectedPrey ) return pursueIntent(self, selectedPrey, world);
+    if( !nearestThreat ) return preySteer(self, world.fish || [], dt, rng);
+
+    const incomingTime = estimatedAttackContactTime(burstCapablePredator(nearestThreat, self, world), self, world);
+    if( selectedPrey ){
+        const ownTime = estimatedAttackContactTime(burstCapablePredator(self, selectedPrey, world), selectedPrey, world);
+        const postEatSize = growSizeFromAreas(self.size, selectedPrey.size);
+        const postEatSelf = { ...self, size: postEatSize, radius: radiusOf(postEatSize) };
+        if( ownTime <= incomingTime && !isEdibleBySize(nearestThreat, postEatSelf) ){
+            return pursueIntent(self, selectedPrey, world);
+        }
+    }
+
+    const courageRoll = rng() * 100;
+    if( selectedPrey && (self.courage ?? NPC.courageBase) >= courageRoll && incomingTime > 0.25 ){
+        return pursueIntent(self, selectedPrey, world);
+    }
+    return fleeFromThreat(self, nearestThreat, world);
+}
+
+function findNearestThreat(self, world){
+    let nearest = null;
+    let nearestDistance = Infinity;
+    for( const candidate of world.fish || [] ){
+        if( candidate === self ) continue;
+        if( !isEdibleBySize(candidate, self) || !canBeVictimOf(candidate, self) ) continue;
+        const delta = nearestToroidalDelta(self.pos, candidate.pos, world);
+        const distance = Math.hypot(delta.x, delta.y);
+        if( distance < nearestDistance ){
+            nearest = candidate;
+            nearestDistance = distance;
+        }
+    }
+    return nearest;
+}
+
+function findSelectedPrey(self, world){
+    let selected = null;
+    let selectedDistance = PREY.fleeRadius;
+    for( const candidate of world.fish || [] ){
+        if( candidate === self ) continue;
+        if( !isEdibleBySize(self, candidate) || !canBeVictimOf(self, candidate) ) continue;
+        const delta = nearestToroidalDelta(self.pos, candidate.pos, world);
+        const distance = Math.hypot(delta.x, delta.y);
+        if( distance < selectedDistance ){
+            selected = candidate;
+            selectedDistance = distance;
+        }
+    }
+    return selected;
+}
+
+function pursueIntent(self, target, world){
+    const toward = normalize(nearestToroidalDelta(self.pos, target.pos, world));
+    return {
+        accel: scale(toward, PREY.fleeAccel),
+        mode: 'burst',
+    };
+}
+
+function fleeFromThreat(self, threat, world){
+    const away = normalize(scale(nearestToroidalDelta(self.pos, threat.pos, world), -1));
+    return {
+        accel: scale(away, PREY.fleeAccel),
+        mode: 'burst',
+    };
 }
 
 function edgeSpawn(world, rng){
@@ -120,4 +278,8 @@ export function advanceFryGrowth(fish, dt){
 // @ds:d4f6a1c2
 export function capPreySpeed(p){
     p.vel = clampLen(p.vel, PREY.maxSpeed);
+}
+
+function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
 }

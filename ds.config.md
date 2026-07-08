@@ -2,7 +2,7 @@
 
 ## Project Mode
 
-DS mode: incremental.
+DS mode: standard.
 
 ## Executable Implementation Boundary
 

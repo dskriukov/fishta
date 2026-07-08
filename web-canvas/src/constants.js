@@ -89,6 +89,7 @@ export const ENERGY = {
 export const PREDATION = {
     eatRatio: 1.15,         // predator.size > prey.size * eatRatio — predation.dsc, ds:98224ab9
     attackReachRatio: 0.38, // forward burst tolerance in combined radii — @ds:a3e394a8 @ds:98224ab9
+    attackConeDotMin: 0.55, // @ds:b39c93a5
 };
 
 export const PREY = {
@@ -111,6 +112,12 @@ export const FRY = {
     growthSeconds: 10,      // @ds:e6ecfbdd
 };
 
+export const NPC = {
+    courageBase: 50,        // @ds:e29aeb93
+    courageJitter: 10,      // @ds:e29aeb93
+    courageRandomEvery: 10, // @ds:e29aeb93
+};
+
 export const BUBBLE = {
     maxRatio: 0.08,         // bubble radius target = fish.radius * maxRatio — world.air#ia:9e0f1a2b, ds:d6cebf86
     displayScale: 1,        // visual size follows fish size directly — ds:d6cebf86
@@ -118,6 +125,7 @@ export const BUBBLE = {
     baseInterval: 0.8,      // seconds between emissions — world.air#ia:3c4d5e6f, ds:d6cebf86
     intervalJitter: 0.8,    // added random delay — world.air#ia:3c4d5e6f, ds:d6cebf86
     life: 1.6,              // seconds to fade out — world.air#ia:3c4d5e6f, ds:d6cebf86
+    birthDuration: 0.22,    // seconds to grow alpha/radius from zero — ds:d6cebf86
     riseSpeed: 18,          // px/s upward drift — world.air#ia:3c4d5e6f, ds:d6cebf86
     drift: 8,               // px/s sideways wobble — world.air#ia:3c4d5e6f, ds:d6cebf86
     burstMinCount: 2,       // minimum bubbles per burst — world.air#ia:7a8b9c0d, ds:d6cebf86

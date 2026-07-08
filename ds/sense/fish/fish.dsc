@@ -17,6 +17,25 @@ entity:
     userName: { type: string?, from: [ds:multiplayer.identity, ds:fish.decor.user-label] }
     userColor: { type: color?, from: [ds:multiplayer.identity, ds:fish.decor.abandoned-gradient] }
     userTier: { type: enum[paid,free]?, from: ds:multiplayer.identity }
+  visual_geometry:
+    from: [ds:fish.visual.geometry-asset, ds:fish.geometry.collision-area, ia:fish.visual.svg-geometry-fidelity]
+    asset: ds/assets/fish2.svg
+    fidelity: "viewBox, path/circle coordinates, proportions, element-relative positions, semantic ids, and canonical silhouette are preserved from the source SVG"
+    anchor: collision_area.center
+    canonical_presence_area: collision_area
+    size_definition: "fish geometric size is the diameter of collision_area"
+    area_definition: "fish geometric area is the area of collision_area"
+    contact_geometry: "fish intersection uses canonical circular presence areas"
+    allowed_render_transforms:
+      - "color and transparent overlay changes"
+      - "group visibility for cruise/burst"
+      - "position, scale, horizontal facing reflection"
+      - "animation transforms applied on top of source element geometry"
+    semantic_ids_required:
+      - collision_area
+      - shape_cruise
+      - shape_burst
+      - fin_*
 
 derived:
   radius:
@@ -74,15 +93,23 @@ decor:
         open with teeth visible; ordinary direction change, cruise acceleration, and
         inertial movement do not open the toothed mouth; otherwise mouth closes smoothly.
   swimMotion:
-    from: [ds:fish.decor.swim_motion, ia:fish.decor.swim-state]
+    from: [ds:fish.decor.swim_motion, ds:fish.visual.geometry-asset, ia:fish.decor.swim-state]
     contract:
       name: updateSwimMotion
       inputs: [fish, accel, dt]
       output: swimMotionState
       rule: >
-        fish keeps a swim phase for tail/fin oscillation; phase speed follows movement
+        fish keeps a swim phase for tail/fin oscillation; animated fin_* SVG
+        elements move with the current swim phase; phase speed follows movement
         speed, burst increases amplitude, and entering burst thrust adds a brief kick
         for a larger starting swing.
+  regimeShape:
+    from: ds:fish.decor.regime-shape
+    contract:
+      name: resolveFishRegimeShape
+      inputs: [fish.mode]
+      output: visibleShapeGroup
+      rule: "mode==cruise displays shape_cruise; mode==burst displays shape_burst; switching happens directly when the swimming regime changes"
   fearEye:
     from: [ds:fish.decor.fear_eye, ia:fish.decor.fear-eye-state]
     contract:
@@ -157,7 +184,7 @@ growth:
     name: grow
     inputs: [size, preySize]
     output: size'
-    rule: "size' is computed by adding 70% of prey circle area to predator circle area, then deriving the new radius/size"
+    rule: "size' is computed by adding 70% of prey canonical circular area to predator canonical circular area, then deriving the new fish size from the resulting area"
     properties:
       - "gain > 0"
       - "gain decreases as size grows"   # замедление роста (fish.air)

@@ -928,7 +928,6 @@ function writeResolvedContractArtifact(ws, setup, context) {
     contractExists: Boolean(setup.contract.exists),
     contractSha256: contractText ? sha256(contractText) : '',
     contractText,
-    generatedAt: new Date().toISOString(),
   };
   fs.mkdirSync(path.dirname(artifactPath), { recursive: true });
   fs.writeFileSync(artifactPath, `${JSON.stringify(artifact, null, 2)}\n`, 'utf8');

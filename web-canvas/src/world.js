@@ -56,15 +56,26 @@ export function emitBubble(fish, dt, rng){
             x: fish.pos.x - fish.facing * fish.radius * 0.15,
             y: fish.pos.y + fish.radius * 0.05,
         },
-        radius,
+        radius: 0,
+        targetRadius: radius,
         vel: {
             x: (rng() - 0.5) * BUBBLE.drift,
             y: -BUBBLE.riseSpeed * (0.8 + 0.4 * rng()),
         },
         life: BUBBLE.life,
-        alpha: 1,
+        age: 0,
+        alpha: 0,
         phase: rng(),
     };
+}
+
+function clamp01(value){
+    return Math.max(0, Math.min(1, value));
+}
+
+function easeOutCubic(t){
+    const inv = 1 - t;
+    return 1 - inv * inv * inv;
 }
 
 // ds:d6cebf86
@@ -73,9 +84,16 @@ export function advanceBubbles(bubbles, world, dt){
         const bubble = bubbles[i];
         bubble.pos.x += bubble.vel.x * dt;
         bubble.pos.y += bubble.vel.y * dt;
+        bubble.age = (bubble.age || 0) + dt;
         bubble.life -= dt;
-        bubble.alpha = Math.max(0, bubble.life / BUBBLE.life);
-        if( bubble.life <= 0 || bubble.pos.y + bubble.radius < 0 || bubble.pos.x < -bubble.radius || bubble.pos.x > world.width + bubble.radius ){
+        const targetRadius = bubble.targetRadius || bubble.radius || 0;
+        bubble.targetRadius = targetRadius;
+        const birth = BUBBLE.birthDuration > 0 ? clamp01(bubble.age / BUBBLE.birthDuration) : 1;
+        const fade = clamp01(bubble.life / BUBBLE.life);
+        bubble.radius = targetRadius * easeOutCubic(birth);
+        bubble.alpha = Math.min(birth, fade);
+        const boundsRadius = Math.max(bubble.radius, targetRadius);
+        if( bubble.life <= 0 || bubble.pos.y + boundsRadius < 0 || bubble.pos.x < -boundsRadius || bubble.pos.x > world.width + boundsRadius ){
             bubbles.splice(i, 1);
         }
     }

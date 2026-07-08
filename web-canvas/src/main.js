@@ -6,7 +6,7 @@ import { DEBUG, FISH, GROWTH, LOOP, MOUTH, SIZE_DELTA_LABEL, SWIM, SYNC } from '
 import { advanceBubbles, emitBubble, makeWorld } from './world.js';
 import { requestExhale, runExhaleCycle, serializeFish } from './fish.js';
 import { createControlModeState, createInput, keySteer, pointerSteer, joystickSteer, huntMode } from './controls.js';
-import { buildToroidalRenderWorld, render, viewportToWorld } from './render.js';
+import { buildToroidalRenderWorld, loadFishGeometry, render, viewportToWorld } from './render.js';
 import { dist, normalize, scale, v } from './vec.js';
 import { createClientNet } from './client-net.js';
 
@@ -50,8 +50,9 @@ const sizeDeltaLabelState = {
 };
 
 // ds:b28b7af6
-function init(){
+async function init(){
     resize();
+    await loadFishGeometry();
 }
 
 // ds:b28b7af6
@@ -345,17 +346,17 @@ function advanceSizeDeltaLabelLifetimes(dt){
 
 function buildInputPayload(){
     const fish = currentUserFish();
-    let accel = null;
-    if( controlMode.active === 'keyboard' ){
-        accel = keySteer(input.keys);
-    }else if( controlMode.active === 'pointer' && fish && input.pointer.active ){
-        const worldPointer = viewportToWorld(input.pointer.pos, state.world, fish, canvas);
-        accel = pointerSteer(fish.pos, { active: true, pos: worldPointer });
-    }else if( controlMode.active === 'touch' && fish && input.pointer.active && input.touchDown ){
-        const worldPointer = viewportToWorld(input.pointer.pos, state.world, fish, canvas);
-        accel = pointerSteer(fish.pos, { active: true, pos: worldPointer });
-    }else if( controlMode.active === 'joystick' ){
-        accel = joystickSteer(input.joystick);
+    let accel = keySteer(input.keys);
+    if( !accel ){
+        if( controlMode.active === 'pointer' && fish && input.pointer.active && !input.pointer.lockedByKeyboard ){
+            const worldPointer = viewportToWorld(input.pointer.pos, state.world, fish, canvas);
+            accel = pointerSteer(fish.pos, { active: true, pos: worldPointer });
+        }else if( controlMode.active === 'touch' && fish && input.pointer.active && input.touchDown ){
+            const worldPointer = viewportToWorld(input.pointer.pos, state.world, fish, canvas);
+            accel = pointerSteer(fish.pos, { active: true, pos: worldPointer });
+        }else if( controlMode.active === 'joystick' ){
+            accel = joystickSteer(input.joystick);
+        }
     }
     return {
         accel: accel ? normalize(accel) : v(0, 0),
@@ -515,5 +516,4 @@ function recordDebugPositionTraces(now, visibleWorld){
     debugPositionTraces = debugPositionTraces.filter(trace => now - trace.createdAt <= maxAge);
 }
 
-init();
-requestAnimationFrame(frame);
+void init().finally(() => requestAnimationFrame(frame));

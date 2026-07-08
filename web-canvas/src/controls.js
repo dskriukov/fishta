@@ -28,7 +28,7 @@ export function createControlModeState(initialMode = null){
     const device = detectControlDevice();
     return {
         device,
-        active: initialMode || (device === 'touch' ? 'touch' : 'pointer'),
+        active: initialMode || (device === 'touch' ? 'joystick' : 'keyboard'),
     };
 }
 

@@ -4,34 +4,45 @@
 // @ds a3e394a8 98224ab9 e9fb3705 fcdfb2b7 d867989f 6f1b0a3c 39305789
 
 import { LEAVE, PREDATION, PLAYER } from './constants.js';
-import { dist, normalize, sub } from './vec.js';
+import { normalize } from './vec.js';
 import { grow, makeFish } from './fish.js';
 import { findLowestDensitySpawn } from './world.js';
 
-// ds:a3e394a8
-export function overlaps(a, b){
-    return dist(a.pos, b.pos) < a.radius + b.radius;
+// @ds:a3e394a8 @ds:b024b514
+export function overlaps(a, b, world = null){
+    return toroidalDistance(a.pos, b.pos, world) < a.radius + b.radius;
 }
 
-// @ds:a3e394a8 @ds:98224ab9
-export function canReachForEating(predator, victim){
-    const contactDistance = predator.radius + victim.radius;
-    const distance = dist(predator.pos, victim.pos);
-    if( distance < contactDistance ) return true;
+// @ds:b39c93a5 @ds:b024b514
+export function isAttackContact(predator, victim, world = null){
     if( predator.mode !== 'burst' ) return false;
-
-    const speed = Math.hypot(predator.vel.x, predator.vel.y);
+    const speed = Math.hypot(predator.vel?.x || 0, predator.vel?.y || 0);
     if( speed <= 1e-3 ) return false;
 
-    const toVictim = sub(victim.pos, predator.pos);
-    const forward = normalize(predator.vel);
-    const direction = normalize(toVictim);
+    const separation = nearestToroidalDelta(predator.pos, victim.pos, world);
+    const distance = Math.hypot(separation.x, separation.y);
+    const contactDistance = predator.radius + victim.radius;
+    const forward = speed > 1e-3
+        ? normalize(predator.vel)
+        : { x: predator.facing || 1, y: 0 };
+    const direction = normalize(separation);
     const alignment = forward.x * direction.x + forward.y * direction.y;
-    if( alignment < 0.55 ) return false;
+    if( alignment < PREDATION.attackConeDotMin ) return false;
+
+    const relativeVelocity = {
+        x: (predator.vel?.x || 0) - (victim.vel?.x || 0),
+        y: (predator.vel?.y || 0) - (victim.vel?.y || 0),
+    };
+    if( relativeVelocity.x * separation.x + relativeVelocity.y * separation.y <= 0 ) return false;
+
+    if( distance < contactDistance ) return true;
 
     const reach = contactDistance * PREDATION.attackReachRatio;
     return distance < contactDistance + reach;
 }
+
+// Backward-compatible name for legacy call sites; new IMP code uses isAttackContact.
+export const canReachForEating = isAttackContact;
 
 // ds:98224ab9
 export function isEdibleBySize(predator, prey){
@@ -45,9 +56,10 @@ export function canBeVictimOf(predator, victim){
     return true;
 }
 
-// ds:98224ab9
-export function canEat(predator, prey){
-    return predator.mode === 'burst' && isEdibleBySize(predator, prey) && canBeVictimOf(predator, prey);
+// @ds:98224ab9 @ds:32745a4f @ds:b39c93a5
+export function canEat(predator, prey, world = null, attackContact = null){
+    const contact = attackContact ?? isAttackContact(predator, prey, world);
+    return predator.mode === 'burst' && isEdibleBySize(predator, prey) && canBeVictimOf(predator, prey) && contact;
 }
 
 // ds:6f1b0a3c
@@ -95,9 +107,9 @@ export function respawnUserFishAfterEating(world, fish, rng){
 export function isLeaveBlockedByUserAttack(world, userFish){
     for( const other of world.fish || [] ){
         if( other === userFish || other.ownerKind !== 'user' || other.mode !== 'burst' ) continue;
-        const toVictim = sub(userFish.pos, other.pos);
+        const toVictim = nearestToroidalDelta(other.pos, userFish.pos, world);
         const distance = Math.hypot(toVictim.x, toVictim.y);
-        const speed = Math.hypot(other.vel.x, other.vel.y);
+        const speed = Math.hypot(other.vel?.x || 0, other.vel?.y || 0);
         if( speed <= 1e-3 ) continue;
         const direction = normalize(other.vel);
         const toward = normalize(toVictim);
@@ -118,7 +130,8 @@ export function resolveEating(state){
 
     for( let i = prey.length - 1; i >= 0; i-- ){
         const p = prey[i];
-        if( canReachForEating(p, player) && canEat(p, player) && canRemoveVictim(state, player) ){
+        const attackContact = isAttackContact(p, player, state.world);
+        if( attackContact && canEat(p, player, state.world, attackContact) && canRemoveVictim(state, player) ){
             grow(p, player.size);
             respawnPlayerAfterEating(state);
             return eatenByPlayer;
@@ -128,7 +141,8 @@ export function resolveEating(state){
     // ds:e9fb3705 ds:d867989f
     for( let i = prey.length - 1; i >= 0; i-- ){
         const p = prey[i];
-        if( canReachForEating(player, p) && canEat(player, p) && canRemoveVictim(state, p) ){
+        const attackContact = isAttackContact(player, p, state.world);
+        if( attackContact && canEat(player, p, state.world, attackContact) && canRemoveVictim(state, p) ){
             grow(player, p.size);
             prey.splice(i, 1);
             eatenByPlayer++;
@@ -143,7 +157,8 @@ export function resolveEating(state){
             if( i === j ) continue;
             const b = prey[j];
             if( !b ) continue;
-            if( canReachForEating(a, b) && canEat(a, b) && canRemoveVictim(state, b) ){
+            const attackContact = isAttackContact(a, b, state.world);
+            if( attackContact && canEat(a, b, state.world, attackContact) && canRemoveVictim(state, b) ){
                 grow(a, b.size);
                 prey.splice(j, 1);
                 if( j < i ) i--;
@@ -163,7 +178,8 @@ function resolveWorldEating(world, rng){
             if( i === j ) continue;
             const victim = fish[j];
             if( !victim ) continue;
-            if( canReachForEating(predator, victim) && canEat(predator, victim) ){
+            const attackContact = isAttackContact(predator, victim, world);
+            if( attackContact && canEat(predator, victim, world, attackContact) ){
                 grow(predator, victim.size);
                 if( predator.ownerKind === 'user' ) eatenByUsers++;
                 if( victim.ownerKind === 'user' ){
@@ -177,4 +193,36 @@ function resolveWorldEating(world, rng){
         }
     }
     return eatenByUsers;
+}
+
+// @ds:b39c93a5
+export function estimatedAttackContactTime(predator, victim, world = null){
+    const separation = nearestToroidalDelta(predator.pos, victim.pos, world);
+    const relativeVelocity = {
+        x: (predator.vel?.x || 0) - (victim.vel?.x || 0),
+        y: (predator.vel?.y || 0) - (victim.vel?.y || 0),
+    };
+    const closingSpeed = relativeVelocity.x * normalize(separation).x + relativeVelocity.y * normalize(separation).y;
+    if( closingSpeed <= 1e-3 ) return Infinity;
+    const reach = predator.radius + victim.radius + (predator.radius + victim.radius) * PREDATION.attackReachRatio;
+    return Math.max(0, (Math.hypot(separation.x, separation.y) - reach) / closingSpeed);
+}
+
+export function nearestToroidalDelta(from, to, world = null){
+    let dx = (to?.x || 0) - (from?.x || 0);
+    let dy = (to?.y || 0) - (from?.y || 0);
+    if( world?.width > 0 ){
+        if( dx > world.width / 2 ) dx -= world.width;
+        if( dx < -world.width / 2 ) dx += world.width;
+    }
+    if( world?.height > 0 ){
+        if( dy > world.height / 2 ) dy -= world.height;
+        if( dy < -world.height / 2 ) dy += world.height;
+    }
+    return { x: dx, y: dy };
+}
+
+function toroidalDistance(a, b, world){
+    const delta = nearestToroidalDelta(a, b, world);
+    return Math.hypot(delta.x, delta.y);
 }

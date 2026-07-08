@@ -4,6 +4,11 @@
 
 domain: fish-eat-fish
 version: 0.1.0
+project_mode:
+  from: ds:project.mode
+  mode: standard
+  source_model: "DS description is the source product model"
+  implementation_derivation: "executable implementation is derived from the DS model"
 
 # Машинно-читаемая сводка мира. Детали — в доменных модулях.
 world:

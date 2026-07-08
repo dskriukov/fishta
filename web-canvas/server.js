@@ -22,6 +22,8 @@ import {
 } from './src/protocol.js';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
+const workspaceRoot = normalize(join(root, '..'));
+const dsAssetRoot = join(workspaceRoot, 'ds', 'assets'); // @ds:df06827a
 const port = Number(process.env.PORT || SERVER.port);
 const world = makeWorld();
 const inputsByClient = new Map();
@@ -36,8 +38,10 @@ maintainPopulation({ world }, Math.random);
 const server = createServer(async (req, res) =>{
     const url = new URL(req.url, `http://${req.headers.host}`);
     const safePath = normalize(url.pathname === '/' ? 'index.html' : url.pathname.replace(/^\/+/, '')).replace(/^(\.\.[/\\])+/, '');
-    const path = join(root, safePath);
-    if( !path.startsWith(root) ){
+    const assetPath = safePath.startsWith('ds/assets/') ? join(workspaceRoot, safePath) : null;
+    const path = assetPath || join(root, safePath);
+    const allowed = assetPath ? path.startsWith(dsAssetRoot) : path.startsWith(root);
+    if( !allowed ){
         res.writeHead(403);
         res.end('Forbidden');
         return;

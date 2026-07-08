@@ -15,6 +15,13 @@ contact:
     inputs: [fishA, fishB]
     output: boolean
     rule: "distance(posA, posB) < radius(A) + radius(B)"
+  attack_contact:
+    from: ds:predation.attack-contact
+    contract:
+      name: isAttackContact
+      inputs: [predator, victim]
+      output: boolean
+      rule: "predator is in burst, victim intersects the predator head/mouth area, predator satisfies size and victim-type eligibility, and current relative motion increases overlap between their canonical circular areas"
 
 rule:
   from: ds:predation.rule
@@ -30,7 +37,7 @@ rule:
     name: canEat
     inputs: [predator, prey]
     output: boolean
-    rule: "predator.mode == 'burst' and isEdibleBySize(predator, prey) and victim is eligible for this predator by user tier rules"
+    rule: "predator.mode == 'burst' and isEdibleBySize(predator, prey) and victim is eligible for this predator by user tier rules and isAttackContact(predator, prey)"
 
 victim_eligibility:
   from: ds:predation.user-tier-eligibility
