@@ -1,6 +1,6 @@
 ds/sense/controls/controls.ds#7d8ce659 - 323e0d97
 ds/sense/controls/controls.ia#3eb8e8e5 - 3ab6da12
-ds/sense/fish/fish.ds#0e8599cb - 0e1af7e8
+ds/sense/fish/fish.ds#ee3ac083 - 0e1af7e8
 ds/sense/fish/fish.ia#5f3a7dac - 2b751007
 ds/sense/main.ds#a5c8fce3 - d3cd9207
 ds/sense/main.ia#55b6bde5 - feab7d75
@@ -35,6 +35,7 @@ ds:debug.fish-collision-radius - 6b4e90d2 d3cd9207
 ds:debug.position-traces - 727e9afe d3cd9207
 ds:debug.world-repeat-bounds - 7435b6ce d3cd9207
 ds:fish.decor.abandoned-gradient - c3708d14 0e1af7e8
+ds:fish.decor.eating-exhale - a44b9d2c 0e1af7e8
 ds:fish.decor.fear_eye - 906be50b 0e1af7e8
 ds:fish.decor.mouth - 975ca168 0e1af7e8
 ds:fish.decor.regime-shape - 1e323735 0e1af7e8

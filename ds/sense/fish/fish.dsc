@@ -85,13 +85,15 @@ decor:
     from: [ds:fish.decor.mouth, ia:fish.decor.mouth-state, ia:fish.client-visual-facing-mouth]
     contract:
       name: updateMouth
-      inputs: [fish, accel, mode, dt, eatenSize?]
+      inputs: [fish, accel, mode, dt, eatenCount?]
       output: mouthState
       rule: >
-        if fish just ate prey -> open mouth to at least the prey size and hold it
-        briefly; if fish is in burst/hunt mode with active thrust -> mouth slightly
-        open with teeth visible; ordinary direction change, cruise acceleration, and
-        inertial movement do not open the toothed mouth; otherwise mouth closes smoothly.
+        if fish is in burst/hunt mode with active thrust -> mouth slightly open
+        with teeth visible; ordinary direction change, cruise acceleration, and
+        inertial movement do not open the toothed mouth. When fish just ate prey,
+        the client holds that fish in a local visual cruise state for 0.3 seconds
+        so the mouth closes through the ordinary cruise form; this visual hold does
+        not change server movement, predation, size, or synchronization.
   swimMotion:
     from: [ds:fish.decor.swim_motion, ds:fish.visual.geometry-asset, ia:fish.decor.swim-state]
     contract:
@@ -151,6 +153,22 @@ decor:
         remainder below 0.1 forward. Each label follows the fish, moves slightly
         upward, fades out, and never changes movement, collision, predation,
         numeric size, or network synchronization.
+  eatingExhale:
+    from: ds:fish.decor.eating-exhale
+    authority: client-only
+    server_domain_event: false
+    contract:
+      name: triggerEatingExhale
+      inputs: [fish.eatenFishCount, previousEatenFishCount, exhaleState]
+      output: exhaleState'
+      rule: >
+        when a visible fish's eatenFishCount increases, the client requests a
+        decorative exhale for that fish. The exhale emits the normal sequential
+        bubble count and timing, with each newly emitted exhale bubble having an
+        approximately 40% chance to use the red eating-bubble style and otherwise
+        using the ordinary white air-bubble style. The effect remains visual-only:
+        movement, collision, predation, numeric size, and network synchronization
+        keep their ordinary rules.
   exhale:
     from: fn:exhale
     authority: client-only

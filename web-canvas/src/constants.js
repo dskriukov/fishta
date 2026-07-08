@@ -150,6 +150,7 @@ export const BUBBLE = {
 export const MOUTH = {
     chaseOpenRatio: 0.22,   // slight open while thrusting in burst — fish.air#ia:9c0d1e2f, ds:975ca168
     holdDuration: 0.4,      // seconds to keep post-eat open state — fish.air#ia:9c0d1e2f, ds:975ca168
+    eatingCruiseHoldSeconds: 0.3, // @ds:975ca168
 };
 
 export const SWIM = {
@@ -174,6 +175,7 @@ export const EXHALE = {
     emitInterval: 0.05,      // fn:a9a3ed12, seconds between sequential exhale bubbles
     emitMinCount: 9,         // fn:a9a3ed12
     emitMaxCount: 16,        // fn:a9a3ed12
+    eatingRedBubbleRatio: 0.4, // @ds:a44b9d2c
     influenceRadiusSizes: 1,
     bubbleDisplaceSpeed: 36,
 };

@@ -51,6 +51,8 @@ export function makeFish({
         visualScale: 1,
         exhale: {
             requested: false,
+            requestedRedRatio: 0,
+            redRatio: 0,
             stage: 'idle',
             t: 0,
             emitTimer: 0,
@@ -203,9 +205,12 @@ export function updateFearEye(fish, accel, dt){
     fish.eyeFear += (target - fish.eyeFear) * Math.min(1, dt * rate);
 }
 
-// fn:a9a3ed12
-export function requestExhale(fish){
+// @ds:a44b9d2c @fn:a9a3ed12
+export function requestExhale(fish, options = {}){
     fish.exhale.requested = true;
+    if( options.redBubbleRatio !== undefined ){
+        fish.exhale.requestedRedRatio = Math.max(0, Math.min(1, options.redBubbleRatio));
+    }
 }
 
 function lerp(a, b, t){
@@ -240,12 +245,14 @@ function displaceExistingBubbles(fish, bubbles, dt, towardMouth){
     }
 }
 
+// @ds:a44b9d2c @fn:a9a3ed12
 function makeExhaleBubble(fish, rng){
     const radius = Math.max(BUBBLE.minRadius, fish.radius * BUBBLE.maxRatio * BUBBLE.displayScale * (0.6 + 0.4 * rng()));
     const mouth = mouthPos(fish);
-    return {
+    const red = rng() < (fish.exhale.redRatio || 0);
+    const bubble = {
         pos: {
-            x: mouth.x + fish.facing * fish.radius * 0.06,
+            x: mouth.x - fish.facing * fish.radius * 0.5,
             y: mouth.y,
         },
         radius: 0,
@@ -259,6 +266,8 @@ function makeExhaleBubble(fish, rng){
         alpha: 0,
         phase: rng(),
     };
+    if( red ) bubble.color = 'red';
+    return bubble;
 }
 
 function beginExhaleEmission(exhale, rng){
@@ -289,6 +298,8 @@ export function runExhaleCycle(fish, bubblesAround, rng, dt){
         exhale.emitTimer = 0;
         exhale.emitCount = 0;
         exhale.emitTotal = 0;
+        exhale.redRatio = exhale.requestedRedRatio || 0;
+        exhale.requestedRedRatio = 0;
         exhale.requested = false;
     }
 
@@ -323,6 +334,7 @@ export function runExhaleCycle(fish, bubblesAround, rng, dt){
         exhale.emitTimer = 0;
         exhale.emitCount = 0;
         exhale.emitTotal = 0;
+        exhale.redRatio = 0;
         fish.visualScale = 1;
     }
 }

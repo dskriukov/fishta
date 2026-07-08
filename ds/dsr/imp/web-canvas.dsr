@@ -90,7 +90,7 @@ contract_map:
   controls.inspectClick:                    main.js#handleInspectClick  # @ds:2e1570ed
   controls.camera:                          render.js#worldToViewport  # @ds:7b9a7984
   controls.toroidalViewportProjection:      render.js#buildToroidalRenderWorld render.js#nearestToroidalCoordinate  # @ds:7b9a7984 @ds:c83f4c1e @ia:dd909d1a
-  client.decorState:                         main.js#applyClientFishDecor main.js#updateClientDecorState  # @ds:975ca168 @ds:bd354b7a @ds:3ddf8f67 @fn:a9a3ed12 @ia:9c0d1e2f @ia:3a4b5c6e
+  client.decorState:                         main.js#applyClientFishDecor main.js#updateClientDecorState  # @ds:975ca168 @ds:bd354b7a @ds:3ddf8f67 @ds:a44b9d2c @fn:a9a3ed12 @ia:9c0d1e2f @ia:3a4b5c6e
   debug.toggleMode:                         main.js#toggleDebugMode  # @ds:59c118f5
   debug.drawWorldRepeatBounds:              render.js#drawDebugWorldRepeatBounds  # @ds:7435b6ce
   debug.recordPositionTraces:               main.js#recordDebugPositionTraces protocol.js#applyWorldSync  # @ds:727e9afe
@@ -125,7 +125,7 @@ contract_map:
   fish.updateAbandonedGradient:             fish.js#updateAbandonedGradient  # @ds:c3708d14 @ds:bfd5a97a
   fish.updateSizeDeltaLabels:                main.js#updateSizeDeltaLabels render.js#drawSizeDeltaLabel  # @ds:c2d7f4a1
   fish.bodyColorVisual:                     render.js#drawFish  # @ia:32288dfb @ds:f883f90c
-  fish.runExhaleCycle:                      fish.js#runExhaleCycle  # @fn:a9a3ed12
+  fish.runExhaleCycle:                      fish.js#requestExhale fish.js#runExhaleCycle fish.js#makeExhaleBubble  # @ds:a44b9d2c @fn:a9a3ed12
   fish.serializeFish:                       fish.js#serializeFish  # @do:a7a50f7b
   prey.wanderSteer:                         prey.js#wanderSteer  # @ds:31cb7a0d
   prey.fleeSteer:                           prey.js#fleeSteer  # @ds:579e4888 @ds:e699c42d
@@ -418,6 +418,8 @@ implementation_instructions:
       - server authority over movement must not become server authority over mouth, teeth, or fin animation.
       - clientFishDecor stores an exhale state object per fish id with the same shape as fish.js#makeFish.exhale; this state is client-only and removed when the fish id is absent from the newest visible world.
       - updateClientDecorState tracks previous displayed mode separately from burstSwimming; when fish.mode transitions from any non-burst value to 'burst', call requestExhale on the decor exhale state once for that edge. Do not require speed > FISH.facingThreshold for this trigger.
+      - updateClientDecorState stores lastEatenFishCount per fish id. When a visible fish's synchronized eatenFishCount increases, call requestExhale on decor.exhale with an eating red-bubble ratio of 0.4; this request is client-only and may queue behind an already active exhale cycle.
+      - updateClientDecorState also starts a 0.3s eatingCruiseHold when eatenFishCount increases. During that hold, set the visible fish's mouthOpen to 0 and render it through the cruise visual state locally. Do not write this cruise hold to protocol rows or server fish.mode.
       - applyClientFishDecor attaches decor.exhale to the temporary visible fish, calls runExhaleCycle(fish, clientBubbles, rng, dt), then copies fish.visualScale from the exhale cycle back into rendered fish state. The cycle may push bubbles into clientBubbles and displace existing client bubbles, but must not write to world.bubbles or protocol fields.
     frame(now):
       - compute dt from previous animation frame and clamp with LOOP.maxDt;
@@ -444,11 +446,11 @@ implementation_instructions:
       - for each fish in world.fish, read or create emitter state `{ bubbleTimer: 0, bubbleBurstRemaining: 0 }` from clientBubbleEmitters by fish.id;
       - call emitBubble with a temporary fish object that combines current visual fish geometry with the local emitter fields;
       - after emitBubble, write the updated bubbleTimer and bubbleBurstRemaining back to the emitter entry;
-      - push non-null emitted bubbles into clientBubbles; emitted bubble objects must carry `{ pos, radius: 0, targetRadius, vel, life, age: 0, alpha: 0, phase }`, where `targetRadius` is the normal visible radius computed from fish size;
+      - push non-null emitted bubbles into clientBubbles; emitted bubble objects must carry `{ pos, radius: 0, targetRadius, vel, life, age: 0, alpha: 0, phase, color? }`, where `targetRadius` is the normal visible radius computed from fish size and `color` is omitted for ordinary white bubbles or set to `red` for eating-exhale red bubbles;
       - call advanceBubbles(clientBubbles, world, dt);
       - do not store these bubbles in world.bubbles.
     advanceBubbles owns bubble motion and birth/fade animation: increment `age`, decrement `life`, move by velocity, compute `birth = clamp(age / BUBBLE.birthDuration, 0..1)`, compute `fade = clamp(life / BUBBLE.life, 0..1)`, set `radius = targetRadius * easeOut(birth)` and `alpha = min(birth, fade)`. Bounds removal must use the larger of current radius and targetRadius so a just-born zero-radius bubble is not removed incorrectly.
-    render(ctx,state) reads bubbles from state.clientBubbles first, then state.world.bubbles only for legacy single-process mode.
+    render(ctx,state) reads bubbles from state.clientBubbles first, then state.world.bubbles only for legacy single-process mode. render.js#drawBubble uses the ordinary white/blue style when bubble.color is absent and a red fill/stroke style when bubble.color is `red`.
     Camera viewport follows current client user fish via worldToViewport(world, followed, canvas).
     Rendering projects game-world units to canvas pixels.  # @ds:e559831a @ds:7b9a7984 @ds:d6cebf86 @ia:3c4d5e6f @ia:5a6b7c8d
   toroidal_viewport_projection: |
@@ -583,22 +585,18 @@ implementation_instructions:
     fish.mode is burst. fin_* elements receive the current swim phase transform
     from updateSwimMotion and remain attached to the same fish transform.  # @ds:df06827a @ds:b024b514 @ds:1e323735 @ds:bd354b7a @ia:2f6e7a91
   fish_mouth_visual: |
-    render.js#drawFish draws the body silhouette before drawing the mouth.
-    For mouthOpenRatio > 0:
-      - use the legacy snout-mounted curved cavity proportions: mouthX = snoutX - r*0.1, mouthWidth = r*(0.22 + mouthOpenRatio*0.16), mouthHeight = r*(0.45 + mouthOpenRatio*0.8);
-      - draw a dark filled cavity with quadratic curves from the snout contour toward mouthX so the open mouth reads as a curved cut in the head;
-      - draw the lip as a stroked curved contour over the cavity.
-    Teeth:
-      - render only when 0 < mouthOpenRatio < MOUTH.chaseOpenRatio + 0.05;
-      - use the legacy sparse predator accent: five small triangular teeth per jaw, placed along the upper and lower cavity edges;
-      - keep the teeth small enough to remain an accent on the mouth shape.  # @ds:975ca168 @ia:9c0d1e2f
+    render.js#drawFish uses the parsed SVG visual geometry for the mouth and teeth.
+    Do not draw an additional canvas mouth overlay on top of the authored SVG shape.
+    The visible mouth state comes from the local rendered fish mode: burst uses the
+    authored burst shape with its attack mouth/teeth, and cruise uses the authored
+    cruise shape with the mouth closed.  # @ds:975ca168 @ia:9c0d1e2f
   fish_facing_and_burst_mouth_state: |
     fish.js#updateFacing derives visual facing from fish.vel.x with FISH.facingThreshold hysteresis; do not add a server protocol field for facing direction.
     protocol.js may preserve previous client facing while decoding rows, but the client fish update/render path must be able to derive facing from movement.
     In multiplayer rendering, main.js#updateClientDecorState computes chaseOpen on the client when fish.mode==='burst' and synchronized speed is above FISH.facingThreshold.
     Do not encode mouthOpen over the protocol; derive the toothed chase mouth locally from synchronized mode and speed.
     Do not open toothed chase mouth for ordinary direction changes, cruise movement, or inertial movement.
-    Eating can still open the mouth through the existing mouthHold/mouthEatenSize path.  # @ds:8d0ca6a8 @ds:975ca168 @ia:0bdc556b
+    Eating closes the mouth by holding a local client-only cruise visual state for 0.3 seconds after eatenFishCount increases; this visual hold must not mutate server fish.mode or protocol rows.  # @ds:8d0ca6a8 @ds:975ca168 @ia:0bdc556b
   serialization: |
     serializeFish returns structured text.
     Always include type, size, age, eatenFishCount.

@@ -2,7 +2,7 @@
 // Bootstraps world + game loop (dsr/use/ecs-loop.dsr). Glue/I-O layer.
 // @ds b28b7af6 27fa3caa ec8cb052 c95ca496 48c4fc99 b433f1bc d2e8a84c 5fb1ff09 c83f4c1e ca07d970 d6cebf86 3ddf8f67 1f3abc43 cbc1225a 7ce238da c4073e51 ee07d6da 8869f043 f51831f5 8d0ca6a8 d867989f 975ca168 bd354b7a 906be50b 91e32235 55c13a4f 10baf178 22fd3ab4 7b9a7984 ad8d81d8 31cb7a0d 579e4888 e699c42d e6ecfbdd 1e66d817 a3e394a8 98224ab9 e9fb3705 fcdfb2b7 0c8d4e2a 6f1b0a3c 39305789
 
-import { DEBUG, FISH, GROWTH, LOOP, MOUTH, SIZE_DELTA_LABEL, SWIM, SYNC } from './constants.js';
+import { DEBUG, EXHALE, FISH, LOOP, MOUTH, SIZE_DELTA_LABEL, SWIM, SYNC } from './constants.js';
 import { advanceBubbles, emitBubble, makeWorld } from './world.js';
 import { requestExhale, runExhaleCycle, serializeFish } from './fish.js';
 import { createControlModeState, createInput, keySteer, pointerSteer, joystickSteer, huntMode } from './controls.js';
@@ -217,7 +217,7 @@ function wrapValue(value, size){
     return ((value % size) + size) % size;
 }
 
-// @ds:975ca168 @ds:bd354b7a @ds:3ddf8f67 @fn:a9a3ed12 @ia:9c0d1e2f @ia:3a4b5c6e
+// @ds:975ca168 @ds:bd354b7a @ds:3ddf8f67 @ds:a44b9d2c @fn:a9a3ed12 @ia:9c0d1e2f @ia:3a4b5c6e
 function applyClientFishDecor(world, bubbles, dt, rng){
     const visibleFishIds = new Set((world.fish || []).map(fish => fish.id));
     for( const fishId of clientFishDecor.keys() ){
@@ -234,6 +234,7 @@ function applyClientFishDecor(world, bubbles, dt, rng){
         fish.swimPhase = decor.swimPhase;
         fish.burstKick = decor.burstKick;
         fish.mouthOpen = decor.mouthOpen;
+        if( decor.eatingCruiseHold > 0 ) fish.mode = 'cruise'; // @ds:975ca168
     }
 }
 
@@ -246,6 +247,8 @@ function makeClientDecor(fish){
         visualScale: fish.visualScale || 1,
         exhale: {
             requested: false,
+            requestedRedRatio: 0,
+            redRatio: 0,
             stage: 'idle',
             t: 0,
             emitTimer: 0,
@@ -255,6 +258,7 @@ function makeClientDecor(fish){
         mouthOpen: 0,
         mouthHold: 0,
         mouthEatenSize: 0,
+        eatingCruiseHold: 0,
         lastEatenFishCount: fish.eatenFishCount || 0,
         lastSize: fish.size || 1,
     };
@@ -273,26 +277,20 @@ function updateClientDecorState(decor, fish, dt){
 
     const eatenCount = fish.eatenFishCount || 0;
     if( eatenCount > decor.lastEatenFishCount ){
-        decor.mouthHold = Math.max(decor.mouthHold, MOUTH.holdDuration);
-        decor.mouthEatenSize = Math.max(decor.mouthEatenSize, estimateEatenSize(decor.lastSize, fish.size));
+        requestExhale({ exhale: decor.exhale }, { redBubbleRatio: EXHALE.eatingRedBubbleRatio }); // @ds:a44b9d2c
+        decor.eatingCruiseHold = Math.max(decor.eatingCruiseHold, MOUTH.eatingCruiseHoldSeconds); // @ds:975ca168
     }
     decor.lastEatenFishCount = eatenCount;
     decor.lastSize = fish.size || decor.lastSize;
 
+    if( decor.eatingCruiseHold > 0 ) decor.eatingCruiseHold = Math.max(0, decor.eatingCruiseHold - dt);
     if( decor.mouthHold > 0 ) decor.mouthHold = Math.max(0, decor.mouthHold - dt);
     if( decor.mouthEatenSize > 0 ) decor.mouthEatenSize = Math.max(0, decor.mouthEatenSize - dt * Math.max(1, fish.size || 1) * 2);
 
-    const chaseOpen = burstSwimming ? MOUTH.chaseOpenRatio : 0;
+    const closeForEating = decor.eatingCruiseHold > 0;
+    const chaseOpen = burstSwimming && !closeForEating ? MOUTH.chaseOpenRatio : 0;
     const eatOpen = decor.mouthHold > 0 ? Math.min(1, decor.mouthEatenSize / Math.max(1, fish.size || 1)) : 0;
-    decor.mouthOpen = Math.max(chaseOpen, eatOpen);
-}
-
-function estimateEatenSize(previousSize, currentSize){
-    const sizeGain = Math.max(0, (currentSize || 0) - (previousSize || 0));
-    if( sizeGain > 0 ){
-        return sizeGain * (1 + (previousSize || 1) * GROWTH.decay) / GROWTH.k;
-    }
-    return Math.max(1, currentSize || previousSize || 1);
+    decor.mouthOpen = closeForEating ? 0 : Math.max(chaseOpen, eatOpen);
 }
 
 // @ds:c2d7f4a1

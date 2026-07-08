@@ -1,6 +1,6 @@
 // imp/web-canvas/src/render.js
 // Read-only over domain state (workspace.air rule: render never mutates domain).
-// @ds 975ca168 bd354b7a 906be50b d6cebf86 b28b7af6 1f3abc43 8f2c91ad
+// @ds 975ca168 bd354b7a 906be50b d6cebf86 a44b9d2c b28b7af6 1f3abc43 8f2c91ad
 // @ia 2f6e7a91
 
 import { BUBBLE, DEBUG, SIZE_DELTA_LABEL, SWIM, FEAR_EYE, WORLD } from './constants.js';
@@ -262,13 +262,13 @@ function colorWithOpacity(color, opacity){
 
 function applySvgAnimationTransform(ctx, id, animation){
     if( id === 'fin_back' ){
-        rotateAround(ctx, animation.tailAngle, 353, 238.205);
+        shearYFromVerticalEdge(ctx, animation.tailWave * 0.32, 360);
     }else if( id === 'fin_bottom' ){
-        rotateAround(ctx, animation.finAngle, 167.5, 280.21);
+        deformFromHorizontalEdge(ctx, 1 + animation.finWave * 0.18, animation.finWave * 0.51, 280.21);
     }else if( id === 'fin_bottom_small' ){
-        rotateAround(ctx, animation.finAngle * 0.65, 285.5, 266.487);
+        deformFromHorizontalEdge(ctx, 1 + animation.finWave * 0.22, animation.finWave * 0.275, 266.487);
     }else if( id === 'fin_bottom_top' ){
-        rotateAround(ctx, -animation.finAngle * 0.55, 210.5, 107.102);
+        deformFromHorizontalEdge(ctx, 1 - animation.finWave * 0.04, animation.finWave * 0.48, 107.102);
     }else if( id === 'eye' && Math.abs(animation.eyeScale - 1) >= 0.01 ){
         ctx.translate(85.0001, 138.109);
         ctx.scale(animation.eyeScale, animation.eyeScale);
@@ -276,11 +276,19 @@ function applySvgAnimationTransform(ctx, id, animation){
     }
 }
 
-function rotateAround(ctx, degrees, cx, cy){
-    if( Math.abs(degrees) < 0.001 ) return;
-    ctx.translate(cx, cy);
-    ctx.rotate(degrees * Math.PI / 180);
-    ctx.translate(-cx, -cy);
+function deformFromHorizontalEdge(ctx, scaleY, shearX, anchorY){
+    if( Math.abs(scaleY - 1) < 0.001 && Math.abs(shearX) < 0.001 ) return;
+    ctx.translate(0, anchorY);
+    ctx.transform(1, 0, shearX, 1, 0, 0);
+    ctx.scale(1, scaleY);
+    ctx.translate(0, -anchorY);
+}
+
+function shearYFromVerticalEdge(ctx, shearY, anchorX){
+    if( Math.abs(shearY) < 0.001 ) return;
+    ctx.translate(anchorX, 0);
+    ctx.transform(1, shearY, 0, 1, 0, 0);
+    ctx.translate(-anchorX, 0);
 }
 
 function clamp(value, min, max){
@@ -406,12 +414,13 @@ function drawBubble(ctx, bubble){
     const age = bubble.age || 0;
     const pulsePhase = Math.floor((age + bubble.phase) / BUBBLE.pulseStep) % 2;
     const squash = pulsePhase === 0 ? 1 : BUBBLE.pulseSquash;
+    const red = bubble.color === 'red';
     ctx.save();
     ctx.translate(bubble.pos.x, bubble.pos.y);
     ctx.scale(1, squash);
     ctx.globalAlpha = bubble.alpha;
-    ctx.fillStyle = `rgba(183, 236, 255, ${BUBBLE.fillAlpha})`;
-    ctx.strokeStyle = '#d9f6ff';
+    ctx.fillStyle = red ? `rgba(255, 72, 72, ${BUBBLE.fillAlpha * 1.35})` : `rgba(183, 236, 255, ${BUBBLE.fillAlpha})`;
+    ctx.strokeStyle = red ? '#ff6b6b' : '#d9f6ff';
     ctx.lineWidth = Math.max(1, bubble.radius * 0.1);
     ctx.beginPath();
     ctx.arc(0, 0, bubble.radius, 0, Math.PI * 2);
@@ -547,8 +556,8 @@ function drawFish(ctx, f){
     if( fishSvgRenderTree ){
         const scale = r / fishSvgGeometry.collisionRadius;
         const animation = {
-            tailAngle: clamp(tailWave * 30, -10, 10),
-            finAngle: clamp(finWave * 28, -9, 9),
+            tailWave: clamp(tailWave, -0.46, 0.46),
+            finWave: clamp(finWave, -0.3, 0.3),
             eyeScale,
         };
         ctx.save();
