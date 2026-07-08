@@ -67,3 +67,7 @@
 - [x] **[bug:fish-svg-frame-cache-animation-stutter]**\
   Рендер рыбы должен быть синхронным на каждом кадре: кадр анимации плавников, хвоста и глаза должен отрисовываться из уже загруженной геометрии без создания новых `Blob`, `ObjectURL` или `Image` во время игрового кадра. Цвет, режим формы и SVG paint model сохраняются, а размер и анимационные трансформации применяются непосредственно при canvas-отрисовке или через заранее подготовленные стабильные ресурсы.
   Source: user report 2026-07-08; affected DSR/code: `ds/dsr/imp/web-canvas.dsr#fish_svg_geometry_visual`, `render.js#parseFishSvgTemplate`, `render.js#drawFish`.
+
+- [x] **[bug:expired-reconnect-follows-abandoned-fish]**\
+  После потери соединения и повторного открытия/восстановления позже reconnect grace клиент должен сбрасывать привязку к прежней пользовательской рыбе, очищать временный код восстановления, показывать форму входа и создавать новую управляемую пользовательскую рыбу только после нового join. Клиент должен перестать фолловить прежнюю рыбу, когда сервер уже перевел ее в NPC.
+  Source: user report 2026-07-08; affected DSR/code: `ds/dsr/imp/web-canvas.dsr#reconnect_and_timeout`, `client-net.js#createClientNet`, `main.js#onIdentity`, `server.js#handleReconnectGrace`.

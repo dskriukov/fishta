@@ -130,6 +130,7 @@ contract_map:
   prey.wanderSteer:                         prey.js#wanderSteer  # @ds:31cb7a0d
   prey.fleeSteer:                           prey.js#fleeSteer  # @ds:579e4888 @ds:e699c42d
   prey.chooseNpcIntent:                     prey.js#chooseNpcIntent prey.js#assignNpcCourage  # @ds:d0ef4576 @ds:e29aeb93
+  prey.dangerAwareSteering:                 prey.js#chooseDangerAwareDirection prey.js#dangerScoreForDirection prey.js#smoothNpcSteering  # @ds:92d5b0c1 @ds:7cb92a44 @ds:4f58a1cd @ds:c6d7e8f9 @ia:8a4b2f19
   prey.maintainPopulation:                  prey.js#maintainPopulation  # @ds:e6ecfbdd @ds:53db39eb @ds:7ba4084c
   prey.growSpawnedFryToNominalSize:         prey.js#advanceFryGrowth  # @ds:e6ecfbdd
   predation.overlaps:                       predation.js#overlaps  # @ds:a3e394a8 @ds:b024b514
@@ -188,6 +189,7 @@ data_model:
       - fryAge?
       - nominalStartSize?
       - courage                # 0..100 NPC conflict tendency
+      - steerDecision          # { desired, accel, nextAt } smoothed NPC steering state
   server_client_state:
     server_owns:
       - fish existence and ownerKind
@@ -233,6 +235,13 @@ implementation_instructions:
     sending identity/world-size/absolute-sync for that same fish.
     A successful reconnect must leave exactly one ownerKind='user' fish for that
     temporaryConnectionCode and client instance.
+    If a reconnect message cannot restore an ownerKind='user' fish inside the grace
+    window, the server must send an explicit reconnect-failed event for that socket.
+    client-net.js must treat reconnect failure as leaving the joined state: clear
+    currentUserFishId, temporaryConnectionCode, and sessionStorage fish.connectionCode,
+    stop sending input/idle messages, and notify main.js so the join panel is visible.
+    main.js must not choose a followed fish by stale id when currentUserFishId no
+    longer points to an ownerKind='user' fish in the latest snapshot.
     Otherwise convert the fish to ownerKind='npc', npcRole='abandoned-user-fish',
     remove userName and userTier, keep formerUserColor, and apply abandoned gradient.  # @ds:93a64773 @ds:eba75588
   explicit_leave: |
@@ -287,7 +296,35 @@ implementation_instructions:
     would still be able to eat self or reaches attack contact first, compare
     self.courage against a random 0..100 roll to choose pursuit vs flee. Flee uses
     a separation trajectory that maximizes distance from the attacker, not merely
-    the opposite of the current target direction.  # @ds:d0ef4576 @ds:e29aeb93 @ds:d867989f @ds:98224ab9
+    the opposite of the current target direction.
+    Potential threats are any fish that can eat self by isEdibleBySize and
+    canBeVictimOf, independent of current mode. Threat selection and danger scoring
+    must use nearestToroidalDelta so edge wrapping does not hide predators.  # @ds:d0ef4576 @ds:e29aeb93 @ds:d867989f @ds:98224ab9 @ds:92d5b0c1
+  npc_danger_aware_steering: |
+    prey.js owns danger-aware steering helpers used by chooseNpcIntent:
+      - potentialThreatsFor(self, world) returns all fish other than self that can
+        eat self by predation size/type, independent of mode.
+      - chooseDangerAwareDirection(self, world, baseDirection, mode, dt, rng)
+        samples candidate directions and returns the lowest-danger normalized vector.
+        For mode='hunt', candidate directions span +/- NPC.huntDangerCorrectionDeg
+        around baseDirection toward the selected prey. For mode='flee', candidate
+        directions cover the full circle.
+      - dangerScoreForDirection(self, direction, threats, world) projects self along
+        direction by NPC.dangerProjectionDistancePx and scores each threat by the
+        projected path's distance to contact and attack reach. Use self.radius and
+        threat.radius in every contact/reach calculation; never score only centers.
+      - smoothNpcSteering(self, targetDirection, targetAccel, dt) stores
+        self.steerDecision and applies NPC.maxTurnRateDegPerSecond and
+        NPC.accelResponsePerSecond so direction and acceleration change gradually.
+    chooseNpcIntent calls chooseDangerAwareDirection in pursuit and flee branches:
+      - pursuit uses the direction toward selected prey as baseDirection and limits
+        correction to the hunt angle;
+      - flee passes no baseDirection and may select any direction around the NPC.
+    The ordinary wander branch also passes its desired heading through
+    smoothNpcSteering so random wander turns do not snap direction or acceleration.
+    The final acceleration returned to stepAuthoritativeWorld comes from
+    smoothNpcSteering and uses the branch magnitude: PREY.wanderAccel for wander,
+    PREY.fleeAccel for hunt and flee.  # @ds:92d5b0c1 @ds:7cb92a44 @ds:4f58a1cd @ds:c6d7e8f9 @ia:8a4b2f19
   movement_and_energy: |
     integrate uses mode to select cruiseSpeedOf(size) or maxSpeedOf(size).
     applyDrag is linear damping.
@@ -584,6 +621,16 @@ new_or_changed_constants:
   NPC.courageBase: 50                  # @ds:e29aeb93
   NPC.courageJitter: 10                # @ds:e29aeb93
   NPC.courageRandomEvery: 10           # @ds:e29aeb93
+  NPC.threatSenseRadius: "maximum distance for potential-predator danger scoring" # @ds:92d5b0c1 @ia:8a4b2f19
+  NPC.dangerDirectionSamples: "number of full-circle flee candidate directions" # @ds:4f58a1cd @ia:8a4b2f19
+  NPC.huntDangerCorrectionDeg: 20       # @ds:7cb92a44 @ia:8a4b2f19
+  NPC.dangerProjectionDistancePx: "forward path length used for danger scoring" # @ds:92d5b0c1 @ia:8a4b2f19
+  NPC.dangerRadiusWeight: "weight for threat/self radius in danger scoring" # @ds:92d5b0c1 @ia:8a4b2f19
+  NPC.dangerContactWeight: "weight for projected contact-zone proximity" # @ds:92d5b0c1 @ia:8a4b2f19
+  NPC.dangerAttackReachWeight: "weight for projected attack-zone proximity" # @ds:92d5b0c1 @ia:8a4b2f19
+  NPC.decisionIntervalSeconds: "minimum interval before resampling a new desired direction" # @ds:c6d7e8f9 @ia:8a4b2f19
+  NPC.maxTurnRateDegPerSecond: "maximum smoothed desired-direction turn rate" # @ds:c6d7e8f9 @ia:8a4b2f19
+  NPC.accelResponsePerSecond: "acceleration smoothing response rate" # @ds:c6d7e8f9 @ia:8a4b2f19
   REGIME.cruiseFactor: 0.55           # @ia:5e6f7a8b
   PLAYER.startSize: 1                 # @ds:39305789
   FISH.minBurstSpeed: "greater than PREY.maxSpeed + PREY.speedMargin; predator/user hunt floor, not fleeing-prey cap" # @ds:8869f043 @ds:d4f6a1c2 @ia:2d3e4f5a
@@ -625,6 +672,10 @@ verification_checks:
   - "New NPC spawn positions are free water candidates that account for current fish positions, sizes, density, and attack zones before falling back to the least risky candidate."
   - "New NPC fish appear as fry and grow to nominal start size over 10 seconds."
   - "New NPC fish receive courage from the live-NPC average plus bounded jitter, with every tenth spawn fully random."
+  - "NPC threat assessment considers all fish that can potentially eat the NPC by size/type, independent of current movement mode."
+  - "Hunting NPCs may correct their vector by at most 20 degrees from the victim direction to reduce predator danger."
+  - "Fleeing NPCs sample the full circle and choose the lowest summed danger direction using fish radii and attack zones."
+  - "NPC direction and acceleration choices change smoothly through configurable decision inertia tunables."
   - "Paid user fish can be eaten only by paid user fish; free user fish can be eaten by any ordinary eligible predator."
   - "The UI has no separate user-fish vulnerability toggle; eligibility comes from paid/free tier."
   - "Abandoned former user fish loses user-tier protection and uses former color to NPC-yellow gradient."

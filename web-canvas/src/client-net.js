@@ -60,6 +60,7 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity }){
                         world.height = height;
                     }
                 }
+                if( message.event === 'rj' ) clearSessionBinding();
                 if( onEvent ) onEvent(message);
                 return;
             }
@@ -149,6 +150,14 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity }){
         return true;
     }
 
+    // @ds:93a64773 @ds:eba75588
+    function clearSessionBinding(){
+        window.sessionStorage.removeItem('fish.connectionCode');
+        temporaryConnectionCode = '';
+        currentUserFishId = null;
+        joined = false;
+    }
+
     connect();
 
     return {
@@ -167,10 +176,7 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity }){
             sendRaw(encodeClientPing(++pingCounter));
         },
         leave(){
-            window.sessionStorage.removeItem('fish.connectionCode');
-            temporaryConnectionCode = '';
-            joined = false;
-            currentUserFishId = null;
+            clearSessionBinding();
             sendRaw('q');
         },
     };

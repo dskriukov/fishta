@@ -1,7 +1,7 @@
 // imp/web-canvas/src/constants.js
 // Tunables. Each value is traceable back to an .air interpretation id.
 // Editing these is "implementation tuning"; editing behaviour means editing sense/*.ds.
-// @ds b28b7af6 ca07d970 c83f4c1e d6cebf86 cbc1225a 7ce238da 8869f043 f51831f5 6aa7c828 d867989f 975ca168 bd354b7a 906be50b 55c13a4f 10baf178 22fd3ab4 31cb7a0d 579e4888 e6ecfbdd 1e66d817 a3e394a8 98224ab9 e9fb3705 39305789 8f2c91ad
+// @ds b28b7af6 ca07d970 c83f4c1e d6cebf86 cbc1225a 7ce238da 8869f043 f51831f5 6aa7c828 d867989f 975ca168 bd354b7a 906be50b 55c13a4f 10baf178 22fd3ab4 31cb7a0d 579e4888 e6ecfbdd 1e66d817 a3e394a8 98224ab9 e9fb3705 39305789 8f2c91ad 92d5b0c1 7cb92a44 4f58a1cd c6d7e8f9
 
 export const WORLD = {
     // size set at runtime to canvas size — world.air#ia:5a6b7c8d, ds:b28b7af6 ds:c83f4c1e
@@ -116,6 +116,16 @@ export const NPC = {
     courageBase: 50,        // @ds:e29aeb93
     courageJitter: 10,      // @ds:e29aeb93
     courageRandomEvery: 10, // @ds:e29aeb93
+    threatSenseRadius: 520, // @ds:92d5b0c1 @ia:8a4b2f19
+    dangerDirectionSamples: 24, // @ds:4f58a1cd @ia:8a4b2f19
+    huntDangerCorrectionDeg: 20, // @ds:7cb92a44 @ia:8a4b2f19
+    dangerProjectionDistancePx: 190, // @ds:92d5b0c1 @ia:8a4b2f19
+    dangerRadiusWeight: 1.15, // @ds:92d5b0c1 @ia:8a4b2f19
+    dangerContactWeight: 1.8, // @ds:92d5b0c1 @ia:8a4b2f19
+    dangerAttackReachWeight: 1.2, // @ds:92d5b0c1 @ia:8a4b2f19
+    decisionIntervalSeconds: 0.18, // @ds:c6d7e8f9 @ia:8a4b2f19
+    maxTurnRateDegPerSecond: 220, // @ds:c6d7e8f9 @ia:8a4b2f19
+    accelResponsePerSecond: 7, // @ds:c6d7e8f9 @ia:8a4b2f19
 };
 
 export const BUBBLE = {

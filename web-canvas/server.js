@@ -130,7 +130,12 @@ function handleReconnectGrace(socket, meta, message){
         send(socket, encodeIdentity(meta.fishId, message.temporaryConnectionCode));
         send(socket, encodeWorldSize(world));
         sendWorldSync(socket, true);
+        return;
     }
+    meta.fishId = null;
+    meta.temporaryConnectionCode = null;
+    inputsByClient.delete(meta.clientId);
+    send(socket, encodeEvent('rj', 'expired'));
 }
 
 function restoreByConnectionCode(meta, code){

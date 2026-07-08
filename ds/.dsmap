@@ -7,8 +7,8 @@ ds/sense/main.ia#55b6bde5 - feab7d75
 ds/sense/multiplayer/multiplayer.ds#380fdb81 - 021f8c6b
 ds/sense/multiplayer/ws-protocol.ds#9c9a61e3 - 9c9a61e3
 ds/sense/predation/predation.ds#a243040c - c4f0fe31
-ds/sense/prey/prey.ds#685a15b3 - 3fbd0a6d
-ds/sense/prey/prey.ia#d538d91e - b73de1c3
+ds/sense/prey/prey.ds#2bdeab0a - 3fbd0a6d
+ds/sense/prey/prey.ia#54167961 - b73de1c3
 ds/sense/world/world.ds#6409aac2 - 0c44252a
 ds/sense/world/world.ia#d1b53549 - a45699db
 
@@ -86,6 +86,10 @@ ds:prey.flee - 579e4888 3fbd0a6d
 ds:prey.flee.effort - e699c42d 3fbd0a6d
 ds:prey.npc-fish - 534bb18b 3fbd0a6d
 ds:npc.courage-selection - e29aeb93 3fbd0a6d
+ds:npc.danger-aware-steering - 92d5b0c1 3fbd0a6d
+ds:npc.decision-inertia - c6d7e8f9 3fbd0a6d
+ds:npc.flee-safest-direction - 4f58a1cd 3fbd0a6d
+ds:npc.hunt-danger-correction - 7cb92a44 3fbd0a6d
 ds:npc.risk-aware-hunt-choice - d0ef4576 3fbd0a6d
 ds:npc.spawn-safe-water - 7ba4084c 3fbd0a6d
 ds:prey.spawn - e6ecfbdd 3fbd0a6d
@@ -136,6 +140,7 @@ ia:prey.size-bias - 7f8a9b0c b73de1c3
 ia:prey.spawn-low-density-entry - 2740e55e b73de1c3
 ia:prey.speed-cap - 2d3e4f5a b73de1c3
 ia:prey.wander-cruise - 9d0e1f2a b73de1c3
+ia:npc.steering-tunables - 8a4b2f19 b73de1c3
 ia:web-canvas.canvas-2d - 3a4b5c6d feab7d75
 ia:web-canvas.ecs-arch - e5f60718 feab7d75
 ia:web-canvas.loop - c9d0e1f2 feab7d75

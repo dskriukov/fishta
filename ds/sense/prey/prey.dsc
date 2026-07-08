@@ -33,7 +33,7 @@ behaviours:
         SKIP burst (mode=cruise, accel:0) if speed(self) > speed(nearest) + SPEED_MARGIN.
     status: refined          # уточнён: форсаж пропорционален близости + «не зря»
   risk_aware_hunt_choice:
-    from: [ds:npc.risk-aware-hunt-choice, ds:npc.courage-selection, ds:fish.growth, ds:predation.rule]
+    from: [ds:npc.risk-aware-hunt-choice, ds:npc.danger-aware-steering, ds:npc.hunt-danger-correction, ds:npc.flee-safest-direction, ds:npc.decision-inertia, ds:npc.courage-selection, ds:fish.growth, ds:predation.rule, ia:npc.steering-tunables]
     contract:
       name: chooseNpcIntent
       inputs: [self, threats[], candidatePrey[], courage, dt]
@@ -47,6 +47,28 @@ behaviours:
         threat can still eat it or reaches attack contact first, choose between
         pursuit and fleeing by individual courage. Fleeing moves along the
         trajectory that most effectively increases separation from the attacker.
+        Potential threats are fish that can eat the NPC by predation size/type
+        eligibility, independent of their current mode. Steering evaluates threat
+        danger by position, size, radius, contact distance, and attack-zone reach.
+        During hunting, safety correction is limited to a configurable angle from
+        the target direction, initially 20 degrees. During fleeing, the NPC may
+        choose any direction around the full circle when it minimizes summed danger.
+        Direction and acceleration changes are smoothed by configurable decision
+        inertia, turn-rate, and acceleration-response tunables.
+  danger_aware_steering:
+    from: [ds:npc.danger-aware-steering, ds:npc.hunt-danger-correction, ds:npc.flee-safest-direction, ds:npc.decision-inertia, ia:npc.steering-tunables]
+    contract:
+      name: chooseDangerAwareDirection
+      inputs: [self, world, baseDirection?, mode, dt]
+      output: { direction, dangerScore }
+      rule: >
+        collect all potential predators that can eat self by predation size/type.
+        Sample candidate directions. For hunt mode, candidates are limited around
+        baseDirection toward the selected prey by the hunt correction angle. For
+        flee mode, candidates cover 360 degrees. Score each candidate by projected
+        path risk against predator radius, self radius, contact distance, and attack
+        reach. Return the lowest-risk direction. Apply decision inertia before
+        producing acceleration, so abrupt direction and speed changes are avoided.
   courage:
     from: ds:npc.courage-selection
     range: [0, 100]

@@ -81,6 +81,12 @@ const net = createClientNet({
     },
     onEvent(message){
         hudStatus.textContent = message.status || message.event || 'event';
+        if( message.event === 'rj' ){
+            state.currentUserFishId = null;
+            lastSentInputKey = null;
+            lastInputFlushAt = 0;
+            if( joinPanel ) joinPanel.hidden = false;
+        }
     },
     onStatus(status){
         hudStatus.textContent = status;
@@ -93,8 +99,8 @@ const net = createClientNet({
 });
 
 function currentUserFish(world = state.world, currentUserFishId = state.currentUserFishId){
-    return (world.fish || []).find(f => f.id === currentUserFishId)
-        || (world.fish || []).find(f => f.id === net.currentUserFishId);
+    const id = currentUserFishId ?? net.currentUserFishId;
+    return (world.fish || []).find(f => f.id === id && f.ownerKind === 'user') || null;
 }
 
 canvas.addEventListener('click', e =>{

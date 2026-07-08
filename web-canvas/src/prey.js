@@ -1,9 +1,9 @@
 // imp/web-canvas/src/prey.js
 // Implements: prey.dsc (wanderSteer, fleeSteer[status:added], maintainPopulation, variety)
-// @ds 31cb7a0d 579e4888 e699c42d e6ecfbdd 1e66d817 ad8d81d8
+// @ds 31cb7a0d 579e4888 e699c42d e6ecfbdd 1e66d817 ad8d81d8 92d5b0c1 7cb92a44 4f58a1cd c6d7e8f9
 
-import { FISH, FRY, NPC, PREY, WORLD } from './constants.js';
-import { v, sub, scale, normalize, dist, clampLen } from './vec.js';
+import { FISH, FRY, NPC, PREDATION, PREY, WORLD } from './constants.js';
+import { v, add, sub, scale, normalize, dist, clampLen } from './vec.js';
 import { growSizeFromAreas, makeFish, radiusOf } from './fish.js';
 import { canBeVictimOf, estimatedAttackContactTime, isAttackContact, isEdibleBySize, nearestToroidalDelta } from './predation.js';
 import { findLowestDensitySpawn, targetNpcCount } from './world.js';
@@ -187,8 +187,8 @@ export function assignNpcCourage(world, rng){
 export function chooseNpcIntent(self, world, rng, dt){
     const nearestThreat = findNearestThreat(self, world);
     const selectedPrey = findSelectedPrey(self, world);
-    if( !nearestThreat && selectedPrey ) return pursueIntent(self, selectedPrey, world);
-    if( !nearestThreat ) return preySteer(self, world.fish || [], dt, rng);
+    if( !nearestThreat && selectedPrey ) return pursueIntent(self, selectedPrey, world, dt, rng);
+    if( !nearestThreat ) return wanderIntent(self, dt, rng);
 
     const incomingTime = estimatedAttackContactTime(burstCapablePredator(nearestThreat, self, world), self, world);
     if( selectedPrey ){
@@ -196,25 +196,31 @@ export function chooseNpcIntent(self, world, rng, dt){
         const postEatSize = growSizeFromAreas(self.size, selectedPrey.size);
         const postEatSelf = { ...self, size: postEatSize, radius: radiusOf(postEatSize) };
         if( ownTime <= incomingTime && !isEdibleBySize(nearestThreat, postEatSelf) ){
-            return pursueIntent(self, selectedPrey, world);
+            return pursueIntent(self, selectedPrey, world, dt, rng);
         }
     }
 
     const courageRoll = rng() * 100;
     if( selectedPrey && (self.courage ?? NPC.courageBase) >= courageRoll && incomingTime > 0.25 ){
-        return pursueIntent(self, selectedPrey, world);
+        return pursueIntent(self, selectedPrey, world, dt, rng);
     }
-    return fleeFromThreat(self, nearestThreat, world);
+    return fleeFromThreat(self, world, dt, rng);
+}
+
+function wanderIntent(self, dt, rng){
+    const accel = wanderSteer(self, dt, rng);
+    return {
+        accel: smoothNpcSteering(self, normalize(accel), Math.hypot(accel.x, accel.y), dt),
+        mode: 'cruise',
+    };
 }
 
 function findNearestThreat(self, world){
     let nearest = null;
     let nearestDistance = Infinity;
-    for( const candidate of world.fish || [] ){
-        if( candidate === self ) continue;
-        if( !isEdibleBySize(candidate, self) || !canBeVictimOf(candidate, self) ) continue;
+    for( const candidate of potentialThreatsFor(self, world) ){
         const delta = nearestToroidalDelta(self.pos, candidate.pos, world);
-        const distance = Math.hypot(delta.x, delta.y);
+        const distance = Math.max(0, Math.hypot(delta.x, delta.y) - (self.radius || 0) - (candidate.radius || 0));
         if( distance < nearestDistance ){
             nearest = candidate;
             nearestDistance = distance;
@@ -239,20 +245,159 @@ function findSelectedPrey(self, world){
     return selected;
 }
 
-function pursueIntent(self, target, world){
+function pursueIntent(self, target, world, dt, rng){
     const toward = normalize(nearestToroidalDelta(self.pos, target.pos, world));
+    const steering = chooseDangerAwareDirection(self, world, toward, 'hunt', dt, rng);
     return {
-        accel: scale(toward, PREY.fleeAccel),
+        accel: smoothNpcSteering(self, steering.direction, PREY.fleeAccel, dt),
         mode: 'burst',
     };
 }
 
-function fleeFromThreat(self, threat, world){
-    const away = normalize(scale(nearestToroidalDelta(self.pos, threat.pos, world), -1));
+function fleeFromThreat(self, world, dt, rng){
+    const steering = chooseDangerAwareDirection(self, world, null, 'flee', dt, rng);
     return {
-        accel: scale(away, PREY.fleeAccel),
+        accel: smoothNpcSteering(self, steering.direction, PREY.fleeAccel, dt),
         mode: 'burst',
     };
+}
+
+// @ds:92d5b0c1 @ds:7cb92a44 @ds:4f58a1cd @ds:c6d7e8f9 @ia:8a4b2f19
+export function chooseDangerAwareDirection(self, world, baseDirection, mode, dt, rng){
+    const state = self.steerDecision || {};
+    const normalizedBase = normalize(baseDirection || currentDirection(self));
+    const sameMode = state.mode === mode;
+    state.nextIn = Math.max(0, (state.nextIn ?? 0) - dt);
+    if( sameMode && state.desired && state.nextIn > 0 ){
+        self.steerDecision = state;
+        return { direction: state.desired, dangerScore: state.dangerScore ?? 0 };
+    }
+
+    const threats = potentialThreatsFor(self, world);
+    let bestDirection = normalizedBase.x || normalizedBase.y ? normalizedBase : v(1, 0);
+    let bestScore = dangerScoreForDirection(self, bestDirection, threats, world);
+    for( const direction of candidateDirections(bestDirection, mode) ){
+        const score = dangerScoreForDirection(self, direction, threats, world);
+        if( score < bestScore ){
+            bestScore = score;
+            bestDirection = direction;
+        }
+    }
+
+    state.mode = mode;
+    state.desired = bestDirection;
+    state.dangerScore = bestScore;
+    state.nextIn = NPC.decisionIntervalSeconds * (0.75 + rng() * 0.5);
+    self.steerDecision = state;
+    return { direction: bestDirection, dangerScore: bestScore };
+}
+
+export function dangerScoreForDirection(self, direction, threats, world){
+    const dir = normalize(direction);
+    if( !dir.x && !dir.y ) return Infinity;
+    const projection = NPC.dangerProjectionDistancePx;
+    let score = 0;
+    for( const threat of threats ){
+        const toThreat = nearestToroidalDelta(self.pos, threat.pos, world);
+        const centerDistance = Math.hypot(toThreat.x, toThreat.y);
+        const contactDistance = (self.radius || 0) + (threat.radius || 0) * NPC.dangerRadiusWeight;
+        if( centerDistance - contactDistance > NPC.threatSenseRadius + projection ) continue;
+
+        const segmentDistance = distanceToSegment(toThreat, v(0, 0), scale(dir, projection));
+        const contactGap = segmentDistance - contactDistance;
+        const attackReach = contactDistance * (1 + PREDATION.attackReachRatio);
+        const attackGap = segmentDistance - attackReach;
+        const distanceBias = 1 / Math.max(1, centerDistance - contactDistance);
+
+        score += threat.radius * NPC.dangerRadiusWeight * distanceBias;
+        score += proximityScore(contactGap, NPC.dangerContactWeight);
+        score += proximityScore(attackGap, NPC.dangerAttackReachWeight);
+    }
+    return score;
+}
+
+export function smoothNpcSteering(self, targetDirection, targetAccel, dt){
+    const state = self.steerDecision || {};
+    const current = normalize(state.smoothedDirection || currentDirection(self));
+    const target = normalize(targetDirection);
+    const maxTurn = NPC.maxTurnRateDegPerSecond * Math.PI / 180 * dt;
+    const direction = rotateToward(current.x || current.y ? current : target, target, maxTurn);
+    const desiredAccel = scale(direction, targetAccel);
+    const response = clamp(NPC.accelResponsePerSecond * dt, 0, 1);
+    const previousAccel = state.accel || v(0, 0);
+    const accel = add(scale(previousAccel, 1 - response), scale(desiredAccel, response));
+    state.smoothedDirection = direction;
+    state.accel = accel;
+    self.steerDecision = state;
+    return accel;
+}
+
+function potentialThreatsFor(self, world){
+    const threats = [];
+    for( const candidate of world.fish || [] ){
+        if( candidate === self ) continue;
+        if( !isEdibleBySize(candidate, self) || !canBeVictimOf(candidate, self) ) continue;
+        const delta = nearestToroidalDelta(self.pos, candidate.pos, world);
+        const distance = Math.max(0, Math.hypot(delta.x, delta.y) - (self.radius || 0) - (candidate.radius || 0));
+        if( distance <= NPC.threatSenseRadius ) threats.push(candidate);
+    }
+    return threats;
+}
+
+function candidateDirections(baseDirection, mode){
+    const samples = Math.max(3, NPC.dangerDirectionSamples);
+    const baseAngle = Math.atan2(baseDirection.y, baseDirection.x);
+    const directions = [];
+    if( mode === 'hunt' ){
+        const limit = NPC.huntDangerCorrectionDeg * Math.PI / 180;
+        const huntSamples = Math.max(3, Math.ceil(samples / 3) | 1);
+        for( let i = 0; i < huntSamples; i++ ){
+            const t = huntSamples === 1 ? 0.5 : i / (huntSamples - 1);
+            directions.push(angleVector(baseAngle - limit + t * limit * 2));
+        }
+        return directions;
+    }
+    for( let i = 0; i < samples; i++ ){
+        directions.push(angleVector((Math.PI * 2 * i) / samples));
+    }
+    return directions;
+}
+
+function currentDirection(self){
+    const velocity = normalize(self.vel || v(0, 0));
+    if( velocity.x || velocity.y ) return velocity;
+    const heading = normalize(self.heading || v(0, 0));
+    if( heading.x || heading.y ) return heading;
+    return v(self.facing || 1, 0);
+}
+
+function distanceToSegment(point, start, end){
+    const segment = sub(end, start);
+    const lengthSq = segment.x * segment.x + segment.y * segment.y;
+    if( lengthSq <= 1e-6 ) return Math.hypot(point.x - start.x, point.y - start.y);
+    const t = clamp(((point.x - start.x) * segment.x + (point.y - start.y) * segment.y) / lengthSq, 0, 1);
+    const closest = add(start, scale(segment, t));
+    return Math.hypot(point.x - closest.x, point.y - closest.y);
+}
+
+function proximityScore(gap, weight){
+    if( gap <= 0 ) return weight * (1000 + Math.abs(gap) * 10);
+    return weight * 100 / (gap + 10);
+}
+
+function rotateToward(current, target, maxAngle){
+    const from = normalize(current);
+    const to = normalize(target);
+    if( !to.x && !to.y ) return from;
+    if( !from.x && !from.y ) return to;
+    const delta = Math.atan2(from.x * to.y - from.y * to.x, from.x * to.x + from.y * to.y);
+    const step = clamp(delta, -maxAngle, maxAngle);
+    const angle = Math.atan2(from.y, from.x) + step;
+    return angleVector(angle);
+}
+
+function angleVector(angle){
+    return v(Math.cos(angle), Math.sin(angle));
 }
 
 function edgeSpawn(world, rng){
