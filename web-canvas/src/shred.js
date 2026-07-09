@@ -1,5 +1,5 @@
 // Server-owned shred mechanics.
-// @ds e13d7a52 7c2f91ad 918d4b63 d5e7a01c 0b8e71d4 3ad65f20 8b62d9ce c14f7a08 9e4c1b7a b6f08d21 4d7c2e93 f0a6c5d8 a2d5936f ed2b4f19 d3187816 fb0f32c4 eccfca7e
+// @ds e13d7a52 7c2f91ad 918d4b63 d5e7a01c 0b8e71d4 3ad65f20 8b62d9ce c14f7a08 9e4c1b7a b6f08d21 4d7c2e93 f0a6c5d8 a2d5936f ed2b4f19 d3187816 31a8f5c2 fb0f32c4 eccfca7e
 
 import { FISH, SHRED } from './constants.js';
 import { nearestToroidalDelta } from './predation.js';
@@ -13,23 +13,29 @@ export function spawnShredsFromFish(world, fish, rng){
     const deadArea = Math.PI * Math.max(0, fish.radius || 0) ** 2;
     let remainingArea = deadArea * SHRED.areaRatio;
     const sourceColor = sourceColorForFish(fish);
+    const created = [];
     let guard = 0;
 
     while( remainingArea > minShredArea() * 0.35 && guard < 500 ){
-        if( !canAddControlledObjects(world, 1) ) return;
+        if( !canAddControlledObjects(world, 1) ) return created;
         const sampledSize = sampleShredSize(random);
         const sampledArea = circleAreaFromDiameter(sampledSize);
         const geometricArea = Math.min(remainingArea, sampledArea);
         const size = diameterFromCircleArea(geometricArea);
-        world.shreds.push(makeShred(world, fish, size, geometricArea, sourceColor, random));
+        const shred = makeShred(world, fish, size, geometricArea, sourceColor, random);
+        world.shreds.push(shred);
+        created.push(shred);
         remainingArea -= geometricArea;
         guard++;
     }
 
     if( remainingArea > 1e-3 && canAddControlledObjects(world, 1) ){
         const size = diameterFromCircleArea(remainingArea);
-        world.shreds.push(makeShred(world, fish, size, remainingArea, sourceColor, random));
+        const shred = makeShred(world, fish, size, remainingArea, sourceColor, random);
+        world.shreds.push(shred);
+        created.push(shred);
     }
+    return created;
 }
 
 function makeShred(world, fish, size, geometricArea, sourceColor, rng){
@@ -96,6 +102,7 @@ function sourceColorForFish(fish){
 // @ds:8b62d9ce @ds:d3187816
 export function advanceShreds(world, dt){
     const shreds = world.shreds || [];
+    updateShredDensityLimit(world, dt);
     for( let i = shreds.length - 1; i >= 0; i-- ){
         const shred = shreds[i];
         applyFishWake(world, shred, dt);
@@ -109,24 +116,39 @@ export function advanceShreds(world, dt){
         shred.pos.x += shred.vel.x * dt;
         shred.pos.y += shred.vel.y * dt;
         wrapPoint(shred.pos, world);
-        if( advanceShredDecay(shred, dt) ){
+        if( advanceShredDecay(world, shred, dt) ){
             shreds.splice(i, 1);
         }
     }
 }
 
-// @ds:d3187816
-function advanceShredDecay(shred, dt){
+// @ds:d3187816 @ds:31a8f5c2
+function advanceShredDecay(world, shred, dt){
     const interval = Math.max(0, SHRED.decayIntervalSeconds || 0);
     if( interval <= 0 ) return false;
     shred.decayAge = (shred.decayAge || 0) + Math.max(0, dt);
     while( shred.decayAge >= interval ){
         shred.decayAge -= interval;
+        if( currentShredDensity(world) < (world.shredDensityLimit ?? SHRED.densityLimitBase) ) continue;
         const group = nextLayerGroup(shred);
         if( group.length === 0 || isFinalLayerGroup(group) ) return true;
         shred.remainingLayers = (shred.remainingLayers || []).filter(layer => !group.includes(layer));
     }
     return false;
+}
+
+// @ds:31a8f5c2
+function updateShredDensityLimit(world, dt){
+    const base = Math.max(0, SHRED.densityLimitBase || 0);
+    const current = Number.isFinite(world.shredDensityLimit) ? world.shredDensityLimit : base;
+    const rate = Math.max(0, SHRED.densityLimitSmoothRate || 0);
+    const t = Math.min(1, rate * Math.max(0, dt));
+    world.shredDensityLimit = current + (base - current) * t;
+}
+
+function currentShredDensity(world){
+    const area = Math.max(1, (world.width || 0) * (world.height || 0));
+    return (world.shreds?.length || 0) / area;
 }
 
 // @ds:fb0f32c4

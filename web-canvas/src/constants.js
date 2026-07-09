@@ -1,7 +1,7 @@
 // imp/web-canvas/src/constants.js
 // Tunables. Each value is traceable back to an .air interpretation id.
 // Editing these is "implementation tuning"; editing behaviour means editing sense/*.ds.
-// @ds b28b7af6 ca07d970 c83f4c1e d6cebf86 cbc1225a 7ce238da 8869f043 f51831f5 6aa7c828 d867989f 975ca168 bd354b7a 906be50b 55c13a4f 10baf178 22fd3ab4 31cb7a0d 579e4888 e6ecfbdd 1e66d817 a3e394a8 98224ab9 e9fb3705 39305789 8f2c91ad 92d5b0c1 7cb92a44 4f58a1cd c6d7e8f9 e13d7a52 7c2f91ad 918d4b63 0b8e71d4 f0a6c5d8 c14f7a08 b6f08d21 73b91e4c 5a9c0e77 ed2b4f19
+// @ds b28b7af6 ca07d970 c83f4c1e d6cebf86 cbc1225a 7ce238da 8869f043 f51831f5 6aa7c828 d867989f 975ca168 bd354b7a 906be50b 55c13a4f 10baf178 22fd3ab4 31cb7a0d 579e4888 e6ecfbdd 1e66d817 a3e394a8 98224ab9 e9fb3705 39305789 4c7a2b91 9d62f0a7 b7a4c391 2e91f6d4 8f2c91ad 92d5b0c1 7cb92a44 4f58a1cd c6d7e8f9 e13d7a52 7c2f91ad 918d4b63 0b8e71d4 f0a6c5d8 c14f7a08 b6f08d21 73b91e4c 5a9c0e77 31a8f5c2 ed2b4f19
 
 export const WORLD = {
     // size set at runtime to canvas size — world.air#ia:5a6b7c8d, ds:b28b7af6 ds:c83f4c1e
@@ -28,7 +28,10 @@ export const FISH = {
 };
 
 export const PLAYER = {
-    startSize: 1,           // player respawns at the same size used on initial spawn — ds:39305789
+    startSize: 1,           // player nominal start size after fry growth — @ds:4c7a2b91 @ds:39305789
+    fryStartSize: 0.03,     // practically a point, still visible — @ds:4c7a2b91
+    fryGrowthSeconds: 3,    // @ds:4c7a2b91 @ds:9d62f0a7 @ds:b7a4c391
+    maxLifetimeSeconds: 30, // longer than NPC lifetime — @ds:b7a4c391
 };
 
 export const SERVER = {
@@ -132,7 +135,7 @@ export const NPC = {
     decisionIntervalSeconds: 0.18, // @ds:c6d7e8f9 @ia:8a4b2f19
     maxTurnRateDegPerSecond: 220, // @ds:c6d7e8f9 @ia:8a4b2f19
     accelResponsePerSecond: 7, // @ds:c6d7e8f9 @ia:8a4b2f19
-    maxLifetimeSeconds: 300, // @ds:a6c9e8b4
+    maxLifetimeSeconds: 20, // @ds:a6c9e8b4
 };
 
 export const SHRED = {
@@ -146,6 +149,8 @@ export const SHRED = {
     minFeedingSpeed: 18,    // @ds:c14f7a08
     mouthCueSeconds: 0.3,   // @ds:a2d5936f
     decayIntervalSeconds: 10, // @ds:d3187816 @ds:5a9c0e77
+    densityLimitBase: 0.000015, // @ds:31a8f5c2 @ds:5a9c0e77
+    densityLimitSmoothRate: 0.35, // @ds:31a8f5c2 @ds:5a9c0e77
     scatterRadiusRatio: 0.82, // @ds:918d4b63
     initialSpeedMin: 18,    // @ds:918d4b63
     initialSpeedMax: 70,    // @ds:918d4b63

@@ -1,16 +1,17 @@
 ds/sense/controls/controls.ds#1a3c0d0f - 323e0d97
 ds/sense/controls/controls.ia#3eb8e8e5 - 3ab6da12
-ds/sense/fish/fish.ds#535a271a - 0e1af7e8
+ds/sense/fish/fish.ds#f832c3b3 - 0e1af7e8
 ds/sense/fish/fish.ia#54e70523 - 2b751007
-ds/sense/main.ds#2c277093 - d3cd9207
+ds/sense/main.ds#7c3a97d2 - d3cd9207
 ds/sense/main.ia#55b6bde5 - feab7d75
 ds/sense/multiplayer/multiplayer.ds#4de5b311 - 021f8c6b
 ds/sense/multiplayer/ws-protocol.ds#9c9a61e3 - 9c9a61e3
-ds/sense/predation/predation.ds#ba7a8596 - c4f0fe31
-ds/sense/prey/prey.ds#b971c5b2 - 3fbd0a6d
+ds/sense/player/player.ds#d57e2041 - 6f2d8c10
+ds/sense/predation/predation.ds#8b07d043 - c4f0fe31
+ds/sense/prey/prey.ds#3bc922ec - 3fbd0a6d
 ds/sense/prey/prey.ia#54167961 - b73de1c3
-ds/sense/shred/shred.ds#a2ee17fb - 51ad0f77
-ds/sense/world/world.ds#f5dba403 - 0c44252a
+ds/sense/shred/shred.ds#9266404c - 51ad0f77
+ds/sense/world/world.ds#de4da0ae - 0c44252a
 ds/sense/world/world.ia#d1b53549 - a45699db
 
 ds:controls.camera - 7b9a7984 323e0d97
@@ -64,6 +65,7 @@ ds:goal.growth - b433f1bc d3cd9207
 ds:intent.game - 27fa3caa d3cd9207
 ds:project.mode - dd674a52 d3cd9207
 ds:ui.version-visible - 8d13f6a2 d3cd9207
+ds:ui.world-snapshot-info - e42a7c19 d3cd9207
 ds:multiplayer.abandoned-fish-visual - bfd5a97a 021f8c6b
 ds:multiplayer.color-palettes - f883f90c 021f8c6b
 ds:multiplayer.connection-fish - 4bfe0352 021f8c6b
@@ -91,6 +93,12 @@ ds:predation.rule - 98224ab9 c4f0fe31
 ds:predation.server-authority - 75a5aa4f c4f0fe31
 ds:predation.symmetry - fcdfb2b7 c4f0fe31
 ds:predation.user-tier-eligibility - 32745a4f c4f0fe31
+ds:player.spawn-fry-stage - 4c7a2b91 6f2d8c10
+ds:player.spawn-placement - c18e5b42 6f2d8c10
+ds:player.fry-feeding-and-invulnerability - 9d62f0a7 6f2d8c10
+ds:player.lifetime-aging - b7a4c391 6f2d8c10
+ds:player.lifetime-ui - 2e91f6d4 6f2d8c10
+ds:player.size-ui - b9136c2e 6f2d8c10
 ds:prey.entity - ad8d81d8 3fbd0a6d
 ds:prey.flee - 579e4888 3fbd0a6d
 ds:prey.flee.effort - e699c42d 3fbd0a6d
@@ -120,6 +128,7 @@ ds:shred.eating-eligibility - c14f7a08 51ad0f77
 ds:shred.eating-mouth-cue - a2d5936f 51ad0f77
 ds:shred.layers - 9e4c1b7a 51ad0f77
 ds:shred.auto-decay - d3187816 51ad0f77
+ds:shred.decay-density-limit - 31a8f5c2 51ad0f77
 ds:shred.interaction-refreshes-decay - fb0f32c4 51ad0f77
 ds:shred.nutrition.color-match - b6f08d21 51ad0f77
 ds:shred.nutrition.common-layers - 4d7c2e93 51ad0f77

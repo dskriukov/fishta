@@ -80,7 +80,7 @@ behaviours:
       name: expireOldNpcFish
       inputs: [world.fish, dt]
       output: [expiredNpcFish[], world.fish', world.shreds']
-      rule: "server removes NPC fish whose age reaches 5 minutes when old-age expiry is not suspended by controlled-object high load; this is an old-age death event, so no predator receives eaten credit; each old-age NPC death creates shreds through shred.spawn within the controlled-object limit"
+      rule: "server removes NPC fish whose age reaches 5 minutes when old-age expiry is not suspended by controlled-object high load; this is an old-age death event, so no predator receives eaten credit; each old-age NPC death creates shreds through the common fish old-age shred spawn rule within the controlled-object limit"
 
 population:
   spawn:

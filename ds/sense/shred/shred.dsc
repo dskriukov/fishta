@@ -24,17 +24,18 @@ entity:
 spawn:
   from: [ds:shred.spawn, ds:shred.spawn.distribution, ds:shred.initial-placement, ds:shred.source-color]
   contract:
-    name: spawnShredsFromOldNpcFish
-    inputs: [world, expiredNpcFish, rng]
+    name: spawnShredsFromFish
+    inputs: [world, oldAgeDeadFish, rng]
     output: shred[]
     rule: >
-      on NPC old-age death, compute total shred geometric area as
+      on fish old-age death, compute total shred geometric area as
       fish canonical circular area * configurable shred area ratio (target 0.5).
       Split that total area into randomized individual shred sizes within
       configurable min/max size and fragmentation tuning. Place each shred at a
       random offset inside the dead fish canonical circle. Give each shred a
-      small random velocity and individual drag. sourceColor is the fish color,
-      or formerUserColor for abandoned former user NPC fish.
+      small random velocity and individual drag. sourceColor is the fish userColor
+      when present, formerUserColor for abandoned former user NPC fish, otherwise
+      the ordinary NPC shred color.
 
 geometry:
   visual_asset:
@@ -82,16 +83,19 @@ eating:
       part_10_percents_1: 0.1
       part_10_percents_2: 0.1
   auto_decay:
-    from: [ds:shred.auto-decay, ds:shred.interaction-refreshes-decay]
+    from: [ds:shred.auto-decay, ds:shred.decay-density-limit, ds:shred.interaction-refreshes-decay]
     contract:
       name: advanceShredDecay + refreshShredDecay
       inputs: [world.shreds, dt, shredInteraction]
       output: world.shreds'
       rule: >
         each shred keeps a server-owned decayAge timer. advanceShredDecay adds dt
-        and, for each full configurable 10 second interval, removes the next layer
-        group in the same order as eating: 30%, then 30%, then 20%. When only the
-        final 10%+10% group remains and another full interval elapses, remove the
+        and, for each full configurable 10 second interval, first checks current
+        shred density against the current smooth density limit. If density is below
+        the limit, preserve remainingLayers and defer the next check by one full
+        interval. If density is at or above the limit, remove the next layer group
+        in the same order as eating: 30%, then 30%, then 20%. When only the final
+        10%+10% group remains and another eligible interval elapses, remove the
         shred from world.shreds. Decay never grants nutrition. Any fish interaction
         with a shred refreshes decayAge to 0 while preserving the current
         remainingLayers exactly.
@@ -164,6 +168,9 @@ tunables:
     - svgScale
     - layerFractions
     - decayIntervalSeconds
+    - densityLimitBase
+    - densityLimitSmoothRate
+    - densityAreaMode
     - colorFactorMin
     - colorFactorMaxDifferent
     - hueWeight

@@ -1,6 +1,6 @@
 // imp/web-canvas/server.js
 // Static file server, WebSocket endpoint, authoritative world loop.
-// @ds:f359ebf2 @ds:27fa3caa @ds:4bfe0352 @ds:93a64773 @ds:704ab317 @ds:e559831a
+// @ds:f359ebf2 @ds:27fa3caa @ds:4bfe0352 @ds:4c7a2b91 @ds:93a64773 @ds:704ab317 @ds:e559831a
 
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { SERVER, SYNC, RECONNECT } from './src/constants.js';
 import { makeFish, updateAbandonedGradient } from './src/fish.js';
+import { startUserFryStage } from './src/player.js';
 import { makeWorld, findLowestDensitySpawn, nextWorldSize, scaleWorldEntities } from './src/world.js';
 import { maintainPopulation } from './src/prey.js';
 import { stepAuthoritativeWorld } from './src/step.js';
@@ -108,6 +109,7 @@ function handleJoin(socket, meta, message){
         temporaryConnectionCode,
         ...normalizedUserProfile(message),
     });
+    startUserFryStage(fish, fish.pos, 'join');
     world.fish.push(fish);
     meta.fishId = fish.id;
     meta.temporaryConnectionCode = temporaryConnectionCode;
@@ -285,6 +287,7 @@ function contentType(path){
     if( ext === '.html' ) return 'text/html; charset=utf-8';
     if( ext === '.css' ) return 'text/css; charset=utf-8';
     if( ext === '.js' ) return 'text/javascript; charset=utf-8';
+    if( ext === '.svg' ) return 'image/svg+xml; charset=utf-8';
     return 'application/octet-stream';
 }
 

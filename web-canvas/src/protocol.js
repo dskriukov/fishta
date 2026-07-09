@@ -1,6 +1,6 @@
 // imp/web-canvas/src/protocol.js
 // Compact WebSocket string protocol.
-// @ds:839f8cd0 @ds:5a4d3d6d @ds:671e9773 @ds:4fad33f8 @ds:682570c7 @ds:ea18a088 @ds:f51a5030 @ds:a16328a6 @ds:ed2b4f19 @ds:a2d5936f
+// @ds:839f8cd0 @ds:5a4d3d6d @ds:671e9773 @ds:4fad33f8 @ds:682570c7 @ds:ea18a088 @ds:f51a5030 @ds:a16328a6 @ds:ed2b4f19 @ds:a2d5936f @ds:2e91f6d4
 
 import { FISH, SHRED } from './constants.js';
 
@@ -289,6 +289,8 @@ export function parseFishRow(row, byId = new Map(), absolute = false){
         },
         mode: burstMode ? 'burst' : 'cruise',
         shredEatCueCounter: parseShredCueMod(mods, previous?.shredEatCueCounter || 0),
+        fryAge: parseFryAgeMod(mods, ownerKind, previous?.fryAge),
+        playerActiveAge: parsePlayerActiveAgeMod(mods, ownerKind, previous?.playerActiveAge || 0),
         eyeFear: mods.includes('f') ? 1 : 0,
         visualScale: previous?.visualScale || 1,
         facing,
@@ -317,12 +319,35 @@ function stateMods(fish){
     if( fish.mode === 'burst' ) mods += 'b';
     if( (fish.eyeFear || 0) > 0.2 ) mods += 'f';
     if( (fish.shredEatCueCounter || 0) > 0 ) mods += `s${Math.min(999, Math.floor(fish.shredEatCueCounter))}`;
+    if( fish.ownerKind === 'user' && fish.fryAge !== null && fish.fryAge !== undefined ){
+        mods += `g${encodeAgeTenths(fish.fryAge, 999)}`;
+    }
+    if( fish.ownerKind === 'user' ){
+        mods += `l${encodeAgeTenths(fish.playerActiveAge || 0, 9999)}`;
+    }
     return mods || '=';
 }
 
 function parseShredCueMod(mods, previous){
     const match = /s(\d+)/.exec(mods || '');
     return match ? Number(match[1]) : previous;
+}
+
+function parseFryAgeMod(mods, ownerKind, previous){
+    if( ownerKind !== 'user' ) return null;
+    const match = /g(\d+)/.exec(mods || '');
+    if( match ) return Number(match[1]) / 10;
+    return previous === null || previous === undefined ? null : null;
+}
+
+function parsePlayerActiveAgeMod(mods, ownerKind, previous){
+    if( ownerKind !== 'user' ) return 0;
+    const match = /l(\d+)/.exec(mods || '');
+    return match ? Number(match[1]) / 10 : previous;
+}
+
+function encodeAgeTenths(value, max){
+    return Math.min(max, Math.max(0, Math.round((Number(value) || 0) * 10)));
 }
 
 function colorOf(fish){

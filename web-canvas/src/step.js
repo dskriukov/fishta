@@ -1,15 +1,16 @@
 // imp/web-canvas/src/step.js
 // Implements: dsr/use/ecs-loop.dsr — PURE domain step: state' = step(state, input, dt)
 // Composes behaviours from world/fish/prey/predation/controls. No canvas here.
-// @ds b28b7af6 22fd3ab4 55c13a4f 10baf178 7ce238da 8869f043 579e4888 31cb7a0d e9fb3705 e6ecfbdd d6cebf86 0c8d4e2a 6f1b0a3c
+// @ds b28b7af6 22fd3ab4 55c13a4f 10baf178 7ce238da 8869f043 579e4888 31cb7a0d e9fb3705 e6ecfbdd d6cebf86 0c8d4e2a 6f1b0a3c 4c7a2b91 c18e5b42 b7a4c391
 
-import { FISH } from './constants.js';
+import { FISH, PLAYER } from './constants.js';
 import { advanceFeedingState, integrate, runExhaleCycle, requestExhale } from './fish.js';
 import { chooseNpcIntent, preySteer, capPreySpeed, maintainPopulation, advanceFryGrowth, expireOldNpcFish } from './prey.js';
+import { advanceUserFryStage, placeUserSpawn, startUserFryStage } from './player.js';
 import { huntSteer } from './hunt.js';
 import { playerSteer, huntMode } from './controls.js';
 import { resolveEating, resolveFeedingBatches } from './predation.js';
-import { advanceShreds } from './shred.js';
+import { advanceShreds, spawnShredsFromFish } from './shred.js';
 import { emitBubble, advanceBubbles } from './world.js';
 import { normalize, scale } from './vec.js';
 
@@ -73,6 +74,8 @@ export function stepAuthoritativeWorld(state, inputsByClient, dt, rng){
     for( const fish of allFish ){
         let accel = { x: 0, y: 0 };
         if( fish.ownerKind === 'user' ){
+            const inFryStage = advanceUserFryStage(fish, dt);
+            if( !inFryStage ) fish.playerActiveAge = (fish.playerActiveAge || 0) + dt;
             const input = inputsByClient.get(fish.clientId) || {};
             fish.mode = input.hunt ? 'burst' : 'cruise';
             accel = input.accel ? scale(normalize(input.accel), FISH.accel) : accel;
@@ -90,10 +93,24 @@ export function stepAuthoritativeWorld(state, inputsByClient, dt, rng){
         advanceFeedingState(fish, dt);
     }
 
+    expireOldUserFish(world, rng);
     advanceShreds(world, dt); // @ds:8b62d9ce
     expireOldNpcFish(world, rng); // @ds:a6c9e8b4
     resolveFeedingBatches(world, rng); // @ds:9b41d2ac @ds:6c80e3b4 @ds:f2ad71c9 @ds:a8f03d2e
     maintainPopulation({ world }, rng);
     world.bubbles = [];
     return state;
+}
+
+// @ds:b7a4c391 @ds:c18e5b42 @ds:e13d7a52
+function expireOldUserFish(world, rng){
+    for( const fish of world.fish || [] ){
+        if( fish.ownerKind !== 'user' ) continue;
+        if( fish.fryAge !== null && fish.fryAge !== undefined ) continue;
+        if( (fish.playerActiveAge || 0) < PLAYER.maxLifetimeSeconds ) continue;
+        const origin = { ...fish.pos };
+        const shreds = spawnShredsFromFish(world, fish, rng);
+        const position = placeUserSpawn(world, 'oldAge', rng, { origin, shreds });
+        startUserFryStage(fish, position, 'oldAge');
+    }
 }

@@ -20,6 +20,7 @@ references:
     - sense/fish/fish.dsc
     - sense/prey/prey.dsc
     - sense/predation/predation.dsc
+    - sense/player/player.dsc
     - sense/shred/shred.dsc
     - sense/controls/controls.dsc
     - sense/multiplayer/multiplayer.dsc
@@ -50,6 +51,7 @@ file_plan:
   web-canvas/src/vec.js:            "vec2 helpers"
   web-canvas/src/world.js:          "wrap bounds, drag, resize, density field, bubbles"
   web-canvas/src/fish.js:           "fish data, identity fields, swim/grow/facing/decor/serialize"
+  web-canvas/src/player.js:         "player fry-stage, active lifetime, old-age respawn"
   web-canvas/src/shred.js:          "server-owned shred spawn, drift, contact, layer nutrition, row helpers"
   web-canvas/src/prey.js:           "NPC wander/flee/density spawn/fry growth"
   web-canvas/src/predation.js:      "eligibility, attack window, overlaps/canEat/resolveEating"
@@ -72,7 +74,7 @@ contract_map:
   wsProtocol.clientDeltaInput:               client-net.js#sendInput  # @ds:671e9773
   wsProtocol.handshakeState:                 client-net.js#connect server.js#handleMessage  # @ds:4fad33f8
   wsProtocol.serverSync:                     protocol.js#encodeWorldSync protocol.js#applyWorldSync  # @ds:682570c7
-  wsProtocol.fishRow:                        protocol.js#encodeFishRow protocol.js#parseFishRow  # @ds:ea18a088
+  wsProtocol.fishRow:                        protocol.js#encodeFishRow protocol.js#parseFishRow  # @ds:ea18a088 @ds:2e91f6d4
   wsProtocol.stateMods:                      protocol.js#stateMods  # @ds:f51a5030
   wsProtocol.removedFishRows:                 protocol.js#encodeRemovedFishRow protocol.js#applyWorldSync  # @ds:f51a5030 @ds:a16328a6
   wsProtocol.events:                         protocol.js#encodeEvent protocol.js#parseEvent  # @ds:a16328a6
@@ -102,6 +104,7 @@ contract_map:
   debug.drawFishMinimap:                    render.js#drawDebugFishMinimap  # @ds:8f2c91ad
   debug.drawFishCollisionRadius:            render.js#drawDebugFishCollisionRadius  # @ds:6b4e90d2 @ds:a3e394a8
   ui.showAppVersion:                         server.js#appVersion main.js#showAppVersion index.html#app-version  # @ds:8d13f6a2
+  ui.worldSnapshotInfo:                      main.js#updateWorldSnapshotInfo index.html#world-info style.css#world-info  # @ds:e42a7c19
   world.wrapPosition:                       world.js#wrapPosition  # @ds:c83f4c1e @ia:dd909d1a
   world.applyDrag:                          world.js#applyDrag  # @ds:ca07d970
   world.resizeWorld:                        world.js#nextWorldSize  # @ds:19c14fea
@@ -110,8 +113,14 @@ contract_map:
   world.maintainNpcDensity:                 world.js#targetNpcCount  # @ds:53db39eb
   world.findLowestFishDensityArea:          world.js#findLowestDensitySpawn  # @ds:53db39eb
   world.controlledObjectLimit:               world.js#controlledObjectCount world.js#canAddControlledObjects world.js#isOldAgeSuspended  # @ds:eccfca7e @ds:d140effd
-  shred.spawn:                               shred.js#spawnShredsFromFish prey.js#expireOldNpcFish  # @ds:e13d7a52 @ds:7c2f91ad @ds:918d4b63 @ds:d5e7a01c @ds:a6c9e8b4 @ds:eccfca7e
-  shred.drift:                               shred.js#advanceShreds  # @ds:8b62d9ce @ds:ed2b4f19 @ds:d3187816
+  player.startUserFryStage:                  player.js#startUserFryStage server.js#handleJoin predation.js#respawnUserFishAfterEating  # @ds:4c7a2b91 @ds:39305789 @ds:4bfe0352
+  player.spawnPlacement:                     player.js#placeUserSpawn predation.js#respawnUserFishAfterEating player.js#expireOldUserFish  # @ds:c18e5b42 @ds:53db39eb
+  player.fryProtection:                      predation.js#canBeVictimOf predation.js#collectFeedingCandidates  # @ds:9d62f0a7 @ds:32745a4f
+  player.lifetimeAging:                      player.js#advancePlayerLifecycle player.js#expireOldUserFish step.js#stepAuthoritativeWorld  # @ds:b7a4c391 @ds:e13d7a52
+  player.lifetimeUi:                         protocol.js#encodeFishRow protocol.js#parseFishRow main.js#updatePlayerLifetimeBar index.html#player-metrics index.html#lifetime-bar style.css#player-metrics style.css#lifetime  # @ds:2e91f6d4
+  player.sizeUi:                             main.js#updatePlayerSizeMetric index.html#player-size style.css#player-size  # @ds:b9136c2e
+  shred.spawn:                               shred.js#spawnShredsFromFish prey.js#expireOldNpcFish player.js#expireOldUserFish  # @ds:e13d7a52 @ds:7c2f91ad @ds:918d4b63 @ds:d5e7a01c @ds:a6c9e8b4 @ds:b7a4c391 @ds:eccfca7e
+  shred.drift:                               shred.js#advanceShreds  # @ds:8b62d9ce @ds:ed2b4f19 @ds:d3187816 @ds:31a8f5c2
   shred.decayRefresh:                        shred.js#refreshShredDecay predation.js#collectFeedingCandidates predation.js#refreshCandidate predation.js#processFeedingBatch  # @ds:fb0f32c4
   shred.eating:                              shred.js#canEatShred shred.js#shredCandidateNutrition shred.js#consumeShredLayer  # @ds:c14f7a08 @ds:9e4c1b7a @ds:b6f08d21 @ds:4d7c2e93 @ds:f0a6c5d8 @ds:d867989f @ds:98224ab9 @ds:fb0f32c4
   shred.protocol:                            protocol.js#encodeShredRow protocol.js#parseShredRow protocol.js#encodeWorldSync protocol.js#applyWorldSync  # @ds:ed2b4f19 @ds:682570c7 @ds:d3187816
@@ -152,11 +161,11 @@ contract_map:
   predation.overlaps:                       predation.js#overlaps  # @ds:a3e394a8 @ds:b024b514
   predation.isAttackContact:                predation.js#isAttackContact  # @ds:b39c93a5 @ds:b024b514
   predation.isEdibleBySize:                 predation.js#isEdibleBySize  # @ds:98224ab9
-  predation.canBeVictimOf:                  predation.js#canBeVictimOf  # @ds:32745a4f @ia:01fe68fa
+  predation.canBeVictimOf:                  predation.js#canBeVictimOf  # @ds:32745a4f @ds:9d62f0a7 @ia:01fe68fa
   predation.canEat:                         predation.js#canEat  # @ds:98224ab9 @ds:32745a4f @ds:b39c93a5
   predation.isLeaveBlockedByUserAttack:     predation.js#isLeaveBlockedByUserAttack  # @ds:8917ad63
   predation.resolveFeedingBatches:          predation.js#resolveFeedingBatches predation.js#collectFeedingCandidates predation.js#processFeedingBatch  # @ds:e9fb3705 @ds:75a5aa4f @ds:9b41d2ac @ds:6c80e3b4 @ds:f2ad71c9 @ds:a8f03d2e @ds:4e2a91f0
-  predation.respawnPlayerAfterEating:       predation.js#respawnUserFishAfterEating  # @ds:39305789 @ds:53db39eb
+  predation.respawnPlayerAfterEating:       predation.js#respawnUserFishAfterEating  # @ds:39305789 @ds:4c7a2b91 @ds:c18e5b42 @ds:9d62f0a7 @ds:53db39eb
   predation.hunt:                           hunt.js#huntSteer  # @ds:d4f6a1c2
 
 data_model:
@@ -177,6 +186,7 @@ data_model:
       debugMode: "boolean toggled by client UI/keyboard; never sent to server"
       debugPositionTraces: "array of { kind:'relative'|'absolute', pos:{x,y}, createdAt, fadeStartAt, alpha?, fishId? }"
       debugFishMinimap: "render-only 200x200 px overlay computed from current world.fish positions; never stored in world state"
+      worldSnapshotInfo: "top-right render-only DOM panel derived from the latest WebSocket-synchronized world.fish and world.shreds arrays"
       latestAbsoluteServerPositions: "Map fishId -> absolute server pos captured from absolute sync diagnostics"
       lastDebugTraceAt: "timestamp of last debug trace sample, used to cap trace density"
       lastSentInputKey: "encoded comparison key for immediate input flush"
@@ -192,6 +202,9 @@ data_model:
       - facing
       - mode                   # cruise|burst
       - age
+      - playerActiveAge          # user active lifetime after start window, synchronized for lifetime UI
+      - fryAge                   # active for NPC fry and user 3s start-window protection
+      - nominalStartSize         # target size for fry growth
       - eatenFishCount
       - visual/decor state
   shred:
@@ -234,7 +247,8 @@ data_model:
       - join form draft values
       - render interpolation and prediction cache
       - decorative bubble emission, advancement, and rendering
-      - size delta label accumulation, lifetime, and rendering for the current user fish only
+      - size delta label accumulation, lifetime, current user size metric, and rendering for the current user fish only
+      - world snapshot information panel derived from the latest received WebSocket snapshot
 
 implementation_instructions:
   local_server: |
@@ -254,10 +268,20 @@ implementation_instructions:
     identity/world-size/absolute-sync for that same fish, and return without pushing
     a new fish into world.fish.
     Otherwise handleJoin creates exactly one user fish with ownerKind='user', userName,
-    userColor, userTier, and a temporaryConnectionCode scoped to this client instance.
+    userColor, userTier, and a temporaryConnectionCode scoped to this client instance,
+    then calls player.js#startUserFryStage with reason='join' so first entry begins
+    at the minimum visible fry size and enters the 3 second start window.
     main.js must hide the join panel after any identity message, not only after a
     manual join submit, so an automatic reconnect cannot leave an active join form
     that creates a duplicate user fish.
+    client-net.js#createClientNet owns first-communication settling for entry UI:
+    when the WebSocket opens with no stored temporaryConnectionCode, call
+    onInitialCommunication({ kind:'new' }); when an identity message is received
+    for a reconnect or join, call onInitialCommunication({ kind:'restored' }) once
+    before/with onIdentity. main.js starts with #join, #control-modes, #hud .hint,
+    #leave-game, #joystick-panel, and #player-metrics hidden; it shows the join
+    form only after first communication establishes a new session, and shows game
+    controls only after joined=true.
   reconnect_and_timeout: |
     On unexpected socket break, keep the user fish as ownerKind='user' for 3 seconds.
     During the grace window, continue the last input action.
@@ -272,6 +296,9 @@ implementation_instructions:
     client-net.js must treat reconnect failure as leaving the joined state: clear
     currentUserFishId, temporaryConnectionCode, and sessionStorage fish.connectionCode,
     stop sending input/idle messages, and notify main.js so the join panel is visible.
+    Reconnect failure also settles first communication as kind='new' when the entry
+    UI is still pending, so a page reload with an expired stored code transitions
+    directly from pending to the join form without a transient joined/control UI.
     main.js must not choose a followed fish by stale id when currentUserFishId no
     longer points to an ownerKind='user' fish in the latest snapshot.
     Otherwise convert the fish to ownerKind='npc', npcRole='abandoned-user-fish',
@@ -281,6 +308,96 @@ implementation_instructions:
     handleLeaveGame first calls isLeaveBlockedByUserAttack.
     If blocked, server rejects the leave command and fish remains user-owned.
     If allowed, convert immediately to NPC without the 3 second grace.  # @ds:704ab317 @ds:8917ad63
+  player_lifecycle: |
+    player.js owns user-fish fry and lifetime helpers.
+    startUserFryStage(fish, position, reason):
+      - preserves fish.id, clientId, temporaryConnectionCode, userName, userColor,
+        and userTier;
+      - sets ownerKind='user', isPlayer=true, npcRole=null, pos=position, vel=0,
+        mode='cruise', size=PLAYER.fryStartSize, radius=radiusOf(size),
+        fryAge=0, nominalStartSize=PLAYER.startSize, playerActiveAge=0, age=0,
+        feedingSuccessFactor=1, feedingCooldown=0;
+      - leaves the same object in world.fish so existing client control binding
+        remains attached to the same id.
+    advancePlayerLifecycle(world, dt, rng):
+      - for every ownerKind='user' fish, if fryAge is active, advance it toward
+        PLAYER.fryGrowthSeconds=3 and reset playerActiveAge to 0 while the start
+        window is active;
+      - while fryAge is active and fish.size is below PLAYER.startSize, interpolate
+        start growth from PLAYER.fryStartSize to PLAYER.startSize using the fryAge
+        ratio and clamp size to PLAYER.startSize; if feeding raises size to
+        PLAYER.startSize or above before 3 seconds, leave that larger current
+        size intact and keep fryAge active for protection until the timer expires;
+      - when fryAge reaches PLAYER.fryGrowthSeconds, clear fryAge and start active
+        lifetime counting from playerActiveAge=0;
+      - when fryAge is not active, increment playerActiveAge by dt;
+      - when playerActiveAge reaches PLAYER.maxLifetimeSeconds, call
+        expireOldUserFish(world, fish, rng).
+    expireOldUserFish(world, fish, rng):
+      - copy the user identity fields and current fish id;
+      - call spawnShredsFromFish(world, fish, rng) before resetting the body;
+      - compute old-age respawn position as the average position of the shreds
+        returned by spawnShredsFromFish, falling back to the dead fish position if
+        no shred was created because of the controlled-object limit;
+      - restart the same fish object with startUserFryStage(reason='oldAge') at
+        that cloud center.
+    stepAuthoritativeWorld must call advancePlayerLifecycle after fish integration
+    and before feeding resolution, so expired user bodies create shreds and re-enter
+    the world as protected fry in the same authoritative tick.  # @ds:4c7a2b91 @ds:c18e5b42 @ds:9d62f0a7 @ds:b7a4c391 @ds:e13d7a52
+  player_lifetime_ui: |
+    protocol.js includes user fish start-window age and playerActiveAge in fish row state mods as
+    `gN` and `lN`, where N is age in tenths of a second clamped to a non-negative
+    integer. stateMods emits `gN` while ownerKind='user' and fryAge is active,
+    and emits `lN` for ownerKind='user'. parseFishRow reads `gN` into
+    parsed.fryAge = N / 10, clears fryAge to null when `gN` is absent on a user
+    row, reads `lN` into parsed.playerActiveAge = N / 10, and preserves the
+    previous active age when `lN` is absent.
+    index.html contains #player-metrics as a fixed bottom-center UI group. It holds
+    #player-size with nested #player-size-label and #player-size-value, plus
+    #lifetime, so the current user fish size stays next to the active lifetime
+    indicator instead of being mixed into the top-left HUD.
+    style.css#player-metrics makes the group noticeable and keeps pointer-events
+    disabled; #lifetime is wider and thicker than the old compact HUD bar and
+    remains centered in that group. The group is positioned above the lower control
+    zone so it does not sit on top of bottom-screen fish controls or near-edge fish
+    visuals.
+    main.js#updatePlayerLifetimeBar(fish):
+      - when no current user fish exists, reset the bar to empty;
+      - keep #player-metrics hidden unless a current ownerKind='user' fish exists
+        and the joined entry UI has been resolved;
+      - read activeAge = max(0, fish.playerActiveAge || 0);
+      - ratio = clamp(1 - activeAge / PLAYER.maxLifetimeSeconds, 0, 1);
+      - set #lifetime-bar scaleX to ratio;
+      - use the start-window color only when activeAge is 0 and fish.fryAge is
+        active in the parsed snapshot;
+      - otherwise compute remainingSeconds = PLAYER.maxLifetimeSeconds - activeAge;
+        set the active bar color red when remainingSeconds < 3, yellow when
+        remainingSeconds < 10, and the ordinary active color otherwise.
+    main.js must not infer lifetime progress from local performance.now(), fish
+    size drops, or PLAYER.fryGrowthSeconds. The bug mechanism was local
+    size/time heuristics drifting from server lifetime and hiding changes to
+    PLAYER.maxLifetimeSeconds.  # @ds:2e91f6d4
+  player_size_ui: |
+    main.js#updatePlayerSizeMetric(fish) owns #player-size-value text. It displays
+    the synchronized current user fish size with one decimal place and displays "-"
+    when there is no current user fish, while the #player-metrics container remains
+    hidden in that state. style.css keeps #player-size-value as the dominant
+    high-contrast number and #player-size-label as secondary text. frame() calls
+    it with the same current user fish used for the lifetime bar so both
+    bottom-center metrics update together from the latest client snapshot.  # @ds:b9136c2e
+  world_snapshot_info_ui: |
+    index.html contains #world-info in the top-right overlay layer. It has four
+    value spans: #world-fish-count, #world-fish-area, #world-nutrient-count, and
+    #world-nutrient-area.
+    main.js#updateWorldSnapshotInfo(world) reads only the latest world object
+    stored from WebSocket synchronization, not extrapolated render-only bubbles
+    or server-only state:
+      - fishCount = world.fish.length;
+      - fishArea = sum(Math.PI * fish.radius^2) for finite synchronized fish radii;
+      - nutrientCount = world.shreds.length;
+      - nutrientArea = sum(shred.geometricArea) for finite synchronized shreds.
+    style.css#world-info anchors the panel at top right, uses a compact
+    translucent background, and leaves pointer-events disabled.  # @ds:e42a7c19
   join_after_leave: |
     main.js owns the local entry/game UI state.
     setJoinedUiState(joined) hides the join panel and labels #leave-game as
@@ -288,6 +405,12 @@ implementation_instructions:
     joined=false without automatically opening the form. handleLeaveGameButton
     calls client-net.js#leave when joined=true. When joined=false, it opens the
     join panel with the existing draft name, color, and paid/free fields intact.
+    setJoinedUiState also owns visibility for entry chrome: before first
+    communication, keep the join form, leave command, control mode row, hint,
+    joystick panel, and player metrics hidden; when the join form is visible,
+    keep fish controls and player metrics hidden; when joined=true, show the fish
+    control row and hint, and let joystick visibility follow the active control
+    mode.
     client-net.js#leave sends the compact leave request but keeps the current
     session binding until the server confirms success. On event npc for the
     currently controlled fish, confirmLeaveSucceeded clears currentUserFishId,
@@ -420,6 +543,8 @@ implementation_instructions:
       - set remainingLayers to the ordered layer ids from shred.dsc, decayAge=0,
         drag to a random value in SHRED.dragMin..SHRED.dragMax, visualSeed=rng(),
         velocity to a random direction and speed in SHRED.initialSpeedMin..initialSpeedMax.
+      - return an array of the shreds actually created so player old-age respawn
+        can place the new fry at the center of its predecessor cloud.
     advanceShreds(world, dt):
       - for each shred, inspect nearby moving fish with nearestToroidalDelta; when
         a fish is within SHRED.wakeRadiusRatio * (fish.radius + shred.radius), add
@@ -430,8 +555,13 @@ implementation_instructions:
         fish influence;
       - clamp tiny speed below SHRED.restSpeed to zero, integrate pos += vel*dt,
         and wrap by world bounds.
+      - update world.shredDensityLimit toward SHRED.densityLimitBase using
+        SHRED.densityLimitSmoothRate and dt;
       - after movement, advance each shred's decayAge by dt. For each full
-        SHRED.decayIntervalSeconds interval, remove the next layer group in
+        SHRED.decayIntervalSeconds interval, compute current shred density from
+        world.shreds against world area. If density is below world.shredDensityLimit,
+        keep the current layers and defer the next check by one full interval. If
+        density is at or above the limit, remove the next layer group in
         SHRED.layerOrder. If the next group is the final 10%+10% group, remove the
         whole shred from world.shreds instead of leaving an empty layer set. Do not
         grant nutrition, increment fish counters, or play mouth cues from decay.
@@ -469,7 +599,7 @@ implementation_instructions:
     meaning. Add decayAge to the shred row after visualSeed; parse rows without
     that field as decayAge=0 for compatibility. Client render draws only remaining
     SVG layers from ds/assets/shred.svg and treats layer drift as render-only.
-    # @ds:e13d7a52 @ds:7c2f91ad @ds:918d4b63 @ds:d5e7a01c @ds:8b62d9ce @ds:c14f7a08 @ds:9e4c1b7a @ds:b6f08d21 @ds:4d7c2e93 @ds:f0a6c5d8 @ds:a2d5936f @ds:ed2b4f19 @ds:d3187816 @ds:fb0f32c4 @ds:eccfca7e
+    # @ds:e13d7a52 @ds:7c2f91ad @ds:918d4b63 @ds:d5e7a01c @ds:8b62d9ce @ds:c14f7a08 @ds:9e4c1b7a @ds:b6f08d21 @ds:4d7c2e93 @ds:f0a6c5d8 @ds:a2d5936f @ds:ed2b4f19 @ds:d3187816 @ds:31a8f5c2 @ds:fb0f32c4 @ds:eccfca7e
   feeding_batch: |
     fish.js#makeFish initializes feedingSuccessFactor=1 and feedingCooldown=0.
     fish.js#advanceFeedingState(fish, dt) runs once per authoritative tick before
@@ -482,7 +612,9 @@ implementation_instructions:
     collectFeedingCandidates(feeder, world):
       - fish candidates: every other fish still in world.fish for which canEat
         is true using isAttackContact, size threshold, user-tier eligibility, and
-        burst mode; nutrition = victim.size * GROWTH.fishAreaGainRatio; swallowedArea = victim.size.
+        burst mode; when feeder has active user fryAge, user-fish victims are
+        skipped even if size/tier would otherwise pass; nutrition = victim.size *
+        GROWTH.fishAreaGainRatio; swallowedArea = victim.size.
       - shred candidates: every shred for which canEatShred is true; use
         shredCandidateNutrition to obtain nutrition and swallowedArea for the next
         layer group.
@@ -506,7 +638,9 @@ implementation_instructions:
         shred regardless of success;
       - on successful fish candidate, call grow(feeder, victim.size), increment
         eatenFishCount through grow(), and remove/respawn the victim exactly as
-        predation.effect and predation.player-respawn require;
+        predation.effect and predation.player-respawn require; user victims keep
+        the same fish id and enter the 3 second player start window at the
+        respawn placement.
       - on successful shred candidate, call growFromNutrient(feeder,nutrition),
         consumeShredLayer(feeder,shred,group), remove exhausted shreds, and do not
         increment eatenFishCount;
@@ -585,9 +719,13 @@ implementation_instructions:
   predation_eligibility: |
     canEat(predator, victim) requires burst, size eligibility, and canBeVictimOf.
     canBeVictimOf rules:
+      - user fish with active fryAge is protected and remains alive when another
+        fish tries to eat it.
       - NPC and abandoned user fish have no user-tier protection.
       - paid user fish can be eaten only by another paid user fish.
       - free user fish can be eaten by any ordinary eligible predator.
+      - user fish with active fryAge can feed on NPC fish and shreds, but
+        collectFeedingCandidates excludes user-fish victims for that feeder.
     There is no separate player vulnerability mode.  # @ds:32745a4f @ia:01fe68fa @ds:5377d065
   user_attack_window: |
     isLeaveBlockedByUserAttack returns true when another user fish is in burst,
@@ -608,7 +746,7 @@ implementation_instructions:
       - require dot(relativeVelocity, separation) > 0 so the current motion increases overlap;
       - allow contact when center distance < predator.radius + victim.radius or when the victim circle intersects the predator mouth/head reach area.
     On NPC victim: grow predator, splice victim from world.fish, and adjust outer loop index when needed.
-    On user victim: grow predator and respawnUserFishAfterEating(world,victim,rng) in place, preserving clientId, temporaryConnectionCode, userName, userColor, and userTier.  # @ds:75a5aa4f @ds:39305789 @ds:a3e394a8 @ds:b39c93a5 @ds:b024b514 @ds:98224ab9
+    On user victim: grow predator and respawnUserFishAfterEating(world,victim,rng) in place, preserving id, clientId, temporaryConnectionCode, userName, userColor, and userTier, then start the 3 second player start window.  # @ds:75a5aa4f @ds:39305789 @ds:4c7a2b91 @ds:9d62f0a7 @ds:a3e394a8 @ds:b39c93a5 @ds:b024b514 @ds:98224ab9
   client_prediction_and_render: |
     main.js owns snapshotBuffer and clientBubbles outside state.world.
     main.js also owns debugMode, debugPositionTraces, and latestAbsoluteServerPositions outside state.world.
@@ -648,6 +786,14 @@ implementation_instructions:
       - main.js owns `sizeDeltaLabelState = { fishId, lastSize, remainder, labels }` outside state.world;
       - find the current user fish by visibleWorld fish id;
       - when no current user fish exists or the id changes, reset fishId, lastSize, remainder, and labels without emitting a catch-up label;
+      - while the current user fish is in the start window and its size is at or
+        below PLAYER.startSize, update lastSize to the visible fish size, clear
+        remainder, keep existing labels aging, and do not emit positive start
+        growth labels;
+      - when the current user fish is still in the start window but has grown
+        above PLAYER.startSize through feeding, compute the label delta from
+        max(previous lastSize, PLAYER.startSize) so the automatic nominal growth
+        portion remains hidden and only the excess feeding growth can emit;
       - compute sizeDelta = fish.size - lastSize, add it to remainder, then update lastSize to fish.size;
       - while Math.abs(remainder) >= 0.1, emit one label step with value = sign(remainder) * 0.1 and subtract that step from remainder;
       - if a single frame contains multiple steps in the same direction, coalesce them into one label whose value is the total emitted amount rounded to one decimal;
@@ -740,6 +886,10 @@ implementation_instructions:
     when the counter is greater than zero, and parseFishRow preserves the previous
     value when the mod is absent. The value is domain-visible event state for
     local mouth cue detection, not mouth animation state.
+    encodeFishRow also includes user start-window age as `gN` and user active
+    lifetime as `lN`, where N is seconds in tenths. parseFishRow exposes them as
+    fish.fryAge and fish.playerActiveAge seconds so start growth suppression and
+    the lifetime bar are bound to synchronized server state and PLAYER.maxLifetimeSeconds.
     encodeWorldSync includes one shred row for each current world.shreds item
     after fish rows. Delta sync may send shreds as absolute shred rows each tick;
     applyWorldSync replaces world.shreds with the parsed shred rows from the
@@ -765,7 +915,7 @@ implementation_instructions:
       - use the elapsed time since the previous sync and the previous client velocity to predict the client-side current position at receive time;
       - print a compact console table with id, role, previous client position, predicted client position, absolute server position, elapsed ms, error dx/dy, and error distance;
       - skip rows with no previous client position.
-    State mods include a, b, f, e. Names use base64url; colors use hex without #; type is u/p/n.
+    State mods include a, b, f, e, sN, gN, and lN. Names use base64url; colors use hex without #; type is u/p/n.
     State mods are domain/network facts only. Do not add protocol fields or mods for visual-only mouth, teeth, fin, swim phase, burst kick, or mouth hold state.  # @ds:839f8cd0 @ds:5a4d3d6d @ds:671e9773 @ds:4fad33f8 @ds:682570c7 @ds:ea18a088 @ds:f51a5030 @ds:a16328a6
   input_latency: |
     Do not throttle changed input in client-net.js.

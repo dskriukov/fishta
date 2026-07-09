@@ -1,12 +1,12 @@
 // imp/web-canvas/src/predation.js
 // Implements: predation.dsc (overlaps, canEat, resolveEating)
 // Note: user fish victim eligibility is derived from paid/free tier.
-// @ds a3e394a8 98224ab9 e9fb3705 fcdfb2b7 d867989f 6f1b0a3c 39305789
+// @ds a3e394a8 98224ab9 e9fb3705 fcdfb2b7 d867989f 6f1b0a3c 39305789 4c7a2b91 c18e5b42 9d62f0a7
 
 import { GROWTH, LEAVE, PREDATION, PLAYER } from './constants.js';
 import { normalize } from './vec.js';
 import { grow, growFromNutrient, makeFish } from './fish.js';
-import { findLowestDensitySpawn } from './world.js';
+import { isUserFryProtected, placeUserSpawn, startUserFryStage } from './player.js';
 import { canEatShred, consumeShredLayer, refreshShredDecay, shredCandidateNutrition } from './shred.js';
 
 // @ds:a3e394a8 @ds:b024b514
@@ -53,6 +53,7 @@ export function isEdibleBySize(predator, prey){
 // ds:98224ab9
 export function canBeVictimOf(predator, victim){
     if( victim.ownerKind !== 'user' ) return true;
+    if( isUserFryProtected(victim) ) return false;
     if( victim.userTier === 'paid' ) return predator.ownerKind === 'user' && predator.userTier === 'paid';
     return true;
 }
@@ -94,13 +95,14 @@ export function respawnUserFishAfterEating(world, fish, rng){
         userTier: fish.userTier,
     };
     const respawned = makeFish({
-        pos: findLowestDensitySpawn(world, rng),
-        size: PLAYER.startSize,
+        pos: placeUserSpawn(world, 'eaten', rng),
+        size: PLAYER.fryStartSize,
         isPlayer: true,
         ownerKind: 'user',
         ...saved,
     });
     respawned.id = saved.id;
+    startUserFryStage(respawned, respawned.pos, 'eaten');
     Object.assign(fish, respawned);
 }
 
@@ -186,6 +188,7 @@ export function collectFeedingCandidates(feeder, world){
     let order = 0;
     for( const victim of world.fish || [] ){
         if( victim === feeder ) continue;
+        if( isUserFryProtected(feeder) && victim.ownerKind === 'user' ) continue; // @ds:9d62f0a7
         const attackContact = isAttackContact(feeder, victim, world);
         if( !canEat(feeder, victim, world, attackContact) ) continue;
         candidates.push({

@@ -158,13 +158,15 @@ decor:
       output: [sizeDeltaLabels, accumulatedDeltaRemainder']
       rule: >
         only the current client's own user fish shows temporary numeric labels
-        for size changes. Positive changes appear as green labels like "+0.2";
-        negative changes appear as red labels like "-0.1". Changes are emitted
-        in discrete 0.1 size steps: continuous loss accumulates until at least
-        one step is reached, emits that rounded step amount, and carries the
-        remainder below 0.1 forward. Each label follows the fish, moves slightly
-        upward, fades out, and never changes movement, collision, predation,
-        numeric size, or network synchronization.
+        for size changes after the player start window. Start growth up to the
+        nominal player start size is visible through the current-size HUD value
+        and does not emit labels above the fish. Positive changes after feeding
+        appear as green labels like "+0.2"; negative changes appear as red labels
+        like "-0.1". Changes are emitted in discrete 0.1 size steps: continuous
+        loss accumulates until at least one step is reached, emits that rounded
+        step amount, and carries the remainder below 0.1 forward. Each label
+        follows the fish, moves slightly upward, fades out, and never changes
+        movement, collision, predation, numeric size, or network synchronization.
   eatingExhale:
     from: ds:fish.decor.eating-exhale
     authority: client-only

@@ -24,6 +24,7 @@ modules:                     # from ds:domain.modules
   - prey
   - predation
   - shred
+  - player
   - controls
   - multiplayer
   - ws-protocol
@@ -72,7 +73,7 @@ goal:                        # from ds:goal.growth
   from: [ds:goal.growth, ia:player.predation-eligibility]
   type: open-ended-growth
   user_fish_can_be_eaten: "by paid/free predation eligibility, not by a separate vulnerability mode"
-  player_respawns_after_eaten: true
+  player_respawns_after_eaten: "through player.spawn fry stage"
   success_metric: userFish.size
 
 constraints:                 # from ds:intent.game
@@ -94,6 +95,20 @@ ui:
       inputs: [buildOrLaunchDate, commitDigest]
       output: versionText
       rule: "interface has a persistent service UI area that shows date-derived build/run version plus commit digest for local verification and bug discussion"
+  world_snapshot_info:
+    from: ds:ui.world-snapshot-info
+    authority: client-display
+    source: "current world snapshot received by the client through WebSocket synchronization"
+    contract:
+      name: updateWorldSnapshotInfo
+      inputs: [world.fish, world.shreds]
+      output: worldSnapshotInfoText
+      placement: "compact translucent top-right client UI panel"
+      metrics:
+        fishCount: "number of fish rows currently present in the synchronized client world"
+        fishArea: "sum of canonical circular fish areas from synchronized fish radii"
+        nutrientCount: "number of synchronized nutrient/shred objects"
+        nutrientArea: "sum of synchronized nutrient/shred geometricArea values"
 
 implementation_model:
   geometry:

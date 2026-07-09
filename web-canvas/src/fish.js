@@ -147,6 +147,7 @@ export function serializeFish(fish){
 // Drift (no thrust) is free; traveling 100*size with thrust => -1% size.
 export function spendEnergy(fish, distance){
     if( fish.mode !== 'burst' || distance <= 0 ) return;
+    if( fish.ownerKind === 'user' && fish.fryAge !== null && fish.fryAge !== undefined ) return; // @ds:4c7a2b91
     const refDist = ENERGY.refSizes * fish.size;            // "100 текущих размеров"
     const lossFrac = ENERGY.lossPerRef * (distance / refDist);
     const minSize = fish.ownerKind === 'user' ? ENERGY.userMinSize : ENERGY.minSize;

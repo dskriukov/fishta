@@ -1,8 +1,8 @@
 // imp/web-canvas/src/main.js
 // Bootstraps world + game loop (dsr/use/ecs-loop.dsr). Glue/I-O layer.
-// @ds b28b7af6 27fa3caa ec8cb052 c95ca496 48c4fc99 b433f1bc d2e8a84c 5fb1ff09 c83f4c1e ca07d970 d6cebf86 3ddf8f67 1f3abc43 cbc1225a 7ce238da c4073e51 ee07d6da 8869f043 f51831f5 8d0ca6a8 d867989f 975ca168 bd354b7a 906be50b 91e32235 55c13a4f 10baf178 22fd3ab4 7b9a7984 ad8d81d8 31cb7a0d 579e4888 e699c42d e6ecfbdd 1e66d817 a3e394a8 98224ab9 e9fb3705 fcdfb2b7 0c8d4e2a 6f1b0a3c 39305789 a2d5936f 73b91e4c ed2b4f19
+// @ds b28b7af6 27fa3caa ec8cb052 c95ca496 48c4fc99 b433f1bc d2e8a84c 5fb1ff09 c83f4c1e ca07d970 d6cebf86 3ddf8f67 1f3abc43 cbc1225a 7ce238da c4073e51 ee07d6da 8869f043 f51831f5 8d0ca6a8 d867989f 975ca168 bd354b7a 906be50b 91e32235 55c13a4f 10baf178 22fd3ab4 7b9a7984 ad8d81d8 31cb7a0d 579e4888 e699c42d e6ecfbdd 1e66d817 a3e394a8 98224ab9 e9fb3705 fcdfb2b7 0c8d4e2a 6f1b0a3c 39305789 2e91f6d4 b9136c2e e42a7c19 a2d5936f 73b91e4c ed2b4f19
 
-import { DEBUG, EXHALE, FISH, LOOP, MOUTH, SHRED, SIZE_DELTA_LABEL, SWIM, SYNC } from './constants.js';
+import { DEBUG, EXHALE, FISH, LOOP, MOUTH, PLAYER, SHRED, SIZE_DELTA_LABEL, SWIM, SYNC } from './constants.js';
 import { advanceBubbles, emitBubble, makeWorld } from './world.js';
 import { requestExhale, runExhaleCycle, serializeFish } from './fish.js';
 import { createControlModeState, createInput, keySteer, pointerSteer, joystickSteer, huntMode } from './controls.js';
@@ -12,9 +12,15 @@ import { createClientNet } from './client-net.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
-const hudSize = document.getElementById('size');
+const playerMetrics = document.getElementById('player-metrics');
+const playerSizeValue = document.getElementById('player-size-value');
 const hudEaten = document.getElementById('eaten');
 const hudStatus = document.getElementById('status');
+const lifetimeBar = document.getElementById('lifetime-bar');
+const worldFishCount = document.getElementById('world-fish-count');
+const worldFishArea = document.getElementById('world-fish-area');
+const worldNutrientCount = document.getElementById('world-nutrient-count');
+const worldNutrientArea = document.getElementById('world-nutrient-area');
 const joinPanel = document.getElementById('join');
 const joinForm = document.getElementById('join-form');
 const joinName = document.getElementById('join-name');
@@ -22,7 +28,9 @@ const joinColor = document.getElementById('join-color');
 const joinTier = document.getElementById('join-tier');
 const leaveButton = document.getElementById('leave-game');
 const debugToggle = document.getElementById('debug-toggle');
+const controlModes = document.getElementById('control-modes');
 const controlModeButtons = [...document.querySelectorAll('[data-control-mode]')];
+const hudHint = document.querySelector('#hud .hint');
 const joystickPanel = document.getElementById('joystick-panel');
 const joystickBase = document.getElementById('joystick-base');
 const joystickKnob = document.getElementById('joystick-knob');
@@ -42,6 +50,8 @@ let debugPositionTraces = [];
 let latestAbsoluteServerPositions = new Map();
 let lastDebugTraceAt = 0;
 let lastVisibleState = state;
+let entrySessionReady = false;
+let net = null;
 const controlMode = createControlModeState();
 const sizeDeltaLabelState = {
     fishId: null,
@@ -49,7 +59,6 @@ const sizeDeltaLabelState = {
     remainder: 0,
     labels: [],
 };
-
 // ds:b28b7af6
 async function init(){
     resize();
@@ -65,7 +74,7 @@ function resize(){
 }
 
 const input = createInput(canvas);
-const net = createClientNet({
+net = createClientNet({
     onSnapshot(message){
         if( state.currentUserFishId !== message.currentUserFishId ) lastSentInputKey = null;
         state.world = message.world;
@@ -103,15 +112,20 @@ const net = createClientNet({
     onStatus(status){
         hudStatus.textContent = status;
     },
+    onInitialCommunication(message){
+        if( message.kind === 'new' && !net?.isJoined ){
+            setJoinedUiState(false, { showJoinForm: true, sessionReady: true });
+        }
+    },
     onIdentity(){
         lastSentInputKey = null;
         lastInputFlushAt = 0;
-        setJoinedUiState(true);
+        setJoinedUiState(true, { sessionReady: true });
     },
 });
 
 function currentUserFish(world = state.world, currentUserFishId = state.currentUserFishId){
-    const id = currentUserFishId ?? net.currentUserFishId;
+    const id = currentUserFishId ?? net?.currentUserFishId;
     return (world.fish || []).find(f => f.id === id && f.ownerKind === 'user') || null;
 }
 
@@ -130,7 +144,7 @@ window.addEventListener('resize', resize);
 
 if( joinName ) joinName.value = `fish-${Math.floor(Math.random() * 900 + 100)}`;
 if( joinColor ) joinColor.value = `#${Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0')}`;
-setJoinedUiState(false, { showJoinForm: true });
+setJoinedUiState(false);
 if( joinForm ){
     joinForm.addEventListener('submit', e =>{
         e.preventDefault();
@@ -139,7 +153,7 @@ if( joinForm ){
             userColor: joinColor.value,
             userTier: joinTier.checked ? 'paid' : 'free',
         });
-        if( joinPanel ) joinPanel.hidden = true;
+        setJoinedUiState(false, { sessionReady: true });
     });
 }
 if( leaveButton ){
@@ -176,9 +190,19 @@ function fallbackVersion(){
 }
 
 // @ds:9772e9ac
-function setJoinedUiState(joined, { showJoinForm = false } = {}){
-    if( leaveButton ) leaveButton.textContent = joined ? 'Выйти' : 'Войти';
-    if( joinPanel ) joinPanel.hidden = joined || !showJoinForm;
+function setJoinedUiState(joined, { showJoinForm = false, sessionReady = entrySessionReady } = {}){
+    entrySessionReady = Boolean(sessionReady);
+    const joinVisible = entrySessionReady && !joined && showJoinForm;
+    const gameControlsVisible = entrySessionReady && joined;
+    if( leaveButton ){
+        leaveButton.textContent = joined ? 'Выйти' : 'Войти';
+        leaveButton.hidden = !entrySessionReady || joinVisible;
+    }
+    if( joinPanel ) joinPanel.hidden = !joinVisible;
+    if( controlModes ) controlModes.hidden = !gameControlsVisible;
+    if( hudHint ) hudHint.hidden = !gameControlsVisible;
+    updateJoystickPanelVisibility();
+    updatePlayerMetricsVisibility(currentUserFish());
 }
 
 // @ds:9772e9ac
@@ -187,7 +211,7 @@ function handleLeaveGameButton(){
         net.leave();
         return;
     }
-    setJoinedUiState(false, { showJoinForm: true });
+    setJoinedUiState(false, { showJoinForm: true, sessionReady: true });
     if( joinName ) joinName.focus();
 }
 
@@ -220,11 +244,82 @@ function frame(now){
     serializeKeyLatch = serializePressed;
 
     const fish = currentUserFish();
-    hudSize.textContent = `size: ${fish ? fish.size.toFixed(1) : '-'}`;
+    updatePlayerSizeMetric(fish);
+    updatePlayerMetricsVisibility(fish);
     hudEaten.textContent = `eaten: ${fish ? fish.eatenFishCount : 0}`;
+    updatePlayerLifetimeBar(fish);
+    updateWorldSnapshotInfo(state.world);
     if( fish ) hudStatus.textContent = fish.userTier === 'paid' ? 'paid' : 'free';
 
     requestAnimationFrame(frame);
+}
+
+// @ds:b9136c2e
+function updatePlayerSizeMetric(fish){
+    if( !playerSizeValue ) return;
+    playerSizeValue.textContent = fish ? fish.size.toFixed(1) : '-';
+}
+
+// @ds:2e91f6d4 @ds:b9136c2e
+function updatePlayerMetricsVisibility(fish){
+    if( !playerMetrics ) return;
+    playerMetrics.hidden = !(entrySessionReady && net?.isJoined && fish);
+}
+
+// @ds:2e91f6d4
+function updatePlayerLifetimeBar(fish){
+    if( !lifetimeBar ) return;
+    if( !fish ){
+        lifetimeBar.style.transform = 'scaleX(0)';
+        return;
+    }
+    const activeAge = Math.max(0, fish.playerActiveAge || 0);
+    const ratio = Math.max(0, Math.min(1, 1 - activeAge / PLAYER.maxLifetimeSeconds));
+    const inFryStage = fish.fryAge !== null && fish.fryAge !== undefined;
+    const remainingSeconds = Math.max(0, PLAYER.maxLifetimeSeconds - activeAge);
+    lifetimeBar.style.transform = `scaleX(${ratio.toFixed(3)})`;
+    lifetimeBar.style.background = lifetimeBarColor(remainingSeconds, inFryStage);
+}
+
+function lifetimeBarColor(remainingSeconds, inFryStage){
+    if( inFryStage ) return '#9edcff';
+    if( remainingSeconds < 3 ) return '#ff5b5b';
+    if( remainingSeconds < 10 ) return '#ffd84d';
+    return '#7bd88f';
+}
+
+// @ds:e42a7c19
+function updateWorldSnapshotInfo(world){
+    const fishItems = world?.fish || [];
+    const nutrientItems = world?.shreds || [];
+    if( worldFishCount ) worldFishCount.textContent = formatCount(fishItems.length);
+    if( worldFishArea ) worldFishArea.textContent = formatArea(sumFishArea(fishItems));
+    if( worldNutrientCount ) worldNutrientCount.textContent = formatCount(nutrientItems.length);
+    if( worldNutrientArea ) worldNutrientArea.textContent = formatArea(sumNutrientArea(nutrientItems));
+}
+
+function sumFishArea(fishItems){
+    return fishItems.reduce((sum, fish) =>{
+        const radius = Number.isFinite(fish?.radius) ? fish.radius : FISH.baseRadius * Math.sqrt(Math.max(0, fish?.size || 0));
+        return Number.isFinite(radius) ? sum + Math.PI * radius * radius : sum;
+    }, 0);
+}
+
+function sumNutrientArea(nutrientItems){
+    return nutrientItems.reduce((sum, nutrient) =>{
+        const area = Number(nutrient?.geometricArea);
+        return Number.isFinite(area) ? sum + Math.max(0, area) : sum;
+    }, 0);
+}
+
+function formatCount(value){
+    return String(Math.max(0, Number(value) || 0));
+}
+
+function formatArea(value){
+    const area = Math.max(0, Number(value) || 0);
+    if( area >= 1000 ) return `${Math.round(area / 100) / 10}k`;
+    return area.toFixed(0);
 }
 
 // @ds:e559831a @ds:7b9a7984
@@ -377,7 +472,16 @@ function updateSizeDeltaLabels(visibleWorld, dt){
 
     const currentSize = Number.isFinite(fish.size) ? fish.size : sizeDeltaLabelState.lastSize;
     if( !Number.isFinite(currentSize) ) return;
-    const delta = currentSize - sizeDeltaLabelState.lastSize;
+    const inStartGrowth = fish.fryAge !== null && fish.fryAge !== undefined && currentSize <= PLAYER.startSize;
+    if( inStartGrowth ){
+        sizeDeltaLabelState.lastSize = currentSize;
+        sizeDeltaLabelState.remainder = 0;
+        return;
+    }
+    const previousSize = fish.fryAge !== null && fish.fryAge !== undefined
+        ? Math.max(sizeDeltaLabelState.lastSize, PLAYER.startSize)
+        : sizeDeltaLabelState.lastSize;
+    const delta = currentSize - previousSize;
     sizeDeltaLabelState.lastSize = currentSize;
     sizeDeltaLabelState.remainder += delta;
 
@@ -505,12 +609,17 @@ function setControlMode(mode){
         const active = button.dataset.controlMode === controlMode.active;
         button.setAttribute('aria-pressed', active ? 'true' : 'false');
     }
-    if( joystickPanel ) joystickPanel.hidden = controlMode.active !== 'joystick';
+    updateJoystickPanelVisibility();
     input.pointer.lockedByKeyboard = controlMode.active === 'keyboard';
     input.joystick.active = false;
     input.joystick.vector = v(0, 0);
     if( joystickKnob ) joystickKnob.style.transform = 'translate(-50%, -50%)';
     lastSentInputKey = null;
+}
+
+// @ds:cd1c5776 @ds:9772e9ac
+function updateJoystickPanelVisibility(){
+    if( joystickPanel ) joystickPanel.hidden = !(entrySessionReady && net?.isJoined && controlMode.active === 'joystick');
 }
 
 // @ds:b43d2f95 @ds:cd1c5776

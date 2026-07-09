@@ -75,7 +75,7 @@ effect:
     steps:
       - "server evaluates overlapping pairs and canEat(a,b)"
       - "if b is an NPC fish: remove b from world; grow a; NPC density maintenance may later spawn replacement"
-      - "if b is a user fish: grow a and respawn that user's fish at start size"
+      - "if b is a user fish: grow a and restart that user's fish through player fry-stage respawn"
 
 feeding_batch:
   from: [ds:predation.feeding-batch, ds:predation.feeding-success-factor, ds:predation.feeding-batch-area-limit, ds:predation.feeding-batch-cooldown, ds:fish.feeding-success, ds:fish.growth, ds:fish.geometry.collision-area, ds:shred.eating-eligibility, ds:shred.growth-effect]
@@ -136,6 +136,10 @@ player_respawn:
     name: respawnPlayerAfterEating
     trigger: "user fish is eaten"
     output: world'
-    rule: "create a new user fish at the user's start size, not the minimum allowed fish size, in a current lowest-density area computed over all fish"
+    rule: "reuse the eaten user fish id and identity, place it in a current lowest-density area computed over all fish, and restart it through the 3 second player start window"
     preserves:
+      - id
+      - client_binding
+      - user_name
+      - user_color
       - user_tier

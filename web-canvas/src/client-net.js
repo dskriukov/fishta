@@ -13,17 +13,25 @@ import {
 } from './protocol.js';
 import { makeWorld } from './world.js';
 
-export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity }){
+export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onInitialCommunication }){
     let socket = null;
     let currentUserFishId = null;
     let temporaryConnectionCode = window.sessionStorage.getItem('fish.connectionCode') || '';
     let joined = false;
     let pingCounter = 0;
     let lastSyncAt = null;
+    let initialCommunicationSettled = false;
     const world = makeWorld();
 
     function status(value){
         if( onStatus ) onStatus(value);
+    }
+
+    // @ds:34ba255b @ds:93a64773
+    function settleInitialCommunication(kind){
+        if( initialCommunicationSettled ) return;
+        initialCommunicationSettled = true;
+        if( onInitialCommunication ) onInitialCommunication({ kind });
     }
 
     function connect(){
@@ -34,6 +42,8 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity }){
             status('connected');
             if( temporaryConnectionCode ){
                 sendRaw(encodeClientReconnect(temporaryConnectionCode));
+            }else{
+                settleInitialCommunication('new');
             }
         });
         socket.addEventListener('close', () =>{
@@ -48,6 +58,7 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity }){
                 currentUserFishId = message.currentUserFishId;
                 temporaryConnectionCode = message.temporaryConnectionCode;
                 window.sessionStorage.setItem('fish.connectionCode', temporaryConnectionCode);
+                settleInitialCommunication('restored');
                 if( onIdentity ) onIdentity(message);
                 return;
             }
@@ -60,7 +71,10 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity }){
                         world.height = height;
                     }
                 }
-                if( message.event === 'rj' ) clearSessionBinding();
+                if( message.event === 'rj' ){
+                    clearSessionBinding();
+                    settleInitialCommunication('new');
+                }
                 if( message.event === 'npc' ) message.leaveSucceeded = confirmLeaveSucceeded(Number(message.data));
                 if( onEvent ) onEvent(message);
                 return;

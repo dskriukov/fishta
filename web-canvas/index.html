@@ -11,39 +11,58 @@
 </head>
 <body>
     <canvas id="game"></canvas>
-    <div id="join">
+    <div id="join" hidden>
+        <!-- @ds:34ba255b -->
         <form id="join-form">
+            <div class="join-header" aria-hidden="true">
+                <div class="join-bait">
+                    <img src="./src/selfish-bait.svg" alt="">
+                </div>
+                <div>
+                    <strong>Selfish bait</strong>
+                    <span>Fish Death Race</span>
+                </div>
+            </div>
             <label>
-                <span>Имя</span>
+                <span>Name</span>
                 <input id="join-name" type="text" maxlength="24" autocomplete="off">
             </label>
             <label>
-                <span>Цвет</span>
+                <span>Color</span>
                 <input id="join-color" type="color">
             </label>
             <label class="toggle">
                 <input id="join-tier" type="checkbox">
                 <span>paid fish</span>
             </label>
-            <button type="submit">Войти</button>
+            <button type="submit">Dive away!</button>
         </form>
     </div>
     <div id="hud">
         <div class="hud-row">
-            <span id="size">size: 1.0</span>
             <span id="eaten">eaten: 0</span>
             <span id="status">alive</span>
             <span id="app-version">version: loading</span>
             <button id="debug-toggle" type="button">Debug</button>
-            <button id="leave-game" type="button">Выйти</button>
+            <button id="leave-game" type="button" hidden>Выйти</button>
         </div>
-        <div id="control-modes" class="hud-row">
+        <div id="control-modes" class="hud-row" hidden>
             <button type="button" data-control-mode="keyboard">Клавиши</button>
             <button type="button" data-control-mode="pointer">Мышь</button>
             <button type="button" data-control-mode="touch">Тач</button>
             <button type="button" data-control-mode="joystick">Джойстик</button>
         </div>
-        <span class="hint">Space/мышь/второй палец/Burst — форсаж, клик по рыбе — serialize</span>
+        <span class="hint" hidden>Space/мышь/второй палец/Burst — форсаж, клик по рыбе — serialize</span>
+    </div>
+    <!-- @ds:2e91f6d4 @ds:b9136c2e -->
+    <div id="player-metrics" aria-label="player metrics" hidden>
+        <span id="player-size"><span id="player-size-label">size</span><strong id="player-size-value">-</strong></span>
+        <span id="lifetime" aria-label="life time"><span id="lifetime-bar"></span></span>
+    </div>
+    <!-- @ds:e42a7c19 -->
+    <div id="world-info" aria-label="world snapshot info">
+        <div><span>fish</span><strong id="world-fish-count">0</strong><em id="world-fish-area">0</em></div>
+        <div><span>nutrients</span><strong id="world-nutrient-count">0</strong><em id="world-nutrient-area">0</em></div>
     </div>
     <div id="joystick-panel" hidden>
         <div id="joystick-base" aria-label="joystick">
