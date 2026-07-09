@@ -598,7 +598,8 @@ implementation_instructions:
     rows are independent from fish rows, so fish tombstone rows keep their current
     meaning. Add decayAge to the shred row after visualSeed; parse rows without
     that field as decayAge=0 for compatibility. Client render draws only remaining
-    SVG layers from ds/assets/shred.svg and treats layer drift as render-only.
+    SVG layers from the published web-canvas/assets/shred.svg runtime copy of
+    the canonical ds/assets/shred.svg asset and treats layer drift as render-only.
     # @ds:e13d7a52 @ds:7c2f91ad @ds:918d4b63 @ds:d5e7a01c @ds:8b62d9ce @ds:c14f7a08 @ds:9e4c1b7a @ds:b6f08d21 @ds:4d7c2e93 @ds:f0a6c5d8 @ds:a2d5936f @ds:ed2b4f19 @ds:d3187816 @ds:31a8f5c2 @ds:fb0f32c4 @ds:eccfca7e
   feeding_batch: |
     fish.js#makeFish initializes feedingSuccessFactor=1 and feedingCooldown=0.
@@ -941,9 +942,10 @@ implementation_instructions:
     authored shade/highlight/decorative layers remain layered over the body base
     without becoming part of the former-user gradient.  # @ia:32288dfb @ds:f883f90c @ds:bfd5a97a @ds:c3708d14
   fish_svg_geometry_visual: |
-    render.js owns loading/parsing the authored ds/assets/fish2.svg geometry into
-    reusable draw paths keyed by semantic SVG ids. The parsed or embedded fallback
-    data must use the exact source SVG viewBox, path/circle coordinates, proportions,
+    render.js owns loading/parsing the published web-canvas/assets/fish2.svg runtime
+    copy of the authored ds/assets/fish2.svg geometry into reusable draw paths keyed
+    by semantic SVG ids. The parsed or embedded fallback data must use the exact
+    source SVG viewBox, path/circle coordinates, proportions,
     element-relative positions, semantic ids, fill styles, fill opacity, stroke
     styles, linearGradient definitions, gradient stops, stop opacity, and
     currentColor usage. Canvas drawing resolves currentColor from the current fish
@@ -1094,7 +1096,7 @@ verification_checks:
   - "A batch whose first candidate is a shred starts with success probability capped at 0.4."
   - "Each shred is consumed layer-by-layer, applies x3 nutrition mass, and does not increment eatenFishCount."
   - "The first two 30% shred layers apply same-color or HSV-similarity nutrition factors; remaining layers feed all fish uniformly."
-  - "Shreds are synchronized to clients and rendered from ds/assets/shred.svg with client-only layer drift."
+  - "Shreds are synchronized to clients and rendered from the published web-canvas/assets/shred.svg runtime copy of canonical ds/assets/shred.svg with client-only layer drift."
   - "Paid user fish can be eaten only by paid user fish; free user fish can be eaten by any ordinary eligible predator."
   - "The UI has no separate user-fish vulnerability toggle; eligibility comes from paid/free tier."
   - "Abandoned former user fish loses user-tier protection and uses former color to NPC-yellow gradient."
@@ -1115,7 +1117,7 @@ verification_checks:
   - "Losing focus clears local key and pointer/touch pressed state so movement and burst cannot remain stuck."
   - "Unchanged input sends p:${N} at one-second cadence, with no faster ping heartbeat."
   - "User fish body decoration preserves the selected user color across the full body through transparent overlays."
-  - "Fish rendering uses ds/assets/fish2.svg semantic ids for canonical collision_area, cruise/burst shape groups, and animated fin_* parts."
+  - "Fish rendering uses the published web-canvas/assets/fish2.svg runtime copy of canonical ds/assets/fish2.svg semantic ids for canonical collision_area, cruise/burst shape groups, and animated fin_* parts."
   - "An open mouth uses the legacy curved snout cavity and small predator teeth."
   - "Only the current client's own user fish shows green +0.1-step size gain labels and red -0.1-step size loss labels; continuous losses accumulate discretely and labels fade while rising."
   - "User respawn preserves paid/free type."

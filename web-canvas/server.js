@@ -25,7 +25,6 @@ import {
 
 const root = fileURLToPath(new URL('.', import.meta.url));
 const workspaceRoot = normalize(join(root, '..'));
-const dsAssetRoot = join(workspaceRoot, 'ds', 'assets'); // @ds:df06827a
 const port = Number(process.env.PORT || SERVER.port);
 const appVersion = makeAppVersion(); // @ds:8d13f6a2
 const world = makeWorld();
@@ -46,9 +45,8 @@ const server = createServer(async (req, res) =>{
         return;
     }
     const safePath = normalize(url.pathname === '/' ? 'index.html' : url.pathname.replace(/^\/+/, '')).replace(/^(\.\.[/\\])+/, '');
-    const assetPath = safePath.startsWith('ds/assets/') ? join(workspaceRoot, safePath) : null;
-    const path = assetPath || join(root, safePath);
-    const allowed = assetPath ? path.startsWith(dsAssetRoot) : path.startsWith(root);
+    const path = join(root, safePath);
+    const allowed = path.startsWith(root);
     if( !allowed ){
         res.writeHead(403);
         res.end('Forbidden');

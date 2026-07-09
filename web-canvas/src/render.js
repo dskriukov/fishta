@@ -28,7 +28,7 @@ let shredSvgGeometry = DEFAULT_SHRED_GEOMETRY;
 let shredSvgRenderTree = null;
 
 // @ds:df06827a @ds:b024b514 @ia:2f6e7a91
-export async function loadFishGeometry(urls = ['../ds/assets/fish2.svg', './src/_fish_save.svg']){
+export async function loadFishGeometry(urls = ['./assets/fish2.svg', './src/_fish_save.svg']){
     if( typeof fetch !== 'function' || typeof DOMParser === 'undefined' ) return null;
     for( const url of urls ){
         try{
@@ -50,7 +50,7 @@ export async function loadFishGeometry(urls = ['../ds/assets/fish2.svg', './src/
 }
 
 // @ds:6f3a9c20
-export async function loadShredGeometry(urls = ['../ds/assets/shred.svg']){
+export async function loadShredGeometry(urls = ['./assets/shred.svg']){
     if( typeof fetch !== 'function' || typeof DOMParser === 'undefined' ) return null;
     for( const url of urls ){
         try{
