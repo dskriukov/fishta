@@ -16,6 +16,7 @@ rationale_notes:
   - "Automatic exhale may be triggered locally at the start of acceleration."
   - "Toroidal wrap has two separate concerns: canonical simulation coordinates remain inside [0,width) x [0,height), while viewport rendering may draw a nearby copied image of the same entity outside that canonical rectangle so motion appears continuous around the followed fish."
   - "A render fix for wraparound must not change authoritative fish positions, protocol rows, or client prediction state; it belongs in the viewport projection layer."
+  - "Camera-followed decorative layers that derive from focus position need the same render-only continuity principle as toroidal entity projection; a background layer should unwrap its visual focus against the previous rendered focus instead of using raw canonical focus directly."
 
 units:
   position: game-world-units

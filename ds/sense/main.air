@@ -26,6 +26,9 @@ accepted_interpretations:
   - decision: "Browser Canvas 2D remains the client rendering target, but the shared world is server-authoritative."
     confidence: high
     rationale: "Multiplayer is the base model; a single user is a single-player experience over the same local-server world."
+  - decision: "PNG background source assets live in ds/assets, while web-canvas loads published runtime copies from web-canvas/assets."
+    confidence: high
+    rationale: "The executable web app must not depend on non-published DS asset paths at runtime."
   - decision: "Debug mode is a client-owned render overlay, not a simulation or protocol mode."
     confidence: high
     rationale: "The requested world bounds and coordinate traces are visual diagnostics for server/client drift and must not affect authoritative gameplay."

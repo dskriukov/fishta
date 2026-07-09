@@ -1,7 +1,9 @@
 // imp/web-canvas/src/constants.js
 // Tunables. Each value is traceable back to an .air interpretation id.
 // Editing these is "implementation tuning"; editing behaviour means editing sense/*.ds.
-// @ds b28b7af6 ca07d970 c83f4c1e d6cebf86 cbc1225a 7ce238da 8869f043 f51831f5 6aa7c828 d867989f 975ca168 bd354b7a 906be50b 55c13a4f 10baf178 22fd3ab4 31cb7a0d 579e4888 e6ecfbdd 1e66d817 a3e394a8 98224ab9 e9fb3705 39305789 4c7a2b91 9d62f0a7 b7a4c391 2e91f6d4 8f2c91ad 92d5b0c1 7cb92a44 4f58a1cd c6d7e8f9 e13d7a52 7c2f91ad 918d4b63 0b8e71d4 f0a6c5d8 c14f7a08 b6f08d21 73b91e4c 5a9c0e77 31a8f5c2 ed2b4f19
+// @ds b28b7af6 ca07d970 c83f4c1e d6cebf86 2b3e71e0 a43de7ec cbc1225a 7ce238da 8869f043 f51831f5 6aa7c828 d867989f 975ca168 bd354b7a 906be50b 55c13a4f 10baf178 22fd3ab4 31cb7a0d 579e4888 e6ecfbdd 1e66d817 a3e394a8 98224ab9 e9fb3705 39305789 4c7a2b91 9d62f0a7 b7a4c391 2e91f6d4 8f2c91ad 92d5b0c1 7cb92a44 4f58a1cd c6d7e8f9 e13d7a52 7c2f91ad 918d4b63 0b8e71d4 f0a6c5d8 c14f7a08 b6f08d21 73b91e4c 5a9c0e77 31a8f5c2 ed2b4f19
+// @ia 3983084a
+// @fix 4bbc0692
 
 export const WORLD = {
     // size set at runtime to canvas size — world.air#ia:5a6b7c8d, ds:b28b7af6 ds:c83f4c1e
@@ -15,6 +17,15 @@ export const WORLD = {
     maxControlledObjects: 900, // @ds:eccfca7e
     oldAgeSuspendFillRatio: 0.9, // @ds:d140effd
     densitySamples: 18,      // @ds:53db39eb
+};
+
+export const BACKGROUND = {
+    parallaxFactor: 0.2,    // @ds:2b3e71e0
+    tileWidthPx: 1536,      // @ds:2b3e71e0
+    tileHeightPx: 1024,     // @ds:2b3e71e0
+    alpha: 0.22,            // @ds:2b3e71e0
+    hazeTopAlpha: 0.16,     // @ds:a43de7ec
+    hazeBottomAlpha: 0.26,  // @ds:a43de7ec
 };
 
 export const FISH = {

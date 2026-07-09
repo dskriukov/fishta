@@ -114,6 +114,15 @@ implementation_model:
   geometry:
     from: ia:web-canvas.vec
     rule: "shared geometry uses reusable vector primitives"
+  runtime_background_assets:
+    from: ia:web-canvas.background-assets-publication
+    canonical_assets:
+      - ds/assets/back.png
+      - ds/assets/start.png
+    published_assets:
+      - web-canvas/assets/back.png
+      - web-canvas/assets/start.png
+    rule: "web-canvas loads PNG backgrounds from published runtime copies so local execution and publication use the same assets"
   simulation_loop:
     from: ia:web-canvas.loop
     time_model: fixed-step-approximation-of-continuous-time

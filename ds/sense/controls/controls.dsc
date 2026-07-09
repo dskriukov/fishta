@@ -19,6 +19,18 @@ join_world:
       - userTier
     rule: "client shows a prefilled join form; user may keep or override generated name/color and choose paid/free type before connecting"
 
+start_background:
+  from: ds:controls.start-background
+  asset: ds/assets/start.png
+  contract:
+    name: drawStartBackground
+    inputs: [entryUiState, startBackgroundImage]
+    output: startScreenBackground
+    rule: >
+      the entry join screen uses start.png as its own visual background before
+      the client joins the world. This UI background is separate from the game
+      surface parallax background used after entry.
+
 no_vulnerability_control:
   from: ds:controls.no-vulnerability-control
   rule: "UI and control input do not expose a separate user-fish vulnerability toggle; victim eligibility is derived from paid/free user tier rules"

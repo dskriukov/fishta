@@ -60,6 +60,8 @@ file_plan:
   web-canvas/src/step.js:           "authoritative pure-ish server step plus client prediction helper"
   web-canvas/src/render.js:         "viewport-follow render over latest client world view"
   web-canvas/src/main.js:           "client init, join flow, render loop, input send"
+  web-canvas/assets/back.png:       "published runtime copy of ds/assets/back.png"
+  web-canvas/assets/start.png:      "published runtime copy of ds/assets/start.png"
 
 contract_map:
   main.serverModel:                         server.js#startServerWorld  # @ds:27fa3caa @ds:ec8cb052
@@ -79,6 +81,7 @@ contract_map:
   wsProtocol.removedFishRows:                 protocol.js#encodeRemovedFishRow protocol.js#applyWorldSync  # @ds:f51a5030 @ds:a16328a6
   wsProtocol.events:                         protocol.js#encodeEvent protocol.js#parseEvent  # @ds:a16328a6
   controls.joinWorldForm:                   controls.js#createJoinFormState  # @ds:34ba255b @ds:58050922
+  controls.startBackground:                 style.css##join  # @ds:58200142 @ia:3983084a
   controls.noVulnerabilityControl:          controls.js#createJoinFormState controls.js#createInput  # @ds:5377d065
   controls.deviceType:                      controls.js#detectControlDevice  # @ds:cf6ad7d6
   controls.modeSelect:                      controls.js#createControlModeState  # @ds:70871bc5
@@ -95,6 +98,8 @@ contract_map:
   controls.joystickHuntPlacement:           style.css##joystick-panel style.css##joystick-hunt  # @ds:cd1c5776
   controls.inspectClick:                    main.js#handleInspectClick  # @ds:2e1570ed
   controls.camera:                          render.js#worldToViewport  # @ds:7b9a7984
+  world.backgroundTileParallax:             style.css#body::before render.js#updateWorldBackgroundCss render.js#backgroundCameraDelta render.js#render  # @ds:2b3e71e0 @fix:4bbc0692 @ia:3983084a
+  world.backgroundDepthHaze:                style.css#body::after  # @ds:a43de7ec
   controls.toroidalViewportProjection:      render.js#buildToroidalRenderWorld render.js#nearestToroidalCoordinate  # @ds:7b9a7984 @ds:c83f4c1e @ia:dd909d1a
   client.decorState:                         main.js#applyClientFishDecor main.js#updateClientDecorState  # @ds:975ca168 @ds:bd354b7a @ds:3ddf8f67 @ds:a44b9d2c @fn:a9a3ed12 @ia:9c0d1e2f @ia:3a4b5c6e
   debug.toggleMode:                         main.js#toggleDebugMode  # @ds:59c118f5
@@ -249,8 +254,15 @@ data_model:
       - decorative bubble emission, advancement, and rendering
       - size delta label accumulation, lifetime, current user size metric, and rendering for the current user fish only
       - world snapshot information panel derived from the latest received WebSocket snapshot
+      - background asset loading and client-only background rendering
 
 implementation_instructions:
+  runtime_background_assets: |
+    Publish the canonical PNG backgrounds by keeping runtime copies at
+    web-canvas/assets/back.png and web-canvas/assets/start.png. Browser code and
+    CSS must reference the web-canvas/assets paths, never ds/assets paths, so the
+    locally served web-canvas directory and any published bundle resolve the same
+    assets.  # @ia:3983084a
   local_server: |
     server.js serves static files from web-canvas/ and opens a WebSocket endpoint.
     The server runs the authoritative world step at a fixed tick rate.
@@ -282,6 +294,10 @@ implementation_instructions:
     #leave-game, #joystick-panel, and #player-metrics hidden; it shows the join
     form only after first communication establishes a new session, and shows game
     controls only after joined=true.
+    style.css#join uses ./assets/start.png as the entry-screen background image,
+    layered under the existing dark water overlay so the form remains readable.
+    This entry background is tied to the visible join panel and is independent of
+    the in-game canvas background.  # @ds:58200142 @ia:3983084a
   reconnect_and_timeout: |
     On unexpected socket break, keep the user fish as ownerKind='user' for 3 seconds.
     During the grace window, continue the last input action.
@@ -437,6 +453,26 @@ implementation_instructions:
     distance-weighted count of all fish plus shreds. Use the lowest
     score for NPC spawn and user respawn. Density includes user fish, NPC fish,
     and persistent shreds.  # @ds:53db39eb @ds:e13d7a52
+  world_background_tile_parallax: |
+    CSS owns the in-game background stack. style.css#body::before draws
+    ./assets/back.png as a repeated fixed layer under the transparent canvas;
+    style.css#body::after draws the viewport-space haze gradient above the tile
+    and below all gameplay/UI layers. style.css#game must not paint an opaque
+    background. render(ctx,state) clears the canvas with clearRect at the start of
+    each frame instead of painting the background.
+    render.js#updateWorldBackgroundCss(world, followed) updates CSS variables
+    --world-bg-x and --world-bg-y on document.documentElement. It owns a render-only
+    accumulated background phase in CSS pixels. render.js#backgroundCameraDelta
+    computes the nearest toroidal delta from the previous camera focus to the
+    current canonical focus; if the followed fish or world dimensions change,
+    reset only the reference focus and keep the current CSS phase unchanged.
+    Each frame subtracts delta * viewportScale * BACKGROUND.parallaxFactor from
+    the phase and wraps the phase to a bounded pixel range before assigning the
+    CSS variables. This prevents visible jumps on world-edge wrapping, reconnects,
+    first snapshots, and followed-fish switches while keeping all state render-only.
+    The background variables must not mutate world, fish, viewport, sync buffers,
+    or input state.
+    # @ds:2b3e71e0 @ds:a43de7ec @fix:4bbc0692 @ia:3983084a
   controlled_objects: |
     world.js owns controlled-object helper functions. controlledObjectCount(world)
     returns (world.fish?.length || 0) + (world.shreds?.length || 0), because these
@@ -1046,6 +1082,12 @@ new_or_changed_constants:
   PREDATION.attackConeDotMin: "forward mouth/head cone threshold" # @ds:b39c93a5
   BUBBLE.maxRatio: 0.08               # @ia:9e0f1a2b
   BUBBLE.minRadius: 1.1               # @ia:9e0f1a2b
+  BACKGROUND.parallaxFactor: 0.2      # @ds:2b3e71e0
+  BACKGROUND.tileWidthPx: 1536       # @ds:2b3e71e0
+  BACKGROUND.tileHeightPx: 1024      # @ds:2b3e71e0
+  BACKGROUND.alpha: 0.22              # @ds:2b3e71e0
+  BACKGROUND.hazeTopAlpha: "CSS variable/default subtle light overlay, about 0.16" # @ds:a43de7ec
+  BACKGROUND.hazeBottomAlpha: "CSS variable/default subtle dark overlay, about 0.26" # @ds:a43de7ec
   EXHALE.inhaleScale: 1.10            # @fn:a9a3ed12
   EXHALE.emitInterval: 0.05           # @fn:a9a3ed12
   EXHALE.emitMinCount: 9              # @fn:a9a3ed12
@@ -1068,6 +1110,11 @@ new_or_changed_constants:
 verification_checks:
   - "A local server is the source of truth even with one connected user."
   - "Join form allows generated/overridden name and color plus paid/free toggle."
+  - "web-canvas/assets/back.png and web-canvas/assets/start.png exist and are the runtime paths used by render.js/style.css."
+  - "After joining, the CSS background layer repeats back.png beneath the transparent gameplay canvas and shifts weakly on both axes as the followed fish moves."
+  - "Crossing a wrapped world edge does not make the CSS background tile jump; the accumulated parallax phase remains visually continuous across the edge."
+  - "The CSS in-game background haze is lighter at the top and darker at the bottom."
+  - "When the join panel is visible, start.png is visible as the entry background while the join form remains readable."
   - "Each client controls only its own user fish."
   - "After automatic reconnect, pressing or exposing the join flow cannot create a second ownerKind='user' fish for the same client instance or temporaryConnectionCode."
   - "Unexpected socket break has a 3 second reconnect grace, then fish becomes NPC."

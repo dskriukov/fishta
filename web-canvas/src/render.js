@@ -1,9 +1,10 @@
 // imp/web-canvas/src/render.js
 // Read-only over domain state (workspace.air rule: render never mutates domain).
-// @ds 975ca168 bd354b7a 906be50b d6cebf86 a44b9d2c b28b7af6 1f3abc43 8f2c91ad 6f3a9c20 73b91e4c 0b8e71d4 3ad65f20
-// @ia 2f6e7a91
+// @ds 975ca168 bd354b7a 906be50b d6cebf86 2b3e71e0 a43de7ec a44b9d2c b28b7af6 1f3abc43 8f2c91ad 6f3a9c20 73b91e4c 0b8e71d4 3ad65f20
+// @ia 2f6e7a91 3983084a
+// @fix 4bbc0692
 
-import { BUBBLE, DEBUG, SHRED, SIZE_DELTA_LABEL, SWIM, FEAR_EYE, WORLD } from './constants.js';
+import { BACKGROUND, BUBBLE, DEBUG, SHRED, SIZE_DELTA_LABEL, SWIM, FEAR_EYE, WORLD } from './constants.js';
 
 const DEFAULT_SVG_GEOMETRY = {
     width: 494,
@@ -26,6 +27,9 @@ const DEFAULT_SHRED_GEOMETRY = {
 
 let shredSvgGeometry = DEFAULT_SHRED_GEOMETRY;
 let shredSvgRenderTree = null;
+let backgroundFocus = null;
+let backgroundFocusKey = null;
+let backgroundPhase = { x: 0, y: 0 };
 
 // @ds:df06827a @ds:b024b514 @ia:2f6e7a91
 export async function loadFishGeometry(urls = ['./assets/fish2.svg', './src/_fish_save.svg']){
@@ -386,12 +390,8 @@ export function render(ctx, state){
         bubbles: state.clientBubbles || world.bubbles || state.bubbles || [],
     }, followed, state.debug?.positionTraces || []);
 
-    // ds:d2e8a84c b28b7af6
-    const g = ctx.createLinearGradient(0, 0, 0, world.height);
-    g.addColorStop(0, '#0a3a57');
-    g.addColorStop(1, '#04263b');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    updateWorldBackgroundCss(world, followed);
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
     ctx.save();
     const viewport = worldToViewport(world, followed, ctx.canvas);
@@ -415,6 +415,54 @@ export function render(ctx, state){
     if( state.debug?.enabled ){
         drawDebugFishMinimap(ctx, world, state.currentUserFishId);
     }
+}
+
+// @ds:2b3e71e0 @fix:4bbc0692 @ia:3983084a
+export function updateWorldBackgroundCss(world, followed){
+    if( typeof document === 'undefined' || !document.documentElement ) return;
+    const delta = backgroundCameraDelta(world, followed);
+    backgroundPhase = {
+        x: wrappedTileOffset(backgroundPhase.x - delta.x * WORLD.initialViewportScale * BACKGROUND.parallaxFactor, BACKGROUND.tileWidthPx),
+        y: wrappedTileOffset(backgroundPhase.y - delta.y * WORLD.initialViewportScale * BACKGROUND.parallaxFactor, BACKGROUND.tileHeightPx),
+    };
+    const style = document.documentElement.style;
+    style.setProperty('--world-bg-x', `${backgroundPhase.x.toFixed(2)}px`);
+    style.setProperty('--world-bg-y', `${backgroundPhase.y.toFixed(2)}px`);
+}
+
+// @fix:4bbc0692
+export function backgroundCameraDelta(world, followed){
+    const canonical = followed ? followed.pos : { x: world.width / 2, y: world.height / 2 };
+    const width = Number(world.width);
+    const height = Number(world.height);
+    const focusKey = `${followed?.id || 'world'}:${width}x${height}`;
+    if( !Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0 ){
+        backgroundFocus = null;
+        backgroundFocusKey = null;
+        return { x: 0, y: 0 };
+    }
+
+    if( !backgroundFocus || backgroundFocusKey !== focusKey ){
+        backgroundFocus = { x: canonical.x, y: canonical.y };
+        backgroundFocusKey = focusKey;
+        return { x: 0, y: 0 };
+    }
+
+    const nextFocus = {
+        x: nearestToroidalCoordinate(canonical.x, backgroundFocus.x, width),
+        y: nearestToroidalCoordinate(canonical.y, backgroundFocus.y, height),
+    };
+    const delta = {
+        x: nextFocus.x - backgroundFocus.x,
+        y: nextFocus.y - backgroundFocus.y,
+    };
+    backgroundFocus = nextFocus;
+    return delta;
+}
+
+function wrappedTileOffset(value, size){
+    if( !Number.isFinite(size) || size <= 0 ) return 0;
+    return ((value % size) + size) % size;
 }
 
 // @ds:7b9a7984

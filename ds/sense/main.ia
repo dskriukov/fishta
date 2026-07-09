@@ -14,3 +14,6 @@
 
 **[ia:web-canvas.canvas-2d]**\
 Клиентская визуализация запускается в браузере на Canvas 2D. Состояние общего мира принадлежит локальному серверу; клиент отвечает за ввод и визуальное отображение серверной модели.
+
+**[ia:web-canvas.background-assets-publication]**\
+Канонические PNG-фоны `ds/assets/back.png` и `ds/assets/start.png` имеют публикуемые runtime-копии в `web-canvas/assets/back.png` и `web-canvas/assets/start.png`. Клиент web-canvas использует runtime-копии из публикуемой директории, чтобы локальный запуск и публикация получали одинаковые визуальные ассеты.

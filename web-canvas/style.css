@@ -1,6 +1,15 @@
 /* imp/web-canvas/style.css — derived from web-canvas.dsr */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
+:root {
+    --world-bg-x: 0px;
+    --world-bg-y: 0px;
+    --world-bg-alpha: 0.22;
+    --world-haze-top-alpha: 0.16;
+    --world-haze-bottom-alpha: 0.26;
+    --join-radius: 8px;
+}
+
 html, body {
     width: 100%;
     height: 100%;
@@ -10,10 +19,42 @@ html, body {
     overscroll-behavior: none;
 }
 
+/* @ds:2b3e71e0 @ia:3983084a @fix:4bbc0692 */
+body::before,
+body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+}
+
+body::before {
+    z-index: 0;
+    background-image: url("./assets/back.png");
+    background-position: var(--world-bg-x) var(--world-bg-y);
+    background-repeat: repeat;
+    opacity: var(--world-bg-alpha);
+}
+
+/* @ds:a43de7ec */
+body::after {
+    z-index: 1;
+    background: linear-gradient(
+        180deg,
+        rgba(210, 240, 255, var(--world-haze-top-alpha)),
+        rgba(210, 240, 255, 0) 42%,
+        rgba(1, 12, 24, var(--world-haze-bottom-alpha))
+    );
+}
+
 #game {
+    position: fixed;
+    inset: 0;
+    z-index: 2;
     display: block;
     width: 100vw;
     height: 100vh;
+    background: transparent;
     cursor: crosshair;
     touch-action: none;
     user-select: none;
@@ -22,6 +63,7 @@ html, body {
 }
 
 #hud {
+    z-index: 3;
     position: fixed;
     top: 12px;
     left: 12px;
@@ -78,7 +120,9 @@ html, body {
     accent-color: #6ed7ef;
 }
 
+/* @ds:58200142 @ia:3983084a */
 #join {
+    z-index: 10;
     position: fixed;
     inset: 0;
     display: grid;
@@ -86,7 +130,8 @@ html, body {
     padding: 18px;
     background:
         linear-gradient(180deg, rgba(3, 41, 58, 0.62), rgba(2, 22, 35, 0.82)),
-        repeating-linear-gradient(135deg, rgba(142, 190, 202, 0.045) 0 2px, transparent 2px 18px);
+        repeating-linear-gradient(135deg, rgba(142, 190, 202, 0.045) 0 2px, transparent 2px 18px),
+        url("./assets/start.png") center / cover no-repeat;
     user-select: auto;
     -webkit-user-select: auto;
 }
@@ -109,7 +154,7 @@ html, body {
     width: min(430px, calc(100vw - 36px));
     padding: 22px;
     border: 2px solid rgba(205, 238, 255, 0.56);
-    border-radius: 8px;
+    border-radius: var(--join-radius);
     background:
         radial-gradient(circle at 100% 0, rgba(132, 170, 184, 0.16), transparent 34%),
         linear-gradient(180deg, rgba(7, 45, 64, 0.96), rgba(2, 29, 45, 0.98));
@@ -141,15 +186,6 @@ html, body {
         radial-gradient(circle at 98px 88px, rgba(221, 238, 244, 0.12) 0 11px, transparent 12px),
         rgba(86, 137, 155, 0.18);
     opacity: 0.7;
-}
-
-#join-form::after {
-    left: 22px;
-    right: 22px;
-    bottom: 12px;
-    height: 3px;
-    background: linear-gradient(90deg, #628fa0, #d3b06a, #7fb8c4);
-    opacity: 0.62;
 }
 
 .join-header {
@@ -214,7 +250,7 @@ html, body {
     width: 100%;
     min-height: 46px;
     border: 2px solid rgba(205, 238, 255, 0.48);
-    border-radius: 6px;
+    border-radius: var(--join-radius);
     background: rgba(2, 28, 44, 0.82);
     color: #edf8ff;
     padding: 9px 12px;
@@ -239,7 +275,7 @@ html, body {
     width: 70px;
     height: 48px;
     border: 2px solid rgba(237, 248, 255, 0.7);
-    border-radius: 6px;
+    border-radius: var(--join-radius);
     background: #dbe8ee;
     padding: 4px;
     cursor: pointer;
@@ -254,7 +290,7 @@ html, body {
     min-height: 42px;
     padding: 8px 12px;
     border: 2px solid rgba(169, 197, 215, 0.34);
-    border-radius: 999px;
+    border-radius: var(--join-radius);
     background: rgba(35, 54, 84, 0.72);
     color: #edf8ff;
     cursor: pointer;
@@ -283,26 +319,30 @@ html, body {
     position: relative;
     z-index: 1;
     min-height: 50px;
-    border: 2px solid rgba(230, 206, 146, 0.78);
-    border-radius: 6px;
-    background: linear-gradient(180deg, #e6ce92, #8bb8c3);
-    color: #062235;
+    border: 2px solid rgba(205, 238, 255, 0.58);
+    border-radius: var(--join-radius);
+    background: transparent;
+    color: #edf8ff;
     font-size: 18px;
     font-weight: 900;
     box-shadow:
-        0 6px 0 rgba(0, 0, 0, 0.28),
-        inset 0 2px 0 rgba(255, 255, 255, 0.42);
+        0 10px 24px rgba(0, 0, 0, 0.24),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
 
 #join-form button:hover {
-    filter: brightness(1.04);
+    border-color: rgba(230, 206, 146, 0.82);
+    color: #ffffff;
+    box-shadow:
+        0 10px 24px rgba(0, 0, 0, 0.24),
+        inset 0 0 0 1px rgba(230, 206, 146, 0.18);
 }
 
 #join-form button:active {
-    transform: translateY(3px);
+    transform: translateY(1px);
     box-shadow:
-        0 3px 0 rgba(0, 0, 0, 0.28),
-        inset 0 2px 0 rgba(255, 255, 255, 0.32);
+        0 6px 16px rgba(0, 0, 0, 0.22),
+        inset 0 0 0 1px rgba(230, 206, 146, 0.18);
 }
 
 #leave-game {
@@ -342,6 +382,7 @@ html, body {
 /* @ds:2e91f6d4 @ds:b9136c2e */
 #player-metrics {
     position: fixed;
+    z-index: 3;
     left: 50%;
     bottom: clamp(92px, 14vh, 150px);
     transform: translateX(-50%);
@@ -389,6 +430,7 @@ html, body {
 /* @ds:e42a7c19 */
 #world-info {
     position: fixed;
+    z-index: 3;
     top: 12px;
     right: 12px;
     display: grid;
@@ -429,6 +471,7 @@ html, body {
 /* @ds:cd1c5776 */
 #joystick-panel {
     position: fixed;
+    z-index: 3;
     left: 24px;
     right: 24px;
     bottom: 24px;

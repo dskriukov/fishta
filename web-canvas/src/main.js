@@ -1,6 +1,7 @@
 // imp/web-canvas/src/main.js
 // Bootstraps world + game loop (dsr/use/ecs-loop.dsr). Glue/I-O layer.
-// @ds b28b7af6 27fa3caa ec8cb052 c95ca496 48c4fc99 b433f1bc d2e8a84c 5fb1ff09 c83f4c1e ca07d970 d6cebf86 3ddf8f67 1f3abc43 cbc1225a 7ce238da c4073e51 ee07d6da 8869f043 f51831f5 8d0ca6a8 d867989f 975ca168 bd354b7a 906be50b 91e32235 55c13a4f 10baf178 22fd3ab4 7b9a7984 ad8d81d8 31cb7a0d 579e4888 e699c42d e6ecfbdd 1e66d817 a3e394a8 98224ab9 e9fb3705 fcdfb2b7 0c8d4e2a 6f1b0a3c 39305789 2e91f6d4 b9136c2e e42a7c19 a2d5936f 73b91e4c ed2b4f19
+// @ds b28b7af6 27fa3caa ec8cb052 c95ca496 48c4fc99 b433f1bc d2e8a84c 5fb1ff09 c83f4c1e ca07d970 d6cebf86 2b3e71e0 3ddf8f67 1f3abc43 cbc1225a 7ce238da c4073e51 ee07d6da 8869f043 f51831f5 8d0ca6a8 d867989f 975ca168 bd354b7a 906be50b 91e32235 55c13a4f 10baf178 22fd3ab4 7b9a7984 ad8d81d8 31cb7a0d 579e4888 e699c42d e6ecfbdd 1e66d817 a3e394a8 98224ab9 e9fb3705 fcdfb2b7 0c8d4e2a 6f1b0a3c 39305789 2e91f6d4 b9136c2e e42a7c19 a2d5936f 73b91e4c ed2b4f19
+// @ia 3983084a
 
 import { DEBUG, EXHALE, FISH, LOOP, MOUTH, PLAYER, SHRED, SIZE_DELTA_LABEL, SWIM, SYNC } from './constants.js';
 import { advanceBubbles, emitBubble, makeWorld } from './world.js';
