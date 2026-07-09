@@ -6,7 +6,8 @@ import { FISH, FRY, NPC, PREDATION, PREY, WORLD } from './constants.js';
 import { v, add, sub, scale, normalize, dist, clampLen } from './vec.js';
 import { growSizeFromAreas, makeFish, radiusOf } from './fish.js';
 import { canBeVictimOf, estimatedAttackContactTime, isAttackContact, isEdibleBySize, nearestToroidalDelta } from './predation.js';
-import { findLowestDensitySpawn, targetNpcCount } from './world.js';
+import { spawnShredsFromFish } from './shred.js';
+import { findLowestDensitySpawn, isOldAgeSuspended, targetNpcCount } from './world.js';
 
 // @ia 7f8a9b0c
 export function sampleSize(rng){
@@ -115,8 +116,9 @@ export function findSafeNpcSpawn(world, nominalStartSize, rng){
         }
         if(
             !bestFallback
-            || risk.time > bestFallback.risk.time
-            || (risk.time === bestFallback.risk.time && densityScore < bestFallback.densityScore)
+            || risk.immediate < bestFallback.risk.immediate
+            || (risk.immediate === bestFallback.risk.immediate && risk.time > bestFallback.risk.time)
+            || (risk.immediate === bestFallback.risk.immediate && risk.time === bestFallback.risk.time && densityScore < bestFallback.densityScore)
         ){
             bestFallback = { pos, densityScore, risk };
         }
@@ -125,12 +127,15 @@ export function findSafeNpcSpawn(world, nominalStartSize, rng){
 }
 
 function spawnCandidate(pos, nominalStartSize){
+    const spawnSize = FRY.startSize;
     return {
         id: -1,
         pos,
         vel: v(0, 0),
-        size: nominalStartSize,
-        radius: radiusOf(nominalStartSize),
+        size: spawnSize,
+        radius: radiusOf(spawnSize),
+        nominalStartSize,
+        fryAge: 0,
         ownerKind: 'npc',
         npcRole: 'prey',
         mode: 'cruise',
@@ -149,15 +154,20 @@ function wrapAwareDensityScore(world, pos){
 
 function spawnAttackRisk(world, candidate){
     let risky = false;
+    let immediate = 0;
     let bestTime = Infinity;
     for( const other of world.fish || [] ){
         if( !isEdibleBySize(other, candidate) || !canBeVictimOf(other, candidate) ) continue;
-        const predator = burstCapablePredator(other, candidate, world);
+        const predator = spawnThreatPredator(other, candidate, world);
         const time = estimatedAttackContactTime(predator, candidate, world);
         bestTime = Math.min(bestTime, time);
-        if( isAttackContact(predator, candidate, world) || time < 0.75 ) risky = true;
+        const contactGap = spawnContactGap(predator, candidate, world);
+        const attackGap = spawnAttackGap(predator, candidate, world);
+        if( contactGap <= 0 ) immediate = Math.max(immediate, 2);
+        else if( attackGap <= 0 ) immediate = Math.max(immediate, 1);
+        if( contactGap <= 0 || attackGap <= 0 || isAttackContact(predator, candidate, world) || time < minSpawnLeadTime() ) risky = true;
     }
-    return { risky, time: Number.isFinite(bestTime) ? bestTime : Infinity };
+    return { risky, immediate, time: Number.isFinite(bestTime) ? bestTime : Infinity };
 }
 
 function burstCapablePredator(fish, candidate, world){
@@ -170,6 +180,32 @@ function burstCapablePredator(fish, candidate, world){
         mode: 'burst',
         vel: scale(direction.x || direction.y ? direction : v(fish.facing || 1, 0), FISH.minBurstSpeed),
     };
+}
+
+function spawnThreatPredator(fish, candidate, world){
+    const delta = nearestToroidalDelta(fish.pos, candidate.pos, world);
+    const direction = normalize(delta);
+    const currentSpeed = Math.hypot(fish.vel?.x || 0, fish.vel?.y || 0);
+    const speed = Math.max(currentSpeed, FISH.minBurstSpeed);
+    return {
+        ...fish,
+        mode: 'burst',
+        vel: scale(direction.x || direction.y ? direction : v(fish.facing || 1, 0), speed),
+    };
+}
+
+function spawnContactGap(predator, candidate, world){
+    const delta = nearestToroidalDelta(predator.pos, candidate.pos, world);
+    return Math.hypot(delta.x, delta.y) - ((predator.radius || 0) + (candidate.radius || 0));
+}
+
+function spawnAttackGap(predator, candidate, world){
+    const contactDistance = (predator.radius || 0) + (candidate.radius || 0);
+    return spawnContactGap(predator, candidate, world) - contactDistance * PREDATION.attackReachRatio;
+}
+
+function minSpawnLeadTime(){
+    return Math.max(0.25, NPC.decisionIntervalSeconds * 2);
 }
 
 // @ds:e29aeb93
@@ -205,6 +241,18 @@ export function chooseNpcIntent(self, world, rng, dt){
         return pursueIntent(self, selectedPrey, world, dt, rng);
     }
     return fleeFromThreat(self, world, dt, rng);
+}
+
+// @ds:a6c9e8b4 @ds:e13d7a52 @ds:d140effd
+export function expireOldNpcFish(world, rng){
+    if( isOldAgeSuspended(world) ) return;
+    const fish = world.fish || [];
+    for( let i = fish.length - 1; i >= 0; i-- ){
+        const candidate = fish[i];
+        if( candidate.ownerKind !== 'npc' || (candidate.age || 0) < NPC.maxLifetimeSeconds ) continue;
+        fish.splice(i, 1);
+        spawnShredsFromFish(world, candidate, rng);
+    }
 }
 
 function wanderIntent(self, dt, rng){

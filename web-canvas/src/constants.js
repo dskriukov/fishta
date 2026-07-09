@@ -1,7 +1,7 @@
 // imp/web-canvas/src/constants.js
 // Tunables. Each value is traceable back to an .air interpretation id.
 // Editing these is "implementation tuning"; editing behaviour means editing sense/*.ds.
-// @ds b28b7af6 ca07d970 c83f4c1e d6cebf86 cbc1225a 7ce238da 8869f043 f51831f5 6aa7c828 d867989f 975ca168 bd354b7a 906be50b 55c13a4f 10baf178 22fd3ab4 31cb7a0d 579e4888 e6ecfbdd 1e66d817 a3e394a8 98224ab9 e9fb3705 39305789 8f2c91ad 92d5b0c1 7cb92a44 4f58a1cd c6d7e8f9
+// @ds b28b7af6 ca07d970 c83f4c1e d6cebf86 cbc1225a 7ce238da 8869f043 f51831f5 6aa7c828 d867989f 975ca168 bd354b7a 906be50b 55c13a4f 10baf178 22fd3ab4 31cb7a0d 579e4888 e6ecfbdd 1e66d817 a3e394a8 98224ab9 e9fb3705 39305789 8f2c91ad 92d5b0c1 7cb92a44 4f58a1cd c6d7e8f9 e13d7a52 7c2f91ad 918d4b63 0b8e71d4 f0a6c5d8 c14f7a08 b6f08d21 73b91e4c 5a9c0e77 ed2b4f19
 
 export const WORLD = {
     // size set at runtime to canvas size — world.air#ia:5a6b7c8d, ds:b28b7af6 ds:c83f4c1e
@@ -12,6 +12,8 @@ export const WORLD = {
     initialViewportScale: 1.5, // @ds:19c14fea
     resizeHysteresisUsers: 1,  // @ds:19c14fea
     npcDensity: 0.00002,    // @ds:53db39eb 0.000006
+    maxControlledObjects: 900, // @ds:eccfca7e
+    oldAgeSuspendFillRatio: 0.9, // @ds:d140effd
     densitySamples: 18,      // @ds:53db39eb
 };
 
@@ -75,8 +77,7 @@ export const REGIME = {
 };
 
 export const GROWTH = {
-    k: 0.6,                 // gain = preySize * k / (1 + size*decay) — fish.air#ia:5c6d7e8f, ds:d867989f
-    decay: 0.35,
+    fishAreaGainRatio: 0.7, // add 70% of eaten fish canonical area — @ds:d867989f @ds:b024b514
 };
 
 export const ENERGY = {
@@ -90,6 +91,11 @@ export const PREDATION = {
     eatRatio: 1.15,         // predator.size > prey.size * eatRatio — predation.dsc, ds:98224ab9
     attackReachRatio: 0.38, // forward burst tolerance in combined radii — @ds:a3e394a8 @ds:98224ab9
     attackConeDotMin: 0.55, // @ds:b39c93a5
+    feedingCooldownSeconds: 0.05, // @ds:a8f03d2e @ds:4e2a91f0
+    feedingRecoverySeconds: 1,    // @ds:4e2a91f0 @ds:6c80e3b4
+    fishFeedingSuccessDecayFactor: 0.75, // @ds:4e2a91f0 @ds:6c80e3b4
+    shredFeedingSuccessDecayFactor: 0.9, // @ds:4e2a91f0 @ds:6c80e3b4
+    shredStartSuccessFactor: 0.8, // @ds:6c80e3b4
 };
 
 export const PREY = {
@@ -126,6 +132,49 @@ export const NPC = {
     decisionIntervalSeconds: 0.18, // @ds:c6d7e8f9 @ia:8a4b2f19
     maxTurnRateDegPerSecond: 220, // @ds:c6d7e8f9 @ia:8a4b2f19
     accelResponsePerSecond: 7, // @ds:c6d7e8f9 @ia:8a4b2f19
+    maxLifetimeSeconds: 300, // @ds:a6c9e8b4
+};
+
+export const SHRED = {
+    areaRatio: 0.5,         // @ds:e13d7a52
+    nutritionMultiplier: 1.05, // @ds:0b8e71d4 @ds:f0a6c5d8
+    minSize: FISH.baseRadius * Math.sqrt(PREY.minSize) * 0.45, // @ds:7c2f91ad
+    maxSize: FISH.baseRadius * Math.sqrt(PREY.minSize) * 1.8, // @ds:7c2f91ad
+    fragmentation: 0.58,    // @ds:7c2f91ad @ds:5a9c0e77
+    sizeJitter: 0.34,       // @ds:7c2f91ad @ds:5a9c0e77
+    eatSizeRatio: 1.08,     // @ds:c14f7a08
+    minFeedingSpeed: 18,    // @ds:c14f7a08
+    mouthCueSeconds: 0.3,   // @ds:a2d5936f
+    decayIntervalSeconds: 10, // @ds:d3187816 @ds:5a9c0e77
+    scatterRadiusRatio: 0.82, // @ds:918d4b63
+    initialSpeedMin: 18,    // @ds:918d4b63
+    initialSpeedMax: 70,    // @ds:918d4b63
+    dragMin: 0.55,          // @ds:8b62d9ce
+    dragMax: 1.1,           // @ds:8b62d9ce
+    restSpeed: 0.35,        // @ds:8b62d9ce
+    wakeRadiusRatio: 4.8,   // @ds:8b62d9ce @ds:ed2b4f19
+    wakeStrength: 0.85,     // @ds:8b62d9ce @ds:ed2b4f19
+    wakeMinFishSpeed: 18,   // @ds:8b62d9ce @ds:ed2b4f19
+    layerFractions: {
+        part_30_percents: 0.3,
+        part_30_percents_main_color: 0.3,
+        part_20_percents: 0.2,
+        part_10_percents_1: 0.1,
+        part_10_percents_2: 0.1,
+    },
+    layerOrder: [
+        ['part_30_percents'],
+        ['part_30_percents_main_color'],
+        ['part_20_percents'],
+        ['part_10_percents_1', 'part_10_percents_2'],
+    ],
+    colorFactorMin: 0.3,    // @ds:b6f08d21
+    colorFactorMaxDifferent: 0.7, // @ds:b6f08d21
+    hueWeight: 0.75,        // @ds:b6f08d21
+    saturationWeight: 0.25, // @ds:b6f08d21
+    layerRotationMinDeg: 3, // @ds:73b91e4c
+    layerRotationMaxDeg: 5, // @ds:73b91e4c
+    layerDriftPx: 1.2,      // @ds:73b91e4c
 };
 
 export const BUBBLE = {

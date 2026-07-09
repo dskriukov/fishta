@@ -2,7 +2,7 @@
 // Implements: fish.dsc (entity, integrateMotion, grow, updateFacing, spendEnergy, derived radius/maxSpeed)
 // Decisions: fish.air#ia:fish.radius-formula..ia:fish.decor.fear-eye-state
 
-import { FISH, GROWTH, ENERGY, REGIME, MOUTH, SWIM, FEAR_EYE, BUBBLE, EXHALE } from './constants.js';
+import { FISH, GROWTH, ENERGY, REGIME, MOUTH, SWIM, FEAR_EYE, BUBBLE, EXHALE, PREDATION } from './constants.js';
 import { add, sub, scale, normalize, clampLen, len } from './vec.js';
 import { clampToBounds, applyDrag } from './world.js';
 
@@ -48,6 +48,8 @@ export function makeFish({
         mode: 'cruise',
         age: 0,
         eatenFishCount: 0,
+        feedingSuccessFactor: 1,     // @ds:4e2a91f0
+        feedingCooldown: 0,          // @ds:4e2a91f0
         visualScale: 1,
         exhale: {
             requested: false,
@@ -168,10 +170,22 @@ export function grow(fish, preySize){
     fish.mouthHold = Math.max(fish.mouthHold, MOUTH.holdDuration);
 }
 
+// @ds:79c1e3a5 @ds:d867989f
+export function growFromNutrient(fish, areaValue){
+    fish.size += Math.max(0, areaValue);
+    fish.radius = radiusOf(fish.size);
+}
+
 // @ds:d867989f @ds:b024b514
 export function growSizeFromAreas(predatorSize, preySize){
-    const gain = preySize * GROWTH.k / (1 + predatorSize * GROWTH.decay);
-    return predatorSize + gain;
+    return predatorSize + Math.max(0, preySize) * GROWTH.fishAreaGainRatio;
+}
+
+// @ds:4e2a91f0
+export function advanceFeedingState(fish, dt){
+    fish.feedingCooldown = Math.max(0, (fish.feedingCooldown || 0) - dt);
+    const recoverySeconds = Math.max(1e-6, PREDATION.feedingRecoverySeconds);
+    fish.feedingSuccessFactor = Math.min(1, (fish.feedingSuccessFactor ?? 1) + dt / recoverySeconds);
 }
 
 // ds:975ca168

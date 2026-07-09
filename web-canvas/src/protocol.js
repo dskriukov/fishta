@@ -1,8 +1,8 @@
 // imp/web-canvas/src/protocol.js
 // Compact WebSocket string protocol.
-// @ds:839f8cd0 @ds:5a4d3d6d @ds:671e9773 @ds:4fad33f8 @ds:682570c7 @ds:ea18a088 @ds:f51a5030 @ds:a16328a6
+// @ds:839f8cd0 @ds:5a4d3d6d @ds:671e9773 @ds:4fad33f8 @ds:682570c7 @ds:ea18a088 @ds:f51a5030 @ds:a16328a6 @ds:ed2b4f19 @ds:a2d5936f
 
-import { FISH } from './constants.js';
+import { FISH, SHRED } from './constants.js';
 
 export function encodeName(name){
     const bytes = new TextEncoder().encode(String(name || ''));
@@ -96,6 +96,9 @@ export function encodeWorldSync(world, previousById = new Map(), absolute = fals
         rows.push(encodeFishRow(fish, previous, absolute));
         nextById.set(fish.id, fishSnapshot(fish));
     }
+    for( const shred of world.shreds || [] ){
+        rows.push(encodeShredRow(shred));
+    }
     if( !absolute ){
         for( const id of previousById.keys() ){
             if( !nextById.has(id) ) rows.push(encodeRemovedFishRow(id));
@@ -105,6 +108,14 @@ export function encodeWorldSync(world, previousById = new Map(), absolute = fals
         message: `${absolute ? 'a|' : '|'}${rows.join('|')}`,
         state: nextById,
     };
+}
+
+// @ds:ed2b4f19 @ds:d3187816
+export function encodeShredRow(shred){
+    const angle = movingAngle(shred);
+    const speed = Math.hypot(shred.vel?.x || 0, shred.vel?.y || 0);
+    const layersHex = encodeLayers(shred.remainingLayers);
+    return `s${shred.id} ${fixed(shred.size, 3)}:${fixed(shred.geometricArea, 3)}:${fixed(shred.initialGeometricArea ?? shred.geometricArea, 3)}:${normalizeHex(shred.sourceColor || 'd6b84f')}:${layersHex}:${fixed(shred.visualSeed || 0, 3)}:${fixed(shred.decayAge || 0, 3)} ${fixed(shred.pos.x, 5)}:${fixed(shred.pos.y, 5)} ${fixed(angle, 5)}:${fixed(speed, 2)}`;
 }
 
 // @ds:f51a5030 @ds:a16328a6
@@ -135,9 +146,15 @@ export function applyWorldSync(world, message){
     const byId = new Map((world.fish || []).map(fish => [fish.id, fish]));
     const seen = new Set();
     const nextFish = absolute ? [] : [...(world.fish || [])];
+    const nextShreds = [];
     const syncDiagnostics = { absolute, fish: [] };
 
     for( const row of rows ){
+        if( row[0] === 's' || row[0] === 'k' ){
+            const shred = parseShredRow(row);
+            if( shred ) nextShreds.push(shred);
+            continue;
+        }
         const parsed = parseFishRow(row, byId, absolute);
         if( !parsed ) continue;
         seen.add(parsed.id);
@@ -169,7 +186,63 @@ export function applyWorldSync(world, message){
     }
 
     world.fish = absolute ? nextFish.filter(fish => seen.has(fish.id)) : nextFish;
+    world.shreds = nextShreds;
     return syncDiagnostics;
+}
+
+// @ds:ed2b4f19 @ds:d3187816
+export function parseShredRow(row){
+    const [idText, sizeText, pos, motion] = String(row).split(' ');
+    if( !idText || !sizeText || !pos || !motion ) return null;
+    const [xText, yText] = pos.split(':');
+    const [angleText, speedText] = motion.split(':');
+    const angle = Number(angleText) || 0;
+    const speed = Number(speedText) || 0;
+    if( idText.startsWith('k') ) return parseLegacyChunkAsShred(idText, sizeText, xText, yText, angle, speed);
+    if( !idText.startsWith('s') ) return null;
+    const [sizePart, areaText, initialAreaText, colorText, layersText, seedText, decayAgeText] = sizeText.split(':');
+    const size = Number(sizePart) || 0;
+    const geometricArea = Number(areaText) || 0;
+    const initialGeometricArea = Number(initialAreaText) || geometricArea;
+    return {
+        id: Number(idText.slice(1)) || 0,
+        pos: { x: Number(xText) || 0, y: Number(yText) || 0 },
+        vel: {
+            x: Math.cos(angle * Math.PI / 180) * speed,
+            y: Math.sin(angle * Math.PI / 180) * speed,
+        },
+        size,
+        radius: size / 2,
+        geometricArea,
+        initialGeometricArea: Math.max(geometricArea, initialGeometricArea),
+        sourceColor: `#${normalizeHex(colorText || 'd6b84f')}`,
+        remainingLayers: decodeLayers(layersText),
+        visualSeed: Number(seedText) || 0,
+        decayAge: Number(decayAgeText) || 0,
+    };
+}
+
+function parseLegacyChunkAsShred(idText, sizeText, xText, yText, angle, speed){
+    const [areaText, initialAreaText] = sizeText.split(':');
+    const area = Number(areaText) || 0;
+    const initialArea = Number(initialAreaText) || area;
+    const size = 2 * Math.sqrt(Math.max(0, area) / Math.PI);
+    return {
+        id: Number(idText.slice(1)) || 0,
+        pos: { x: Number(xText) || 0, y: Number(yText) || 0 },
+        vel: {
+            x: Math.cos(angle * Math.PI / 180) * speed,
+            y: Math.sin(angle * Math.PI / 180) * speed,
+        },
+        size,
+        radius: size / 2,
+        geometricArea: area,
+        initialGeometricArea: Math.max(area, initialArea),
+        sourceColor: '#d6b84f',
+        remainingLayers: [...SHRED.layerOrder.flat()],
+        visualSeed: 0,
+        decayAge: 0,
+    };
 }
 
 export function parseFishRow(row, byId = new Map(), absolute = false){
@@ -215,6 +288,7 @@ export function parseFishRow(row, byId = new Map(), absolute = false){
             y: vy,
         },
         mode: burstMode ? 'burst' : 'cruise',
+        shredEatCueCounter: parseShredCueMod(mods, previous?.shredEatCueCounter || 0),
         eyeFear: mods.includes('f') ? 1 : 0,
         visualScale: previous?.visualScale || 1,
         facing,
@@ -230,6 +304,7 @@ function fishSnapshot(fish){
         pos: { ...fish.pos },
         size: fish.size,
         eatenFishCount: fish.eatenFishCount || 0,
+        shredEatCueCounter: fish.shredEatCueCounter || 0,
         color1: colorOf(fish),
         color2: color2Of(fish),
         name: fish.ownerKind === 'user' ? encodeName(fish.userName || '') : '',
@@ -241,7 +316,13 @@ function stateMods(fish){
     if( fish.ownerKind === 'npc' && fish.npcRole === 'abandoned-user-fish' ) mods += 'a';
     if( fish.mode === 'burst' ) mods += 'b';
     if( (fish.eyeFear || 0) > 0.2 ) mods += 'f';
+    if( (fish.shredEatCueCounter || 0) > 0 ) mods += `s${Math.min(999, Math.floor(fish.shredEatCueCounter))}`;
     return mods || '=';
+}
+
+function parseShredCueMod(mods, previous){
+    const match = /s(\d+)/.exec(mods || '');
+    return match ? Number(match[1]) : previous;
 }
 
 function colorOf(fish){
@@ -286,6 +367,21 @@ function decodeSignedThousand(value){
 function normalizeHex(value){
     const hex = String(value || '').replace(/^#/, '').replace(/[^a-fA-F0-9]/g, '').slice(0, 6);
     return hex.padEnd(6, '0').toLowerCase();
+}
+
+function encodeLayers(layers = []){
+    let mask = 0;
+    const all = SHRED.layerOrder.flat();
+    for( let i = 0; i < all.length; i++ ){
+        if( layers.includes(all[i]) ) mask |= (1 << i);
+    }
+    return mask.toString(16);
+}
+
+function decodeLayers(value){
+    const mask = parseInt(value || '0', 16);
+    const all = SHRED.layerOrder.flat();
+    return all.filter((_, index) => mask & (1 << index));
 }
 
 function bytesToBase64Url(bytes){

@@ -20,6 +20,7 @@ references:
     - sense/fish/fish.dsc
     - sense/prey/prey.dsc
     - sense/predation/predation.dsc
+    - sense/shred/shred.dsc
     - sense/controls/controls.dsc
     - sense/multiplayer/multiplayer.dsc
     - sense/multiplayer/ws-protocol.dsc
@@ -49,6 +50,7 @@ file_plan:
   web-canvas/src/vec.js:            "vec2 helpers"
   web-canvas/src/world.js:          "wrap bounds, drag, resize, density field, bubbles"
   web-canvas/src/fish.js:           "fish data, identity fields, swim/grow/facing/decor/serialize"
+  web-canvas/src/shred.js:          "server-owned shred spawn, drift, contact, layer nutrition, row helpers"
   web-canvas/src/prey.js:           "NPC wander/flee/density spawn/fry growth"
   web-canvas/src/predation.js:      "eligibility, attack window, overlaps/canEat/resolveEating"
   web-canvas/src/controls.js:       "join form, mode selection, pointer/keys/touch/joystick/hunt/leave input"
@@ -62,7 +64,7 @@ contract_map:
   multiplayer.localServer:                  server.js#startLocalServer  # @ds:f359ebf2
   multiplayer.connectClientInstance:        server.js#handleJoin  # @ds:4bfe0352 @ds:58050922
   multiplayer.reconnectGrace:               server.js#handleReconnectGrace  # @ds:93a64773
-  multiplayer.convertDisconnectedUserFishToNpc: server.js#convertUserFishToNpc  # @ds:eba75588
+  multiplayer.convertDisconnectedUserFishToNpc: server.js#convertUserFishToNpc  # @ds:eba75588 @ds:a6c9e8b4
   multiplayer.leaveGame:                    server.js#handleLeaveGame  # @ds:704ab317
   multiplayer.syncWorld:                    server.js#broadcastWorldSync  # @ds:e559831a @ds:e4d375ed
   wsProtocol.encoding:                       protocol.js#encodeName protocol.js#decodeName  # @ds:839f8cd0
@@ -79,7 +81,9 @@ contract_map:
   controls.deviceType:                      controls.js#detectControlDevice  # @ds:cf6ad7d6
   controls.modeSelect:                      controls.js#createControlModeState  # @ds:70871bc5
   controls.initialMode:                      controls.js#createControlModeState  # @ds:c2aeb63a
+  controls.gameSurfaceInputOwnership:        controls.js#createInput style.css#game style.css#hud style.css#joystick-panel  # @ds:5d92a6ef
   controls.leaveGameCommand:                controls.js#createInput  # @ds:fb11044e
+  controls.joinAfterLeave:                  main.js#setJoinedUiState main.js#handleLeaveGameButton client-net.js#leave client-net.js#confirmLeaveSucceeded  # @ds:9772e9ac
   controls.pointerSteer:                    controls.js#pointerSteer  # @ds:55c13a4f
   controls.keySteer:                        controls.js#keySteer  # @ds:10baf178
   controls.immediateInputFlush:              main.js#sendInputIfChanged client-net.js#sendInput  # @ds:10baf178 @ds:22fd3ab4 @ds:671e9773
@@ -97,6 +101,7 @@ contract_map:
   debug.drawPositionTraces:                 render.js#drawDebugPositionTraces  # @ds:727e9afe
   debug.drawFishMinimap:                    render.js#drawDebugFishMinimap  # @ds:8f2c91ad
   debug.drawFishCollisionRadius:            render.js#drawDebugFishCollisionRadius  # @ds:6b4e90d2 @ds:a3e394a8
+  ui.showAppVersion:                         server.js#appVersion main.js#showAppVersion index.html#app-version  # @ds:8d13f6a2
   world.wrapPosition:                       world.js#wrapPosition  # @ds:c83f4c1e @ia:dd909d1a
   world.applyDrag:                          world.js#applyDrag  # @ds:ca07d970
   world.resizeWorld:                        world.js#nextWorldSize  # @ds:19c14fea
@@ -104,6 +109,14 @@ contract_map:
   world.playWorldResize:                    render.js#interpolateWorldResize  # @ds:19c14fea
   world.maintainNpcDensity:                 world.js#targetNpcCount  # @ds:53db39eb
   world.findLowestFishDensityArea:          world.js#findLowestDensitySpawn  # @ds:53db39eb
+  world.controlledObjectLimit:               world.js#controlledObjectCount world.js#canAddControlledObjects world.js#isOldAgeSuspended  # @ds:eccfca7e @ds:d140effd
+  shred.spawn:                               shred.js#spawnShredsFromFish prey.js#expireOldNpcFish  # @ds:e13d7a52 @ds:7c2f91ad @ds:918d4b63 @ds:d5e7a01c @ds:a6c9e8b4 @ds:eccfca7e
+  shred.drift:                               shred.js#advanceShreds  # @ds:8b62d9ce @ds:ed2b4f19 @ds:d3187816
+  shred.decayRefresh:                        shred.js#refreshShredDecay predation.js#collectFeedingCandidates predation.js#refreshCandidate predation.js#processFeedingBatch  # @ds:fb0f32c4
+  shred.eating:                              shred.js#canEatShred shred.js#shredCandidateNutrition shred.js#consumeShredLayer  # @ds:c14f7a08 @ds:9e4c1b7a @ds:b6f08d21 @ds:4d7c2e93 @ds:f0a6c5d8 @ds:d867989f @ds:98224ab9 @ds:fb0f32c4
+  shred.protocol:                            protocol.js#encodeShredRow protocol.js#parseShredRow protocol.js#encodeWorldSync protocol.js#applyWorldSync  # @ds:ed2b4f19 @ds:682570c7 @ds:d3187816
+  shred.render:                              render.js#loadShredGeometry render.js#drawShred  # @ds:6f3a9c20 @ds:73b91e4c @ds:0b8e71d4 @ds:3ad65f20
+  shred.mouthCue:                            main.js#updateClientDecorState protocol.js#parseFishRow  # @ds:a2d5936f @ia:0bdc556b
   world.emitBubbles:                        world.js#emitBubble  # @ds:d6cebf86
   world.advanceBubbles:                     world.js#advanceBubbles  # @ds:d6cebf86 @ia:3c4d5e6f
   world.clientLocalBubbles:                  main.js#advanceClientBubbles render.js#drawBubble  # @ds:d6cebf86 @ia:3c4d5e6f
@@ -114,6 +127,7 @@ contract_map:
   fish.wrapInWorld:                         fish.js#integrate  # @ds:c4073e51
   fish.geometryAsset:                       render.js#loadFishGeometry render.js#drawFish  # @ds:df06827a @ds:b024b514
   fish.grow:                                fish.js#grow  # @ds:d867989f @ds:b024b514
+  fish.feedingState:                        fish.js#makeFish fish.js#advanceFeedingState  # @ds:4e2a91f0
   fish.updateFacing:                        fish.js#updateFacing  # @ds:8d0ca6a8 @ia:0bdc556b
   fish.spendEnergy:                         fish.js#spendEnergy  # @ds:f51831f5 @ds:6aa7c828
   fish.maxSpeedOf:                          fish.js#maxSpeedOf prey.js#capPreySpeed  # @ds:8869f043 @ds:d4f6a1c2
@@ -128,18 +142,20 @@ contract_map:
   fish.runExhaleCycle:                      fish.js#requestExhale fish.js#runExhaleCycle fish.js#makeExhaleBubble  # @ds:a44b9d2c @fn:a9a3ed12
   fish.serializeFish:                       fish.js#serializeFish  # @do:a7a50f7b
   prey.wanderSteer:                         prey.js#wanderSteer  # @ds:31cb7a0d
+  prey.continuousMotionIntent:               prey.js#wanderSteer prey.js#chooseNpcIntent  # @ds:b47c2d91
   prey.fleeSteer:                           prey.js#fleeSteer  # @ds:579e4888 @ds:e699c42d
   prey.chooseNpcIntent:                     prey.js#chooseNpcIntent prey.js#assignNpcCourage  # @ds:d0ef4576 @ds:e29aeb93
   prey.dangerAwareSteering:                 prey.js#chooseDangerAwareDirection prey.js#dangerScoreForDirection prey.js#smoothNpcSteering  # @ds:92d5b0c1 @ds:7cb92a44 @ds:4f58a1cd @ds:c6d7e8f9 @ia:8a4b2f19
   prey.maintainPopulation:                  prey.js#maintainPopulation  # @ds:e6ecfbdd @ds:53db39eb @ds:7ba4084c
   prey.growSpawnedFryToNominalSize:         prey.js#advanceFryGrowth  # @ds:e6ecfbdd
+  prey.expireOldNpcFish:                     prey.js#expireOldNpcFish step.js#stepAuthoritativeWorld  # @ds:a6c9e8b4 @ds:d140effd
   predation.overlaps:                       predation.js#overlaps  # @ds:a3e394a8 @ds:b024b514
   predation.isAttackContact:                predation.js#isAttackContact  # @ds:b39c93a5 @ds:b024b514
   predation.isEdibleBySize:                 predation.js#isEdibleBySize  # @ds:98224ab9
   predation.canBeVictimOf:                  predation.js#canBeVictimOf  # @ds:32745a4f @ia:01fe68fa
   predation.canEat:                         predation.js#canEat  # @ds:98224ab9 @ds:32745a4f @ds:b39c93a5
   predation.isLeaveBlockedByUserAttack:     predation.js#isLeaveBlockedByUserAttack  # @ds:8917ad63
-  predation.resolveEating:                  predation.js#resolveEating  # @ds:e9fb3705 @ds:75a5aa4f
+  predation.resolveFeedingBatches:          predation.js#resolveFeedingBatches predation.js#collectFeedingCandidates predation.js#processFeedingBatch  # @ds:e9fb3705 @ds:75a5aa4f @ds:9b41d2ac @ds:6c80e3b4 @ds:f2ad71c9 @ds:a8f03d2e @ds:4e2a91f0
   predation.respawnPlayerAfterEating:       predation.js#respawnUserFishAfterEating  # @ds:39305789 @ds:53db39eb
   predation.hunt:                           hunt.js#huntSteer  # @ds:d4f6a1c2
 
@@ -150,6 +166,7 @@ data_model:
       height: number
       nextSizeStep: "optional server resize target"
       fish: "array of all fish, user and NPC"
+      shreds: "array of edible server-owned drifting shreds"
       bubbles: "server-side legacy field only; server sync does not transmit bubbles"
       tick: integer
   client_render:
@@ -177,6 +194,21 @@ data_model:
       - age
       - eatenFishCount
       - visual/decor state
+  shred:
+    fields:
+      - id
+      - pos
+      - vel
+      - size
+      - radius
+      - geometricArea
+      - initialGeometricArea
+      - sourceColor
+      - remainingLayers
+      - drag
+      - visualSeed
+      - decayAge
+      - decayIntervalSeconds derived from SHRED.decayIntervalSeconds
     user_fields:
       - clientId
       - temporaryConnectionCode
@@ -243,11 +275,26 @@ implementation_instructions:
     main.js must not choose a followed fish by stale id when currentUserFishId no
     longer points to an ownerKind='user' fish in the latest snapshot.
     Otherwise convert the fish to ownerKind='npc', npcRole='abandoned-user-fish',
-    remove userName and userTier, keep formerUserColor, and apply abandoned gradient.  # @ds:93a64773 @ds:eba75588
+    remove userName and userTier, keep formerUserColor, reset age to 0 so the
+    abandoned fish starts a fresh NPC lifetime, and apply abandoned gradient.  # @ds:93a64773 @ds:eba75588 @ds:a6c9e8b4
   explicit_leave: |
     handleLeaveGame first calls isLeaveBlockedByUserAttack.
     If blocked, server rejects the leave command and fish remains user-owned.
     If allowed, convert immediately to NPC without the 3 second grace.  # @ds:704ab317 @ds:8917ad63
+  join_after_leave: |
+    main.js owns the local entry/game UI state.
+    setJoinedUiState(joined) hides the join panel and labels #leave-game as
+    "Выйти" while joined=true; it labels the same HUD command as "Войти" while
+    joined=false without automatically opening the form. handleLeaveGameButton
+    calls client-net.js#leave when joined=true. When joined=false, it opens the
+    join panel with the existing draft name, color, and paid/free fields intact.
+    client-net.js#leave sends the compact leave request but keeps the current
+    session binding until the server confirms success. On event npc for the
+    currently controlled fish, confirmLeaveSucceeded clears currentUserFishId,
+    temporaryConnectionCode, sessionStorage fish.connectionCode, and joined.
+    main.js then calls setJoinedUiState(false) and shows the join panel. On event
+    wrn, keep the joined state and leave button label unchanged because the
+    server denied the explicit leave.  # @ds:9772e9ac @ds:fb11044e @ds:704ab317 @ds:8917ad63
   world_resize: |
     nextWorldSize(userFishCount) changes size only across thresholds with hysteresis.
     When size changes, scale every fish position proportionally:
@@ -264,8 +311,19 @@ implementation_instructions:
   density_spawn: |
     targetNpcCount = floor(world.width * world.height * WORLD.npcDensity)
     findLowestDensitySpawn samples candidate cells/points and scores each by
-    distance-weighted count of all fish. Use the lowest score for NPC spawn and
-    user respawn. Density includes user fish and NPC fish.  # @ds:53db39eb
+    distance-weighted count of all fish plus shreds. Use the lowest
+    score for NPC spawn and user respawn. Density includes user fish, NPC fish,
+    and persistent shreds.  # @ds:53db39eb @ds:e13d7a52
+  controlled_objects: |
+    world.js owns controlled-object helper functions. controlledObjectCount(world)
+    returns (world.fish?.length || 0) + (world.shreds?.length || 0), because these
+    are the server-owned entities encoded into world sync rows. It excludes client
+    decor, local bubbles, exhale state, debug traces, labels, and any other render
+    only arrays. canAddControlledObjects(world, addedCount) compares the resulting
+    count with WORLD.maxControlledObjects. isOldAgeSuspended(world) returns true
+    only when WORLD.maxControlledObjects is finite and positive and
+    controlledObjectCount(world) / WORLD.maxControlledObjects > WORLD.oldAgeSuspendFillRatio.
+    # @ds:eccfca7e @ds:d140effd
   npc_spawn_and_growth: |
     maintainPopulation compares current ownerKind='npc' count to targetNpcCount.
     New NPC fish spawn at safe lowest-density areas as fry:
@@ -274,14 +332,18 @@ implementation_instructions:
       fryAge increases for 10 seconds
       size interpolates to nominalStartSize during those 10 seconds
     findSafeNpcSpawn(world, nominalStartSize, rng) must wrap-aware sample candidate
-    positions, score density over all fish, then reject candidates whose canonical
-    circle at nominalStartSize is already inside or immediately entering any fish
-    attack zone. The attack-zone rejection must use current fish positions, radii,
-    burst-capable reach, mouth/head direction, and relative motion where available.
+    positions, score density over all fish, then reject candidates whose actual
+    spawn-state fry circle at FRY.startSize is already inside or immediately
+    entering any fish attack zone. The attack-zone rejection must use current fish
+    positions, radii, burst-capable reach, mouth/head direction, relative motion
+    where available, and the fact that the fry is edible while it grows. A safe
+    candidate must provide at least a short lead time before first attack contact
+    so the fry can execute ordinary NPC intent selection on the next server step.
     If all candidates are risky, choose the candidate with the largest estimated
-    time-to-attack-contact and lowest density as fallback rather than spawning on
-    top of a predator. maintainPopulation passes the chosen position into makeFish
-    and assigns NPC courage before adding the fish to world.fish.
+    time-to-attack-contact and lowest density as fallback, while still preferring
+    candidates outside immediate overlap/attack reach. maintainPopulation passes
+    the chosen position into makeFish and assigns NPC courage before adding the
+    fish to world.fish.
     New NPC courage is assigned by assignNpcCourage(world,rng): every tenth NPC
     spawn uses a uniform 0..100 value; otherwise use current live-NPC average
     courage or 50 when none exists, add random +/-10, then clamp to 0..100.
@@ -325,6 +387,135 @@ implementation_instructions:
     The final acceleration returned to stepAuthoritativeWorld comes from
     smoothNpcSteering and uses the branch magnitude: PREY.wanderAccel for wander,
     PREY.fleeAccel for hunt and flee.  # @ds:92d5b0c1 @ds:7cb92a44 @ds:4f58a1cd @ds:c6d7e8f9 @ia:8a4b2f19
+  npc_continuous_motion_and_lifetime: |
+    chooseNpcIntent must return an active movement intent for every live NPC on
+    every authoritative tick. If no threat and no prey target is selected, use
+    wanderIntent; wanderSteer keeps an existing heading until a random turn event
+    replaces it, so ordinary NPCs keep a cruising goal instead of becoming idle.
+    prey.js#expireOldNpcFish(world,rng) runs after NPC integration and before
+    predation resolution. It first checks world.js#isOldAgeSuspended(world). When
+    old-age is suspended, keep all NPC fish in world.fish and leave their current
+    age values intact. When old-age is active, remove ownerKind='npc' fish whose
+    age is at least NPC.maxLifetimeSeconds, call spawnShredsFromFish for each
+    removed fish, and do not call grow(), increment eatenFishCount, or emit a
+    predation victim row.
+    # @ds:b47c2d91 @ds:a6c9e8b4 @ds:e13d7a52 @ds:d140effd
+  shreds: |
+    shred.js owns shred creation, drift, contact eligibility, layer consumption,
+    and nutrition math. makeWorld initializes shreds=[] and nextShredId=1.
+    spawnShredsFromFish(world, fish, rng):
+      - compute dead fish canonical circular area as Math.PI * fish.radius^2;
+      - compute total shred geometric area = deadArea * SHRED.areaRatio;
+      - repeatedly sample individual shred diameter in SHRED.minSize..SHRED.maxSize
+        with SHRED.fragmentation/sizeJitter, convert diameter to circle area, clamp
+        the final piece to remaining area, and derive shred.size from that area;
+      - place each shred at a random polar offset within min(fish.radius,
+        fish.radius * SHRED.scatterRadiusRatio) around fish.pos and wrap it;
+      - sourceColor = fish.formerUserColor for npcRole='abandoned-user-fish' when
+        present, otherwise fish.userColor when present, otherwise the rendered NPC
+        hue color converted to a CSS hsl string;
+      - before pushing each shred, ensure canAddControlledObjects(world, 1) is true;
+        if the limit is reached, stop adding further shreds and leave any remaining
+        geometric area unspawned;
+      - set remainingLayers to the ordered layer ids from shred.dsc, decayAge=0,
+        drag to a random value in SHRED.dragMin..SHRED.dragMax, visualSeed=rng(),
+        velocity to a random direction and speed in SHRED.initialSpeedMin..initialSpeedMax.
+    advanceShreds(world, dt):
+      - for each shred, inspect nearby moving fish with nearestToroidalDelta; when
+        a fish is within SHRED.wakeRadiusRatio * (fish.radius + shred.radius), add
+        a small dt-scaled velocity impulse along the fish velocity, weighted by
+        speed and squared proximity falloff;
+      - damp velocity with exponential drag exp(-shred.drag * dt), using tuned
+        SHRED.dragMin..SHRED.dragMax values that leave visible drift after passing
+        fish influence;
+      - clamp tiny speed below SHRED.restSpeed to zero, integrate pos += vel*dt,
+        and wrap by world bounds.
+      - after movement, advance each shred's decayAge by dt. For each full
+        SHRED.decayIntervalSeconds interval, remove the next layer group in
+        SHRED.layerOrder. If the next group is the final 10%+10% group, remove the
+        whole shred from world.shreds instead of leaving an empty layer set. Do not
+        grant nutrition, increment fish counters, or play mouth cues from decay.
+    canEatShred(fish, shred, world):
+      - speed = hypot(fish.vel.x, fish.vel.y) must be >= SHRED.minFeedingSpeed;
+      - fish visual diameter `(fish.radius * 2)` must be >= shred.size * SHRED.eatSizeRatio;
+      - circle contact uses nearestToroidalDelta and radius sum fish.radius +
+        shred.radius, where shred.radius = shred.size / 2.
+    shredCandidateNutrition(fish, shred):
+      - inspect the next layer group from remainingLayers in order: first 30%,
+        second 30%, 20%, then both final 10% layers as one group;
+      - layerFraction is the sum of that group;
+      - swallowedArea = shred.geometricArea * layerFraction;
+      - baseNutrition = swallowedArea * SHRED.nutritionMultiplier;
+      - color factor = 1.0 for common layers; for the first two 30% layers use
+        1.0 when normalized colors match, otherwise compute HSV similarity as
+        hueWeight*hueSimilarity + saturationWeight*saturationSimilarity and map
+        it to SHRED.colorFactorMin..SHRED.colorFactorMaxDifferent;
+      - return { group, swallowedArea, nutrition } without mutating fish or shred.
+    consumeShredLayer(fish, shred, group):
+      - call refreshShredDecay(shred) before or after removing layers; refresh sets
+        decayAge=0 and does not restore any missing layers;
+      - remove group layers from shred.remainingLayers;
+      - increment a protocol-visible fish.shredEatCueCounter integer for every
+        consumed layer, including burst-state feeding, so clients can play the
+        0.3s mouth cue;
+      - predation.js removes the shred from world.shreds when no layers remain.
+    refreshShredDecay(shred) must also be called when a fish interaction reaches
+    shred candidate handling but the random feeding attempt fails or the candidate
+    is later rejected during refresh. This keeps any successful or unsuccessful
+    feeding interaction from losing already-decayed state while postponing the next
+    automatic decay interval.
+    Protocol sync must include shreds in world snapshots via shred rows. Shred
+    rows are independent from fish rows, so fish tombstone rows keep their current
+    meaning. Add decayAge to the shred row after visualSeed; parse rows without
+    that field as decayAge=0 for compatibility. Client render draws only remaining
+    SVG layers from ds/assets/shred.svg and treats layer drift as render-only.
+    # @ds:e13d7a52 @ds:7c2f91ad @ds:918d4b63 @ds:d5e7a01c @ds:8b62d9ce @ds:c14f7a08 @ds:9e4c1b7a @ds:b6f08d21 @ds:4d7c2e93 @ds:f0a6c5d8 @ds:a2d5936f @ds:ed2b4f19 @ds:d3187816 @ds:fb0f32c4 @ds:eccfca7e
+  feeding_batch: |
+    fish.js#makeFish initializes feedingSuccessFactor=1 and feedingCooldown=0.
+    fish.js#advanceFeedingState(fish, dt) runs once per authoritative tick before
+    feeding resolution: feedingCooldown=max(0, feedingCooldown-dt) and
+    feedingSuccessFactor=min(1, feedingSuccessFactor + dt / PREDATION.feedingRecoverySeconds).
+    predation.js owns resolveFeedingBatches(world,rng), called after fish movement,
+    shred drift, and old-age expiry, before maintainPopulation.
+    resolveFeedingBatches iterates over a snapshot of world.fish in current order;
+    skip a feeder if it is no longer in world.fish or feedingCooldown>0.
+    collectFeedingCandidates(feeder, world):
+      - fish candidates: every other fish still in world.fish for which canEat
+        is true using isAttackContact, size threshold, user-tier eligibility, and
+        burst mode; nutrition = victim.size * GROWTH.fishAreaGainRatio; swallowedArea = victim.size.
+      - shred candidates: every shred for which canEatShred is true; use
+        shredCandidateNutrition to obtain nutrition and swallowedArea for the next
+        layer group.
+      - sort descending by nutrition; for equal nutrition keep collection order.
+    processFeedingBatch(feeder,candidates,world,rng):
+      - if candidates is empty, do nothing and do not start cooldown;
+      - capacity = feeder.size, because fish.size is normalized canonical circle
+        area from fish.geometry.collision-area;
+      - activeFactor = min(feeder.feedingSuccessFactor ?? 1, first candidate is
+        shred ? PREDATION.shredStartSuccessFactor : 1);
+      - for each candidate in order, first discard it if the candidate object is
+        no longer present or no longer eligible;
+      - if swallowedArea would make successfulArea + swallowedArea > capacity,
+        end the series immediately without attempting that candidate;
+      - attempt succeeds when rng() < activeFactor;
+      - after every attempted candidate, multiply activeFactor by
+        PREDATION.fishFeedingSuccessDecayFactor for fish candidates or
+        PREDATION.shredFeedingSuccessDecayFactor for shred candidates, then set
+        feeder.feedingSuccessFactor = activeFactor;
+      - after every attempted shred candidate, call refreshShredDecay on that
+        shred regardless of success;
+      - on successful fish candidate, call grow(feeder, victim.size), increment
+        eatenFishCount through grow(), and remove/respawn the victim exactly as
+        predation.effect and predation.player-respawn require;
+      - on successful shred candidate, call growFromNutrient(feeder,nutrition),
+        consumeShredLayer(feeder,shred,group), remove exhausted shreds, and do not
+        increment eatenFishCount;
+      - track successfulArea only for successful attempts.
+      - when at least one candidate was attempted, set feeder.feedingCooldown to
+        PREDATION.feedingCooldownSeconds.
+    Remove the old independent resolveShredEating pass; fish and shreds are
+    considered together in this one sorted batch so larger expected nutrition
+    wins the earlier attempt.  # @ds:9b41d2ac @ds:6c80e3b4 @ds:f2ad71c9 @ds:a8f03d2e @ds:4e2a91f0 @ds:e9fb3705 @ds:75a5aa4f @ds:d867989f @ds:b024b514 @ia:0bdc556b @ds:c14f7a08 @ds:9e4c1b7a @ds:b6f08d21 @ds:4d7c2e93 @ds:f0a6c5d8 @ds:3ad65f20 @ds:a2d5936f @ds:ed2b4f19
   movement_and_energy: |
     integrate uses mode to select cruiseSpeedOf(size) or maxSpeedOf(size).
     applyDrag is linear damping.
@@ -365,6 +556,26 @@ implementation_instructions:
       - when any movement key is pressed, pointer.lockedByKeyboard=true until an explicit pointer/touch move unlocks it.
     Client input is encoded as cXXYYmods where X/Y are signed thousandths
     of normalized steering and b in mods means burst.  # @ds:91e32235 @ds:70871bc5 @ds:c2aeb63a @ds:cf6ad7d6 @ds:5377d065 @ds:671e9773
+  game_surface_input_ownership: |
+    CSS and input event handlers split browser interaction by surface:
+      - #game, #hud game buttons, #control-modes, and #joystick-panel use
+        user-select:none, -webkit-user-select:none, touch-action:none where
+        game gestures are handled, and suppress context menu on the canvas;
+      - createInput uses non-passive touch listeners for canvas movement so it
+        can preventDefault for game steering gestures;
+      - #join and form fields keep normal text input, selection, color picker,
+        button activation, and label behavior.
+    This keeps browser scroll/zoom/navigation gestures from taking precedence on
+    the game surface while preserving ordinary form controls.  # @ds:5d92a6ef
+  version_ui: |
+    server.js computes appVersion once at launch from current UTC date/time and
+    the git commit digest when available. It serves /version.json as
+    `{ "version": "YYYYMMDD-HHMM-<digest>" }`; when git digest is unavailable,
+    use "nogit" as the digest segment.
+    index.html contains a persistent #app-version span in the HUD/service area.
+    main.js#showAppVersion fetches /version.json on init and writes the version
+    string to #app-version; fetch failure displays the current document load date
+    plus "unknown" digest rather than hiding the field.  # @ds:8d13f6a2
   mobile_joystick_layout: |
     style.css owns the on-screen joystick layout.
     #joystick-panel remains fixed near the bottom of the viewport and keeps pointer-events enabled.
@@ -406,6 +617,7 @@ implementation_instructions:
     extrapolateWorld(snapshot,elapsedSeconds):
       - copy width/height and all non-position fish fields from the newest snapshot;
       - for each fish, compute visual position as fish.pos + fish.vel * elapsedSeconds;
+      - for each shred, compute visual position as shred.pos + shred.vel * elapsedSeconds;
       - do not compute mouth, teeth, fin, swim phase, or burst kick as protocol-controlled snapshot fields;
       - wrap extrapolated positions back into world bounds on both axes;
       - clamp elapsedSeconds to a short maximum so a stalled socket cannot send fish flying indefinitely;
@@ -413,13 +625,15 @@ implementation_instructions:
     Client decor:
       - main.js owns a clientFishDecor Map keyed by fish id;
       - after extrapolation and before render, applyClientFishDecor advances swimPhase, burstKick, mouthOpen, mouth hold timers, and local exhale cycles using dt;
-      - the input facts for decor are synchronized fish velocity, mode, size, and eatenFishCount deltas;
+      - the input facts for decor are synchronized fish velocity, mode, size, eatenFishCount deltas, and shredEatCueCounter deltas;
       - protocol rows must not encode or decode mouthOpen, teeth state, swimPhase, burstKick, mouth timers, or any other visual-only fish decor field;
       - server authority over movement must not become server authority over mouth, teeth, or fin animation.
       - clientFishDecor stores an exhale state object per fish id with the same shape as fish.js#makeFish.exhale; this state is client-only and removed when the fish id is absent from the newest visible world.
       - updateClientDecorState tracks previous displayed mode separately from burstSwimming; when fish.mode transitions from any non-burst value to 'burst', call requestExhale on the decor exhale state once for that edge. Do not require speed > FISH.facingThreshold for this trigger.
       - updateClientDecorState stores lastEatenFishCount per fish id. When a visible fish's synchronized eatenFishCount increases, call requestExhale on decor.exhale with an eating red-bubble ratio of 0.4; this request is client-only and may queue behind an already active exhale cycle.
       - updateClientDecorState also starts a 0.3s eatingCruiseHold when eatenFishCount increases. During that hold, set the visible fish's mouthOpen to 0 and render it through the cruise visual state locally. Do not write this cruise hold to protocol rows or server fish.mode.
+      - updateClientDecorState stores lastShredEatCueCounter per fish id. Initialize this field to 0 when client decor is first created so a fish that first appears with a positive synchronized shredEatCueCounter still plays the cue instead of treating that value as already consumed.
+      - When the synchronized shredEatCueCounter increases, start a local 0.3s shredBurstHold and set mouthHold/mouthEatenSize for compatibility with non-SVG rendering. While shredBurstHold is active, applyClientFishDecor sets only the temporary visible fish.mode to 'burst' so the existing SVG shape_burst mouth opens for cruise-state shred feeding. Do not write this hold to protocol rows or server fish.mode.
       - applyClientFishDecor attaches decor.exhale to the temporary visible fish, calls runExhaleCycle(fish, clientBubbles, rng, dt), then copies fish.visualScale from the exhale cycle back into rendered fish state. The cycle may push bubbles into clientBubbles and displace existing client bubbles, but must not write to world.bubbles or protocol fields.
     frame(now):
       - compute dt from previous animation frame and clamp with LOOP.maxDt;
@@ -520,6 +734,18 @@ implementation_instructions:
       - return state=nextById for the caller to store as lastWorldSyncState.
     Fish row shape:
       ID:TYPE EATEN_OPT:SIZE_ABS:COLOR1_OPT:COLOR2_OPT:NAME_OPT POS_X_OPT:POS_Y_OPT MOVING_ANG:MOVING_SPEED STATE_MODS
+    Shred row shape:
+      sID SIZE:GEOM_AREA:INITIAL_GEOM_AREA:COLOR_HEX:LAYERS_HEX:SEED POS_X:POS_Y MOVING_ANG:MOVING_SPEED
+    encodeFishRow includes shredEatCueCounter as a numeric state mod `sN` only
+    when the counter is greater than zero, and parseFishRow preserves the previous
+    value when the mod is absent. The value is domain-visible event state for
+    local mouth cue detection, not mouth animation state.
+    encodeWorldSync includes one shred row for each current world.shreds item
+    after fish rows. Delta sync may send shreds as absolute shred rows each tick;
+    applyWorldSync replaces world.shreds with the parsed shred rows from the
+    latest message so eaten/exhausted shreds disappear without fish tombstones.
+    parseShredRow must also accept legacy `kID AREA:INITIAL_AREA ...` chunk rows
+    during transition and convert them into one-layer neutral shreds.
     encodeRemovedFishRow(id):
       - output a syntactically valid fish row with id, type n, unchanged/default metadata and state mod e;
       - parseFishRow must set parsed.eaten=true when mods contains e.
@@ -559,7 +785,11 @@ implementation_instructions:
       - do not use fixed replacement colors such as hard-coded cyan shadow/light fills for user-fish body regions;
       - mouth cavity, teeth, eyes, and text label may keep semantic non-body colors because they are not body-color decoration.
     For ordinary NPC fish, keep yellow-toned HSL palette.
-    For abandoned former user fish, draw the existing former-user-color to NPC-yellow gradient as the base and apply the same transparent overlay policy to decoration.  # @ia:32288dfb @ds:f883f90c @ds:bfd5a97a
+    For abandoned former user fish, draw a top-to-bottom former-user-color to
+    NPC-yellow gradient only for body_cruise/body_burst base shapes. Non-body
+    SVG elements that use currentColor resolve to ordinary NPC yellow, and
+    authored shade/highlight/decorative layers remain layered over the body base
+    without becoming part of the former-user gradient.  # @ia:32288dfb @ds:f883f90c @ds:bfd5a97a @ds:c3708d14
   fish_svg_geometry_visual: |
     render.js owns loading/parsing the authored ds/assets/fish2.svg geometry into
     reusable draw paths keyed by semantic SVG ids. The parsed or embedded fallback
@@ -629,9 +859,37 @@ new_or_changed_constants:
   NPC.decisionIntervalSeconds: "minimum interval before resampling a new desired direction" # @ds:c6d7e8f9 @ia:8a4b2f19
   NPC.maxTurnRateDegPerSecond: "maximum smoothed desired-direction turn rate" # @ds:c6d7e8f9 @ia:8a4b2f19
   NPC.accelResponsePerSecond: "acceleration smoothing response rate" # @ds:c6d7e8f9 @ia:8a4b2f19
+  NPC.maxLifetimeSeconds: 300          # @ds:a6c9e8b4
+  SHRED.areaRatio: 0.5                 # @ds:e13d7a52
+  SHRED.nutritionMultiplier: 3         # @ds:0b8e71d4 @ds:f0a6c5d8
+  SHRED.minSize: "small enough for tiny fish to eat some pieces" # @ds:7c2f91ad
+  SHRED.maxSize: "upper shred diameter" # @ds:7c2f91ad
+  SHRED.fragmentation: "controls average sampled shred diameter" # @ds:7c2f91ad @ds:5a9c0e77
+  SHRED.sizeJitter: "randomized individual shred size variation" # @ds:7c2f91ad @ds:5a9c0e77
+  SHRED.eatSizeRatio: "fish.size threshold relative to shred.size" # @ds:c14f7a08
+  SHRED.minFeedingSpeed: "minimum actual speed for eating a shred" # @ds:c14f7a08
+  SHRED.mouthCueSeconds: 0.3          # @ds:a2d5936f
+  SHRED.initialSpeedMin/Max: "small random launch speed" # @ds:918d4b63
+  SHRED.dragMin/Max: "soft water damping range that preserves visible drift" # @ds:8b62d9ce
+  SHRED.restSpeed: "speed below which shred stops" # @ds:8b62d9ce
+  SHRED.wakeRadiusRatio: "fish wake influence radius multiplier" # @ds:8b62d9ce @ds:ed2b4f19
+  SHRED.wakeStrength: "dt-scaled fish wake velocity coupling" # @ds:8b62d9ce @ds:ed2b4f19
+  SHRED.wakeMinFishSpeed: "minimum fish speed that can pull shreds" # @ds:8b62d9ce @ds:ed2b4f19
+  SHRED.layerFractions: "0.3,0.3,0.2,0.1,0.1" # @ds:9e4c1b7a
+  SHRED.colorFactorMin: 0.3            # @ds:b6f08d21
+  SHRED.colorFactorMaxDifferent: 0.7   # @ds:b6f08d21
+  SHRED.hueWeight/saturationWeight: "HSV similarity weights" # @ds:b6f08d21
+  SHRED.layerRotationMin/MaxDeg: "3..5 degrees" # @ds:73b91e4c
+  SHRED.layerDriftPx: "small visual drift amplitude" # @ds:73b91e4c
   REGIME.cruiseFactor: 0.55           # @ia:5e6f7a8b
   PLAYER.startSize: 1                 # @ds:39305789
   FISH.minBurstSpeed: "greater than PREY.maxSpeed + PREY.speedMargin; predator/user hunt floor, not fleeing-prey cap" # @ds:8869f043 @ds:d4f6a1c2 @ia:2d3e4f5a
+  GROWTH.fishAreaGainRatio: 0.7       # @ds:d867989f
+  PREDATION.feedingCooldownSeconds: 0.35 # @ds:a8f03d2e @ds:4e2a91f0
+  PREDATION.feedingRecoverySeconds: 1 # @ds:4e2a91f0 @ds:6c80e3b4
+  PREDATION.fishFeedingSuccessDecayFactor: 0.75 # @ds:4e2a91f0 @ds:6c80e3b4
+  PREDATION.shredFeedingSuccessDecayFactor: 0.9 # @ds:4e2a91f0 @ds:6c80e3b4
+  PREDATION.shredStartSuccessFactor: 0.4 # @ds:6c80e3b4
   ENERGY.userMinSize: "greater than PREY.minSize * PREDATION.eatRatio" # @ds:6aa7c828
   PREDATION.attackConeDotMin: "forward mouth/head cone threshold" # @ds:b39c93a5
   BUBBLE.maxRatio: 0.08               # @ia:9e0f1a2b
@@ -662,6 +920,7 @@ verification_checks:
   - "After automatic reconnect, pressing or exposing the join flow cannot create a second ownerKind='user' fish for the same client instance or temporaryConnectionCode."
   - "Unexpected socket break has a 3 second reconnect grace, then fish becomes NPC."
   - "Explicit leave immediately converts to NPC unless active user-vs-user attack window blocks it."
+  - "After a successful explicit leave, the HUD command changes from Выйти to Войти; pressing Войти opens the start join form with name, color, and paid/free controls for creating a new user fish."
   - "Server broadcasts world events and coordinate corrections; client prediction cannot override server events."
   - "World edges wrap horizontally and vertically without stopping fish."
   - "World resize scales fish coordinates but not fish sizes; clients animate resize playback."
@@ -674,9 +933,22 @@ verification_checks:
   - "Hunting NPCs may correct their vector by at most 20 degrees from the victim direction to reduce predator danger."
   - "Fleeing NPCs sample the full circle and choose the lowest summed danger direction using fish radii and attack zones."
   - "NPC direction and acceleration choices change smoothly through configurable decision inertia tunables."
+  - "NPC fish have an active wander, hunt, or flee motion intent on every server tick, aside from brief physical transitions caused by inertia."
+  - "NPC fish reaching 5 minutes of age disappear by old-age death, not predation, and no predator receives eaten credit."
+  - "Old-age NPC death creates edible drifting shreds with total geometric area equal to the configured ratio of the dead NPC canonical circular area."
+  - "Fish can eat shreds in burst or cruise when contact, size threshold, and minimum feeding speed are satisfied."
+  - "A fish with feedingCooldown > 0 performs no feeding attempts, while feedingSuccessFactor continues restoring toward 1."
+  - "When a fish contacts multiple edible fish/shreds, the server sorts candidates by expected nutrition and processes one feeding batch."
+  - "Each attempted candidate uses the current feedingSuccessFactor probability, applies the food-type decay factor after the attempt, and starts a 0.35s cooldown after the series."
+  - "A batch cannot successfully swallow more canonical area than the feeder fish's own canonical area."
+  - "A batch whose first candidate is a shred starts with success probability capped at 0.4."
+  - "Each shred is consumed layer-by-layer, applies x3 nutrition mass, and does not increment eatenFishCount."
+  - "The first two 30% shred layers apply same-color or HSV-similarity nutrition factors; remaining layers feed all fish uniformly."
+  - "Shreds are synchronized to clients and rendered from ds/assets/shred.svg with client-only layer drift."
   - "Paid user fish can be eaten only by paid user fish; free user fish can be eaten by any ordinary eligible predator."
   - "The UI has no separate user-fish vulnerability toggle; eligibility comes from paid/free tier."
   - "Abandoned former user fish loses user-tier protection and uses former color to NPC-yellow gradient."
+  - "Abandoned former user fish applies that gradient only to the body base; fins, eyes, mouth, highlights, and other SVG layers keep their normal authored treatment."
   - "Predation requires attack contact: burst predator, size/type eligibility, victim in the head/mouth area, and relative motion increasing canonical circle overlap."
   - "A burst attack that reaches an eligible smaller fish through the mouth/head area triggers eating without requiring pixel-perfect center overlap."
   - "Remote fish motion is rendered smoothly between authoritative snapshots."
@@ -687,6 +959,8 @@ verification_checks:
   - "Keyboard key-down/key-up and burst transitions are sent without waiting for the idle input cadence."
   - "Space enables burst in keyboard, pointer, touch, and joystick modes."
   - "The initial control mode is keyboard on ordinary pointer devices and visual joystick on mobile/touch devices."
+  - "The game surface and game controls suppress browser selection, scrolling, zooming, context gestures, and navigation gestures while the join form remains normally editable."
+  - "The HUD shows a persistent version string derived from launch/build date and commit digest."
   - "In joystick mode, the steering joystick is on the right side of the screen and the Burst press-and-hold control is on the left."
   - "Losing focus clears local key and pointer/touch pressed state so movement and burst cannot remain stuck."
   - "Unchanged input sends p:${N} at one-second cadence, with no faster ping heartbeat."

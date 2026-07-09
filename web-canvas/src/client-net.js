@@ -61,6 +61,7 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity }){
                     }
                 }
                 if( message.event === 'rj' ) clearSessionBinding();
+                if( message.event === 'npc' ) message.leaveSucceeded = confirmLeaveSucceeded(Number(message.data));
                 if( onEvent ) onEvent(message);
                 return;
             }
@@ -158,11 +159,19 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity }){
         joined = false;
     }
 
+    // @ds:9772e9ac
+    function confirmLeaveSucceeded(fishId){
+        if( fishId !== currentUserFishId ) return false;
+        clearSessionBinding();
+        return true;
+    }
+
     connect();
 
     return {
         get currentUserFishId(){ return currentUserFishId; },
         get temporaryConnectionCode(){ return temporaryConnectionCode; },
+        get isJoined(){ return joined; },
         join(profile){
             sendRaw(encodeClientJoin(profile));
         },
@@ -175,8 +184,8 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity }){
             if( !joined ) return;
             sendRaw(encodeClientPing(++pingCounter));
         },
+        // @ds:9772e9ac
         leave(){
-            clearSessionBinding();
             sendRaw('q');
         },
     };

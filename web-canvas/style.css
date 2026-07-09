@@ -7,6 +7,7 @@ html, body {
     overflow: hidden;
     background: #04263b;
     font-family: system-ui, -apple-system, sans-serif;
+    overscroll-behavior: none;
 }
 
 #game {
@@ -15,6 +16,9 @@ html, body {
     height: 100vh;
     cursor: crosshair;
     touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
 }
 
 #hud {
@@ -30,6 +34,8 @@ html, body {
     letter-spacing: 0.3px;
     pointer-events: none;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 #hud .hud-row {
@@ -61,6 +67,8 @@ html, body {
     display: grid;
     place-items: center;
     background: rgba(4, 38, 59, 0.55);
+    user-select: auto;
+    -webkit-user-select: auto;
 }
 
 #join[hidden] {
@@ -89,6 +97,8 @@ html, body {
     background: #062f47;
     color: #edf8ff;
     padding: 8px 10px;
+    user-select: text;
+    -webkit-user-select: text;
 }
 
 #join-form input[type="color"] {
@@ -121,6 +131,7 @@ html, body {
 #control-modes {
     pointer-events: auto;
     gap: 6px;
+    touch-action: none;
 }
 
 #control-modes button {
@@ -149,6 +160,8 @@ html, body {
     bottom: 24px;
     height: 112px;
     pointer-events: none;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 #joystick-panel[hidden] {

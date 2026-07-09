@@ -3,10 +3,11 @@
 // Note: user fish victim eligibility is derived from paid/free tier.
 // @ds a3e394a8 98224ab9 e9fb3705 fcdfb2b7 d867989f 6f1b0a3c 39305789
 
-import { LEAVE, PREDATION, PLAYER } from './constants.js';
+import { GROWTH, LEAVE, PREDATION, PLAYER } from './constants.js';
 import { normalize } from './vec.js';
-import { grow, makeFish } from './fish.js';
+import { grow, growFromNutrient, makeFish } from './fish.js';
 import { findLowestDensitySpawn } from './world.js';
+import { canEatShred, consumeShredLayer, refreshShredDecay, shredCandidateNutrition } from './shred.js';
 
 // @ds:a3e394a8 @ds:b024b514
 export function overlaps(a, b, world = null){
@@ -123,7 +124,7 @@ export function isLeaveBlockedByUserAttack(world, userFish){
 // Returns number of prey eaten by the player this tick (for HUD).
 export function resolveEating(state){
     if( state.world && Array.isArray(state.world.fish) ){
-        return resolveWorldEating(state.world, state.rng || Math.random);
+        return resolveFeedingBatches(state.world, state.rng || Math.random);
     }
     const { player, prey } = state;
     let eatenByPlayer = 0;
@@ -168,31 +169,112 @@ export function resolveEating(state){
     return eatenByPlayer;
 }
 
-function resolveWorldEating(world, rng){
+// @ds:9b41d2ac @ds:6c80e3b4 @ds:f2ad71c9 @ds:a8f03d2e @ds:4e2a91f0
+export function resolveFeedingBatches(world, rng){
     let eatenByUsers = 0;
-    const fish = world.fish;
-    for( let i = fish.length - 1; i >= 0; i-- ){
-        const predator = fish[i];
-        if( !predator ) continue;
-        for( let j = fish.length - 1; j >= 0; j-- ){
-            if( i === j ) continue;
-            const victim = fish[j];
-            if( !victim ) continue;
-            const attackContact = isAttackContact(predator, victim, world);
-            if( attackContact && canEat(predator, victim, world, attackContact) ){
-                grow(predator, victim.size);
-                if( predator.ownerKind === 'user' ) eatenByUsers++;
-                if( victim.ownerKind === 'user' ){
-                    respawnUserFishAfterEating(world, victim, rng);
-                }else{
-                    fish.splice(j, 1);
-                    if( j < i ) i--;
-                }
-                break;
+    for( const feeder of [...(world.fish || [])] ){
+        if( !(world.fish || []).includes(feeder) ) continue;
+        if( (feeder.feedingCooldown || 0) > 0 ) continue;
+        const candidates = collectFeedingCandidates(feeder, world);
+        eatenByUsers += processFeedingBatch(feeder, candidates, world, rng);
+    }
+    return eatenByUsers;
+}
+
+export function collectFeedingCandidates(feeder, world){
+    const candidates = [];
+    let order = 0;
+    for( const victim of world.fish || [] ){
+        if( victim === feeder ) continue;
+        const attackContact = isAttackContact(feeder, victim, world);
+        if( !canEat(feeder, victim, world, attackContact) ) continue;
+        candidates.push({
+            type: 'fish',
+            target: victim,
+            nutrition: Math.max(0, victim.size || 0) * GROWTH.fishAreaGainRatio,
+            swallowedArea: Math.max(0, victim.size || 0),
+            order: order++,
+        });
+    }
+    for( const shred of world.shreds || [] ){
+        if( !canEatShred(feeder, shred, world) ) continue;
+        const nutrition = shredCandidateNutrition(feeder, shred);
+        if( !nutrition ) continue;
+        candidates.push({
+            type: 'shred',
+            target: shred,
+            ...nutrition,
+            order: order++,
+        });
+    }
+    return candidates.sort((a, b) => b.nutrition - a.nutrition || a.order - b.order);
+}
+
+export function processFeedingBatch(feeder, candidates, world, rng){
+    if( candidates.length === 0 ) return 0;
+    let eatenByUsers = 0;
+    let attempted = false;
+    let successfulArea = 0;
+    const capacity = Math.max(0, feeder.size || 0);
+    let activeFactor = Math.min(
+        feeder.feedingSuccessFactor ?? 1,
+        candidates[0].type === 'shred' ? PREDATION.shredStartSuccessFactor : 1,
+    );
+
+    for( const candidate of candidates ){
+        const current = refreshCandidate(feeder, candidate, world);
+        if( !current ) continue;
+        if( successfulArea + current.swallowedArea > capacity + 1e-9 ) break;
+
+        attempted = true;
+        const success = rng() < activeFactor;
+        const decayFactor = current.type === 'shred'
+            ? PREDATION.shredFeedingSuccessDecayFactor
+            : PREDATION.fishFeedingSuccessDecayFactor;
+        activeFactor *= decayFactor;
+        feeder.feedingSuccessFactor = activeFactor;
+        if( current.type === 'shred' ) refreshShredDecay(current.target); // @ds:fb0f32c4
+        if( !success ) continue;
+
+        successfulArea += current.swallowedArea;
+        if( current.type === 'fish' ){
+            grow(feeder, current.target.size);
+            if( feeder.ownerKind === 'user' ) eatenByUsers++;
+            if( current.target.ownerKind === 'user' ){
+                respawnUserFishAfterEating(world, current.target, rng);
+            }else{
+                const index = (world.fish || []).indexOf(current.target);
+                if( index >= 0 ) world.fish.splice(index, 1);
+            }
+        }else{
+            growFromNutrient(feeder, current.nutrition);
+            consumeShredLayer(feeder, current.target, current.group);
+            if( !current.target.remainingLayers || current.target.remainingLayers.length === 0 ){
+                const index = (world.shreds || []).indexOf(current.target);
+                if( index >= 0 ) world.shreds.splice(index, 1);
             }
         }
     }
+
+    if( attempted ) feeder.feedingCooldown = PREDATION.feedingCooldownSeconds;
     return eatenByUsers;
+}
+
+function refreshCandidate(feeder, candidate, world){
+    if( candidate.type === 'fish' ){
+        if( !(world.fish || []).includes(candidate.target) ) return null;
+        const attackContact = isAttackContact(feeder, candidate.target, world);
+        if( !canEat(feeder, candidate.target, world, attackContact) ) return null;
+        return {
+            ...candidate,
+            nutrition: Math.max(0, candidate.target.size || 0) * GROWTH.fishAreaGainRatio,
+            swallowedArea: Math.max(0, candidate.target.size || 0),
+        };
+    }
+    if( !(world.shreds || []).includes(candidate.target) ) return null;
+    if( !canEatShred(feeder, candidate.target, world) ) return null;
+    const nutrition = shredCandidateNutrition(feeder, candidate.target);
+    return nutrition ? { ...candidate, ...nutrition } : null;
 }
 
 // @ds:b39c93a5

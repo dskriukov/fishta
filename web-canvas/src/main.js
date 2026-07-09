@@ -1,12 +1,12 @@
 // imp/web-canvas/src/main.js
 // Bootstraps world + game loop (dsr/use/ecs-loop.dsr). Glue/I-O layer.
-// @ds b28b7af6 27fa3caa ec8cb052 c95ca496 48c4fc99 b433f1bc d2e8a84c 5fb1ff09 c83f4c1e ca07d970 d6cebf86 3ddf8f67 1f3abc43 cbc1225a 7ce238da c4073e51 ee07d6da 8869f043 f51831f5 8d0ca6a8 d867989f 975ca168 bd354b7a 906be50b 91e32235 55c13a4f 10baf178 22fd3ab4 7b9a7984 ad8d81d8 31cb7a0d 579e4888 e699c42d e6ecfbdd 1e66d817 a3e394a8 98224ab9 e9fb3705 fcdfb2b7 0c8d4e2a 6f1b0a3c 39305789
+// @ds b28b7af6 27fa3caa ec8cb052 c95ca496 48c4fc99 b433f1bc d2e8a84c 5fb1ff09 c83f4c1e ca07d970 d6cebf86 3ddf8f67 1f3abc43 cbc1225a 7ce238da c4073e51 ee07d6da 8869f043 f51831f5 8d0ca6a8 d867989f 975ca168 bd354b7a 906be50b 91e32235 55c13a4f 10baf178 22fd3ab4 7b9a7984 ad8d81d8 31cb7a0d 579e4888 e699c42d e6ecfbdd 1e66d817 a3e394a8 98224ab9 e9fb3705 fcdfb2b7 0c8d4e2a 6f1b0a3c 39305789 a2d5936f 73b91e4c ed2b4f19
 
-import { DEBUG, EXHALE, FISH, LOOP, MOUTH, SIZE_DELTA_LABEL, SWIM, SYNC } from './constants.js';
+import { DEBUG, EXHALE, FISH, LOOP, MOUTH, SHRED, SIZE_DELTA_LABEL, SWIM, SYNC } from './constants.js';
 import { advanceBubbles, emitBubble, makeWorld } from './world.js';
 import { requestExhale, runExhaleCycle, serializeFish } from './fish.js';
 import { createControlModeState, createInput, keySteer, pointerSteer, joystickSteer, huntMode } from './controls.js';
-import { buildToroidalRenderWorld, loadFishGeometry, render, viewportToWorld } from './render.js';
+import { buildToroidalRenderWorld, loadFishGeometry, loadShredGeometry, render, viewportToWorld } from './render.js';
 import { dist, normalize, scale, v } from './vec.js';
 import { createClientNet } from './client-net.js';
 
@@ -27,6 +27,7 @@ const joystickPanel = document.getElementById('joystick-panel');
 const joystickBase = document.getElementById('joystick-base');
 const joystickKnob = document.getElementById('joystick-knob');
 const joystickHunt = document.getElementById('joystick-hunt');
+const appVersion = document.getElementById('app-version');
 
 let state = { world: makeWorld(), currentUserFishId: null };
 const snapshotBuffer = [];
@@ -52,7 +53,9 @@ const sizeDeltaLabelState = {
 // ds:b28b7af6
 async function init(){
     resize();
+    showAppVersion();
     await loadFishGeometry();
+    await loadShredGeometry();
 }
 
 // ds:b28b7af6
@@ -85,7 +88,16 @@ const net = createClientNet({
             state.currentUserFishId = null;
             lastSentInputKey = null;
             lastInputFlushAt = 0;
-            if( joinPanel ) joinPanel.hidden = false;
+            setJoinedUiState(false, { showJoinForm: true });
+        }
+        if( message.leaveSucceeded ){
+            state.currentUserFishId = null;
+            lastSentInputKey = null;
+            lastInputFlushAt = 0;
+            setJoinedUiState(false, { showJoinForm: true });
+        }
+        if( message.event === 'wrn' ){
+            setJoinedUiState(true);
         }
     },
     onStatus(status){
@@ -94,7 +106,7 @@ const net = createClientNet({
     onIdentity(){
         lastSentInputKey = null;
         lastInputFlushAt = 0;
-        if( joinPanel ) joinPanel.hidden = true;
+        setJoinedUiState(true);
     },
 });
 
@@ -118,6 +130,7 @@ window.addEventListener('resize', resize);
 
 if( joinName ) joinName.value = `fish-${Math.floor(Math.random() * 900 + 100)}`;
 if( joinColor ) joinColor.value = `#${Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0')}`;
+setJoinedUiState(false, { showJoinForm: true });
 if( joinForm ){
     joinForm.addEventListener('submit', e =>{
         e.preventDefault();
@@ -130,7 +143,7 @@ if( joinForm ){
     });
 }
 if( leaveButton ){
-    leaveButton.addEventListener('click', () => net.leave());
+    leaveButton.addEventListener('click', handleLeaveGameButton);
 }
 if( debugToggle ){
     debugToggle.addEventListener('click', toggleDebugMode);
@@ -144,6 +157,39 @@ window.addEventListener('keydown', e =>{
         toggleDebugMode();
     }
 });
+
+// @ds:8d13f6a2
+async function showAppVersion(){
+    if( !appVersion ) return;
+    try{
+        const response = await fetch('/version.json', { cache: 'no-store' });
+        if( !response.ok ) throw new Error('version unavailable');
+        const data = await response.json();
+        appVersion.textContent = `version: ${data.version || fallbackVersion()}`;
+    }catch{
+        appVersion.textContent = `version: ${fallbackVersion()}`;
+    }
+}
+
+function fallbackVersion(){
+    return `${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '')}-unknown`;
+}
+
+// @ds:9772e9ac
+function setJoinedUiState(joined, { showJoinForm = false } = {}){
+    if( leaveButton ) leaveButton.textContent = joined ? 'Выйти' : 'Войти';
+    if( joinPanel ) joinPanel.hidden = joined || !showJoinForm;
+}
+
+// @ds:9772e9ac
+function handleLeaveGameButton(){
+    if( net.isJoined ){
+        net.leave();
+        return;
+    }
+    setJoinedUiState(false, { showJoinForm: true });
+    if( joinName ) joinName.focus();
+}
 
 let last = performance.now();
 // ds:b28b7af6
@@ -198,7 +244,19 @@ function extrapolateWorld(world, elapsedSeconds){
     return {
         ...world,
         bubbles: world.bubbles || [],
+        shreds: (world.shreds || []).map(shred => extrapolateShred(shred, elapsedSeconds, world.width, world.height)),
         fish: (world.fish || []).map(fish => extrapolateFish(fish, elapsedSeconds, world.width, world.height)),
+    };
+}
+
+// @ds:8b62d9ce
+function extrapolateShred(shred, elapsedSeconds, worldWidth, worldHeight){
+    return {
+        ...shred,
+        pos: {
+            x: wrapValue(shred.pos.x + (shred.vel?.x || 0) * elapsedSeconds, worldWidth),
+            y: wrapValue(shred.pos.y + (shred.vel?.y || 0) * elapsedSeconds, worldHeight),
+        },
     };
 }
 
@@ -234,6 +292,7 @@ function applyClientFishDecor(world, bubbles, dt, rng){
         fish.swimPhase = decor.swimPhase;
         fish.burstKick = decor.burstKick;
         fish.mouthOpen = decor.mouthOpen;
+        if( decor.shredBurstHold > 0 ) fish.mode = 'burst'; // @ds:a2d5936f
         if( decor.eatingCruiseHold > 0 ) fish.mode = 'cruise'; // @ds:975ca168
     }
 }
@@ -258,8 +317,10 @@ function makeClientDecor(fish){
         mouthOpen: 0,
         mouthHold: 0,
         mouthEatenSize: 0,
+        shredBurstHold: 0,
         eatingCruiseHold: 0,
         lastEatenFishCount: fish.eatenFishCount || 0,
+        lastShredEatCueCounter: 0,
         lastSize: fish.size || 1,
     };
 }
@@ -281,9 +342,17 @@ function updateClientDecorState(decor, fish, dt){
         decor.eatingCruiseHold = Math.max(decor.eatingCruiseHold, MOUTH.eatingCruiseHoldSeconds); // @ds:975ca168
     }
     decor.lastEatenFishCount = eatenCount;
+    const shredCueCounter = fish.shredEatCueCounter || 0;
+    if( shredCueCounter > decor.lastShredEatCueCounter ){
+        decor.shredBurstHold = Math.max(decor.shredBurstHold, SHRED.mouthCueSeconds);
+        decor.mouthHold = Math.max(decor.mouthHold, SHRED.mouthCueSeconds);
+        decor.mouthEatenSize = Math.max(decor.mouthEatenSize, fish.size || 1);
+    }
+    decor.lastShredEatCueCounter = shredCueCounter;
     decor.lastSize = fish.size || decor.lastSize;
 
     if( decor.eatingCruiseHold > 0 ) decor.eatingCruiseHold = Math.max(0, decor.eatingCruiseHold - dt);
+    if( decor.shredBurstHold > 0 ) decor.shredBurstHold = Math.max(0, decor.shredBurstHold - dt);
     if( decor.mouthHold > 0 ) decor.mouthHold = Math.max(0, decor.mouthHold - dt);
     if( decor.mouthEatenSize > 0 ) decor.mouthEatenSize = Math.max(0, decor.mouthEatenSize - dt * Math.max(1, fish.size || 1) * 2);
 

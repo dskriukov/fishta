@@ -1,9 +1,9 @@
 // imp/web-canvas/src/render.js
 // Read-only over domain state (workspace.air rule: render never mutates domain).
-// @ds 975ca168 bd354b7a 906be50b d6cebf86 a44b9d2c b28b7af6 1f3abc43 8f2c91ad
+// @ds 975ca168 bd354b7a 906be50b d6cebf86 a44b9d2c b28b7af6 1f3abc43 8f2c91ad 6f3a9c20 73b91e4c 0b8e71d4 3ad65f20
 // @ia 2f6e7a91
 
-import { BUBBLE, DEBUG, SIZE_DELTA_LABEL, SWIM, FEAR_EYE, WORLD } from './constants.js';
+import { BUBBLE, DEBUG, SHRED, SIZE_DELTA_LABEL, SWIM, FEAR_EYE, WORLD } from './constants.js';
 
 const DEFAULT_SVG_GEOMETRY = {
     width: 494,
@@ -16,6 +16,16 @@ const DEFAULT_SVG_GEOMETRY = {
 let fishSvgGeometry = DEFAULT_SVG_GEOMETRY;
 let fishSvgRenderTree = null;
 let fishSvgGradients = new Map();
+
+const DEFAULT_SHRED_GEOMETRY = {
+    width: 75,
+    height: 75,
+    centerX: 37.5,
+    centerY: 37.5,
+};
+
+let shredSvgGeometry = DEFAULT_SHRED_GEOMETRY;
+let shredSvgRenderTree = null;
 
 // @ds:df06827a @ds:b024b514 @ia:2f6e7a91
 export async function loadFishGeometry(urls = ['../ds/assets/fish2.svg', './src/_fish_save.svg']){
@@ -30,6 +40,27 @@ export async function loadFishGeometry(urls = ['../ds/assets/fish2.svg', './src/
                 fishSvgGeometry = parsed.geometry;
                 fishSvgRenderTree = parsed.renderTree;
                 fishSvgGradients = parsed.gradients;
+                return parsed;
+            }
+        }catch{
+            // Keep trying fallback URLs.
+        }
+    }
+    return null;
+}
+
+// @ds:6f3a9c20
+export async function loadShredGeometry(urls = ['../ds/assets/shred.svg']){
+    if( typeof fetch !== 'function' || typeof DOMParser === 'undefined' ) return null;
+    for( const url of urls ){
+        try{
+            const response = await fetch(url);
+            if( !response.ok ) continue;
+            const svgText = await response.text();
+            const parsed = parseShredSvgTemplate(svgText);
+            if( parsed ){
+                shredSvgGeometry = parsed.geometry;
+                shredSvgRenderTree = parsed.renderTree;
                 return parsed;
             }
         }catch{
@@ -62,6 +93,24 @@ function parseFishSvgTemplate(svgText){
     };
 }
 
+function parseShredSvgTemplate(svgText){
+    const doc = new DOMParser().parseFromString(svgText, 'image/svg+xml');
+    const svg = doc.documentElement;
+    if( !svg || svg.nodeName.toLowerCase() !== 'svg' ) return null;
+    const viewBox = parseViewBox(svg.getAttribute('viewBox'));
+    const width = numberOrDefault(svg.getAttribute('width'), viewBox?.width || DEFAULT_SHRED_GEOMETRY.width);
+    const height = numberOrDefault(svg.getAttribute('height'), viewBox?.height || DEFAULT_SHRED_GEOMETRY.height);
+    return {
+        geometry: {
+            width,
+            height,
+            centerX: (viewBox?.x || 0) + width / 2,
+            centerY: (viewBox?.y || 0) + height / 2,
+        },
+        renderTree: parseSvgChildren(svg),
+    };
+}
+
 function parseViewBox(value){
     const parts = String(value || '').trim().split(/\s+/).map(Number);
     if( parts.length !== 4 || parts.some(part => !Number.isFinite(part)) ) return null;
@@ -76,7 +125,6 @@ function numberOrDefault(value, fallback){
 
 function fishBodyColor(f){
     if( f.ownerKind === 'user' && isCssColor(f.userColor) ) return f.userColor;
-    if( f.ownerKind === 'npc' && f.npcRole === 'abandoned-user-fish' && isCssColor(f.formerUserColor) ) return f.formerUserColor;
     if( isCssColor(f.userColor) ) return f.userColor;
     if( Number.isFinite(f.hue) ) return `hsl(${f.hue}, 68%, 58%)`;
     return '#d6b84f';
@@ -182,13 +230,13 @@ function drawSvgNode(ctx, node, fish, animation){
     if( node.type === 'group' ){
         drawSvgNodes(ctx, node.children, fish, animation);
     }else if( node.type === 'path' ){
-        drawSvgPaintedShape(ctx, node.paint, fish, () => ctx.fill(node.path), () => ctx.stroke(node.path));
+        drawSvgPaintedShape(ctx, node.id, node.paint, fish, () => ctx.fill(node.path), () => ctx.stroke(node.path));
     }else if( node.type === 'circle' ){
         const draw = () => {
             ctx.beginPath();
             ctx.arc(node.cx, node.cy, node.r, 0, Math.PI * 2);
         };
-        drawSvgPaintedShape(ctx, node.paint, fish, () => {
+        drawSvgPaintedShape(ctx, node.id, node.paint, fish, () => {
             draw();
             ctx.fill();
         }, () => {
@@ -199,8 +247,8 @@ function drawSvgNode(ctx, node, fish, animation){
     ctx.restore();
 }
 
-function drawSvgPaintedShape(ctx, paint, fish, fillShape, strokeShape){
-    const fill = resolveSvgPaint(ctx, paint.fill, fish);
+function drawSvgPaintedShape(ctx, nodeId, paint, fish, fillShape, strokeShape){
+    const fill = resolveSvgPaint(ctx, paint.fill, fish, nodeId);
     if( fill ){
         ctx.save();
         ctx.globalAlpha *= paint.fillOpacity;
@@ -209,7 +257,7 @@ function drawSvgPaintedShape(ctx, paint, fish, fillShape, strokeShape){
         ctx.restore();
     }
 
-    const stroke = resolveSvgPaint(ctx, paint.stroke, fish);
+    const stroke = resolveSvgPaint(ctx, paint.stroke, fish, nodeId);
     if( stroke ){
         ctx.save();
         ctx.globalAlpha *= paint.strokeOpacity;
@@ -220,27 +268,47 @@ function drawSvgPaintedShape(ctx, paint, fish, fillShape, strokeShape){
     }
 }
 
-function resolveSvgPaint(ctx, value, fish){
+function resolveSvgPaint(ctx, value, fish, nodeId = ''){
     if( !value || value === 'none' || value === 'transparent' ) return null;
-    if( value === 'currentColor' ) return fishBodyColor(fish);
+    if( value === 'currentColor' ) return currentColorPaint(ctx, fish, nodeId);
     const gradientMatch = /^url\(#([^)]+)\)$/.exec(value);
-    if( gradientMatch ) return createSvgGradient(ctx, gradientMatch[1], fish);
+    if( gradientMatch ) return createSvgGradient(ctx, gradientMatch[1], fish, nodeId);
     return value;
 }
 
-function createSvgGradient(ctx, id, fish){
+function createSvgGradient(ctx, id, fish, nodeId = ''){
     const source = fishSvgGradients.get(id);
-    if( !source ) return fishBodyColor(fish);
+    if( !source ) return currentColorPaint(ctx, fish, nodeId);
     const gradient = ctx.createLinearGradient(source.x1, source.y1, source.x2, source.y2);
     for( const stop of source.stops ){
-        gradient.addColorStop(stop.offset, colorWithOpacity(resolveSvgColor(stop.color, fish), stop.opacity));
+        gradient.addColorStop(stop.offset, colorWithOpacity(resolveSvgColor(stop.color, fish, nodeId), stop.opacity));
     }
     return gradient;
 }
 
-function resolveSvgColor(value, fish){
-    if( !value || value === 'currentColor' ) return fishBodyColor(fish);
+function resolveSvgColor(value, fish, nodeId = ''){
+    if( !value || value === 'currentColor' ) return currentColorPaint(null, fish, nodeId);
     return value;
+}
+
+// @ds:c3708d14 @ds:bfd5a97a
+function currentColorPaint(ctx, fish, nodeId = ''){
+    if( fish.ownerKind === 'npc' && fish.npcRole === 'abandoned-user-fish' ){
+        if( ctx && isAbandonedBodyBase(nodeId) ) return abandonedBodyGradient(ctx, fish);
+        return '#d6b84f';
+    }
+    return fishBodyColor(fish);
+}
+
+function isAbandonedBodyBase(nodeId){
+    return nodeId === 'body_cruise' || nodeId === 'body_burst';
+}
+
+function abandonedBodyGradient(ctx, fish){
+    const gradient = ctx.createLinearGradient(0, 0, 0, fishSvgGeometry.height);
+    gradient.addColorStop(0, isCssColor(fish.formerUserColor) ? fish.formerUserColor : '#59bcd6');
+    gradient.addColorStop(1, '#d6b84f');
+    return gradient;
 }
 
 function colorWithOpacity(color, opacity){
@@ -331,6 +399,7 @@ export function render(ctx, state){
     ctx.scale(viewport.scale, viewport.scale);
 
     for( const bubble of renderWorld.bubbles ) drawBubble(ctx, bubble); // ds:d6cebf86
+    for( const shred of renderWorld.shreds || [] ) drawShred(ctx, shred, (state.debug?.now || performance.now()) / 1000); // @ds:6f3a9c20
     for( const f of renderWorld.fish ) drawFish(ctx, f); // ds:1f3abc43
     for( const label of state.sizeDeltaLabels || [] ){
         const fishForLabel = renderWorld.fish.find(fishItem => fishItem.id === label.fishId);
@@ -398,6 +467,10 @@ export function buildToroidalRenderWorld(world, followed, debugTraces = []){
             ...fish,
             pos: projectPos(fish.pos),
         })),
+        shreds: (world.shreds || []).map(shred => ({
+            ...shred,
+            pos: projectPos(shred.pos),
+        })),
         bubbles: (world.bubbles || []).map(bubble => ({
             ...bubble,
             pos: projectPos(bubble.pos),
@@ -407,6 +480,75 @@ export function buildToroidalRenderWorld(world, followed, debugTraces = []){
             pos: projectPos(trace.pos),
         })),
     };
+}
+
+// @ds:6f3a9c20 @ds:73b91e4c
+function drawShred(ctx, shred, timeSeconds = 0){
+    ctx.save();
+    ctx.translate(shred.pos.x, shred.pos.y);
+    const scale = Math.max(0.001, shred.size || 1) / Math.max(1, shredSvgGeometry.width);
+    ctx.scale(scale, scale);
+    ctx.translate(-shredSvgGeometry.centerX, -shredSvgGeometry.centerY);
+    const paintSource = {
+        ownerKind: 'user',
+        userColor: shred.sourceColor || '#d6b84f',
+        mode: 'cruise',
+    };
+    const remaining = new Set(shred.remainingLayers || SHRED.layerOrder.flat());
+    drawShredSvgNodes(ctx, shredSvgRenderTree, paintSource, shred, remaining, timeSeconds);
+    ctx.restore();
+}
+
+function drawShredSvgNodes(ctx, nodes, paintSource, shred, remaining, timeSeconds){
+    for( const node of nodes || [] ) drawShredSvgNode(ctx, node, paintSource, shred, remaining, timeSeconds);
+}
+
+function drawShredSvgNode(ctx, node, paintSource, shred, remaining, timeSeconds){
+    if( !node ) return;
+    if( isShredLayer(node.id) && !remaining.has(node.id) ) return;
+    ctx.save();
+    applyShredLayerTransform(ctx, node.id, shred, timeSeconds);
+    if( node.type === 'group' ){
+        drawShredSvgNodes(ctx, node.children, paintSource, shred, remaining, timeSeconds);
+    }else if( node.type === 'path' ){
+        drawSvgPaintedShape(ctx, node.id, node.paint, paintSource, () => ctx.fill(node.path), () => ctx.stroke(node.path));
+    }else if( node.type === 'circle' ){
+        const draw = () => {
+            ctx.beginPath();
+            ctx.arc(node.cx, node.cy, node.r, 0, Math.PI * 2);
+        };
+        drawSvgPaintedShape(ctx, node.id, node.paint, paintSource, () => {
+            draw();
+            ctx.fill();
+        }, () => {
+            draw();
+            ctx.stroke();
+        });
+    }
+    ctx.restore();
+}
+
+function isShredLayer(id){
+    return SHRED.layerOrder.flat().includes(id);
+}
+
+function applyShredLayerTransform(ctx, id, shred, timeSeconds){
+    if( !isShredLayer(id) ) return;
+    const layerIndex = SHRED.layerOrder.flat().indexOf(id);
+    const seed = (shred.visualSeed || 0) + layerIndex * 0.173;
+    const phase = timeSeconds * (0.75 + seed * 0.9) + seed * Math.PI * 2;
+    const maxDeg = SHRED.layerRotationMinDeg + seededUnit(seed) * (SHRED.layerRotationMaxDeg - SHRED.layerRotationMinDeg);
+    const angle = Math.sin(phase) * maxDeg * Math.PI / 180;
+    const dx = Math.cos(phase * 1.13) * SHRED.layerDriftPx;
+    const dy = Math.sin(phase * 0.91) * SHRED.layerDriftPx;
+    ctx.translate(shredSvgGeometry.centerX + dx, shredSvgGeometry.centerY + dy);
+    ctx.rotate(angle);
+    ctx.translate(-shredSvgGeometry.centerX, -shredSvgGeometry.centerY);
+}
+
+function seededUnit(seed){
+    const value = Math.sin(seed * 999.133) * 43758.5453;
+    return value - Math.floor(value);
 }
 
 // @ia 3c4d5e6f

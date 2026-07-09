@@ -14,12 +14,12 @@ entity:
 
 behaviours:
   wander:
-    from: [ds:prey.wander, ia:prey.wander-cruise]
+    from: [ds:prey.wander, ds:npc.continuous-motion-intent, ia:prey.wander-cruise]
     contract:
       name: wanderSteer
       inputs: [self, dt, rng]
       output: { acceleration, mode: cruise }   # блуждание = cruise, размер не тратит
-      rule: "occasionally pick new heading; gentle, slower than player; mode stays cruise"
+      rule: "NPC always keeps an active movement intent; when no hunt target or threat exists, occasionally pick or keep a gentle wander heading; mode stays cruise"
   flee:
     from: [ds:prey.flee, ds:prey.flee.effort, ia:prey.flee-proximity, ia:prey.flee-vain-skip, ia:prey.speed-cap]
     contract:
@@ -74,6 +74,13 @@ behaviours:
     range: [0, 100]
     spawn_rule: "new NPC courage is current live NPC average plus random +/-10%, clamped to 0..100; world start average is 50"
     diversity_rule: "every tenth new NPC receives fully random courage 0..100"
+  lifetime_aging:
+    from: [ds:npc.lifetime-aging, ds:world.high-load-old-age-suspension]
+    contract:
+      name: expireOldNpcFish
+      inputs: [world.fish, dt]
+      output: [expiredNpcFish[], world.fish', world.shreds']
+      rule: "server removes NPC fish whose age reaches 5 minutes when old-age expiry is not suspended by controlled-object high load; this is an old-age death event, so no predator receives eaten credit; each old-age NPC death creates shreds through shred.spawn within the controlled-object limit"
 
 population:
   spawn:

@@ -17,6 +17,8 @@ entity:
     userName: { type: string?, from: [ds:multiplayer.identity, ds:fish.decor.user-label] }
     userColor: { type: color?, from: [ds:multiplayer.identity, ds:fish.decor.abandoned-gradient] }
     userTier: { type: enum[paid,free]?, from: ds:multiplayer.identity }
+    feedingSuccessFactor: { type: number, range: [0,1], default: 1, from: ds:fish.feeding-success }
+    feedingCooldown: { type: seconds, gte: 0, default: 0, from: ds:fish.feeding-success }
   visual_geometry:
     from: [ds:fish.visual.geometry-asset, ds:fish.geometry.collision-area, ia:fish.visual.svg-geometry-fidelity]
     asset: ds/assets/fish2.svg
@@ -68,6 +70,13 @@ behaviours:
   updateFacing:
     from: [ds:fish.facing, ia:fish.facing-threshold, ia:fish.client-visual-facing-mouth]
     rule: "client visual facing follows confident horizontal movement inferred from fish velocity; tiny or jittery horizontal changes do not flip facing; no server-facing field is required"
+  feedingRecovery:
+    from: ds:fish.feeding-success
+    contract:
+      name: advanceFeedingState
+      inputs: [fish, dt]
+      output: fish'
+      rule: "server reduces feedingCooldown toward 0 by elapsed dt and linearly restores feedingSuccessFactor toward 1 over 1 second; every processed feeding attempt multiplies feedingSuccessFactor by the food-type decay factor before later time recovery: 0.75 for fish attempts and 0.9 for shred attempts"
 
 decor:
   userColorBody:
@@ -85,7 +94,7 @@ decor:
     from: [ds:fish.decor.mouth, ia:fish.decor.mouth-state, ia:fish.client-visual-facing-mouth]
     contract:
       name: updateMouth
-      inputs: [fish, accel, mode, dt, eatenCount?]
+      inputs: [fish, accel, mode, dt, eatenCount?, shredEatCue?]
       output: mouthState
       rule: >
         if fish is in burst/hunt mode with active thrust -> mouth slightly open
@@ -93,7 +102,10 @@ decor:
         inertial movement do not open the toothed mouth. When fish just ate prey,
         the client holds that fish in a local visual cruise state for 0.3 seconds
         so the mouth closes through the ordinary cruise form; this visual hold does
-        not change server movement, predation, size, or synchronization.
+        not change server movement, predation, size, or synchronization. When fish
+        eats a shred while in cruise or inertial movement, the client opens the
+        toothed mouth locally for 0.3 seconds without changing the domain movement
+        mode.
   swimMotion:
     from: [ds:fish.decor.swim_motion, ds:fish.visual.geometry-asset, ia:fish.decor.swim-state]
     contract:
@@ -135,7 +147,7 @@ decor:
       name: updateAbandonedGradient
       inputs: [fish]
       output: bodyColorStyle
-      rule: "abandoned former user fish uses a gradient mixing former user color with ordinary NPC yellow; ordinary decor overlays still preserve the visible gradient base"
+      rule: "abandoned former user fish applies the former-user-to-NPC-yellow gradient only to the SVG body base; fins, eyes, gills, mouth, highlights, and decorative SVG layers keep their authored geometry and layer policy"
   sizeDeltaLabel:
     from: ds:fish.decor.size-delta-label
     authority: client-only

@@ -4,6 +4,7 @@
 
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
@@ -25,6 +26,7 @@ const root = fileURLToPath(new URL('.', import.meta.url));
 const workspaceRoot = normalize(join(root, '..'));
 const dsAssetRoot = join(workspaceRoot, 'ds', 'assets'); // @ds:df06827a
 const port = Number(process.env.PORT || SERVER.port);
+const appVersion = makeAppVersion(); // @ds:8d13f6a2
 const world = makeWorld();
 const inputsByClient = new Map();
 const sockets = new Map();
@@ -37,6 +39,11 @@ maintainPopulation({ world }, Math.random);
 
 const server = createServer(async (req, res) =>{
     const url = new URL(req.url, `http://${req.headers.host}`);
+    if( url.pathname === '/version.json' ){
+        res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+        res.end(JSON.stringify({ version: appVersion }));
+        return;
+    }
     const safePath = normalize(url.pathname === '/' ? 'index.html' : url.pathname.replace(/^\/+/, '')).replace(/^(\.\.[/\\])+/, '');
     const assetPath = safePath.startsWith('ds/assets/') ? join(workspaceRoot, safePath) : null;
     const path = assetPath || join(root, safePath);
@@ -173,6 +180,7 @@ function convertUserFishToNpc(fish){
     fish.userName = '';
     fish.userTier = null;
     fish.clientId = null;
+    fish.age = 0; // @ds:a6c9e8b4
     updateAbandonedGradient(fish);
 }
 
@@ -254,6 +262,22 @@ function broadcastEvent(message){
 
 function makeCode(){
     return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+// @ds:8d13f6a2
+function makeAppVersion(){
+    const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
+    let digest = 'nogit';
+    try{
+        digest = execFileSync('git', ['rev-parse', '--short', 'HEAD'], {
+            cwd: workspaceRoot,
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'ignore'],
+        }).trim() || digest;
+    }catch{
+        // Keep the launch-date version usable outside a git checkout.
+    }
+    return `${stamp}-${digest}`;
 }
 
 function contentType(path){

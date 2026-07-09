@@ -23,6 +23,7 @@ modules:                     # from ds:domain.modules
   - fish
   - prey
   - predation
+  - shred
   - controls
   - multiplayer
   - ws-protocol
@@ -82,6 +83,17 @@ constraints:                 # from ds:intent.game
   authority: server
   multiplayer_primary: true
   single_user_mode: "single-player experience over the same server-authoritative world"
+
+ui:
+  version_visible:
+    from: ds:ui.version-visible
+    authority: client-display
+    source: "server-served app version metadata"
+    contract:
+      name: showAppVersion
+      inputs: [buildOrLaunchDate, commitDigest]
+      output: versionText
+      rule: "interface has a persistent service UI area that shows date-derived build/run version plus commit digest for local verification and bug discussion"
 
 implementation_model:
   geometry:

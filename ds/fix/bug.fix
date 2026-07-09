@@ -56,7 +56,7 @@
   Все еще невозможно догнать большой рыбой маленькую NPC-рыбу. В режиме охоты это должно быть возможно: в burst даже самая большая пользовательская рыба должна двигаться быстрее, чем самая маленькая NPC-рыба в режиме ускорения/бегства.
   Source: user report 2026-07-05; affected DSR/code: `ds/dsr/imp/web-canvas.dsr#movement_and_energy`, `constants.js#FISH`, `constants.js#PREY`, `fish.js#maxSpeedOf`, `fish.js#integrate`, `prey.js#capPreySpeed`.
 
-- [ ] **[bug:npc-passive-growth-by-incidental-eating]**\
+- [x] **[bug:npc-passive-growth-by-incidental-eating]**\
   Новые NPC-рыбы могут появляться в опасной зоне рядом с более крупной рыбой и быть съеденными сразу после появления. Ожидаемое поведение: новая NPC-рыба появляется в свободной области воды, где у неё есть возможность начать движение до первого атакующего контакта.
   Source: user report 2026-07-08; affected requirement/DSR/code: `ds/sense/prey/prey.ds#ds:npc.spawn-safe-water`, `ds/dsr/imp/web-canvas.dsr#npc_spawn_and_growth`, `prey.js#maintainPopulation`, `prey.js#spawnOne`, `world.js#findLowestDensitySpawn`.
 
@@ -75,3 +75,19 @@
 - [x] **[bug:eating-mouth-close-state]**\
   При съедении пасть съевшей рыбы должна закрываться через краткое локальное визуальное состояние `cruise` на 0.3s после роста `eatenFishCount`; серверное состояние движения, predation и синхронизация продолжают идти по обычным правилам.
   Source: user report 2026-07-08; affected DSR/code: `ds/dsr/imp/web-canvas.dsr#client_prediction_and_render`, `main.js#updateClientDecorState`, `render.js#drawFish`.
+
+- [x] **[bug:abandoned-user-fish-age-reset]**\
+  При переходе пользовательской рыбы в NPC начинается новый NPC lifetime: возраст сбрасывается на 0, поэтому бывшая пользовательская рыба остается жить как abandoned-user-fish и проходит обычное NPC-старение с начала этого состояния.
+  Source: user report 2026-07-09; affected DSR/code: `ds/dsr/imp/web-canvas.dsr#reconnect_and_timeout`, `server.js#convertUserFishToNpc`.
+
+- [x] **[bug:shred-eating-burst-mouth-cue]**\
+  При съедении слоя ошмётка сервер увеличивает `shredEatCueCounter` для любого режима движения рыбы, а клиент по этому счётчику показывает локальное открытие пасти на 0.3s.
+  Source: user report 2026-07-09; affected DSR/code: `ds/dsr/imp/web-canvas.dsr#shreds`, `ds/dsr/imp/web-canvas.dsr#client_prediction_and_render`, `shred.js#consumeShredLayer`, `main.js#updateClientDecorState`.
+
+- [x] **[bug:shred-fish-wake-too-weak]**\
+  Ошмётки сохраняют заметный дрейф в воде и получают мягкий локальный импульс в направлении движения проплывающих рядом рыб.
+  Source: user report 2026-07-09; affected DSR/code: `ds/dsr/imp/web-canvas.dsr#shreds`, `constants.js#SHRED`, `shred.js#advanceShreds`.
+
+- [x] **[bug:shred-cruise-mouth-cue-not-rendered]**\
+  При съедении корма в режиме cruise клиент показывает открытие пасти через краткое локальное `shape_burst` состояние на 0.3s; cue запускается и для первого snapshot с положительным `shredEatCueCounter`.
+  Source: user report 2026-07-09; affected DSR/code: `ds/dsr/imp/web-canvas.dsr#client_prediction_and_render`, `main.js#makeClientDecor`, `main.js#updateClientDecorState`, `main.js#applyClientFishDecor`.

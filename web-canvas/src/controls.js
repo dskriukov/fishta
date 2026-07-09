@@ -110,30 +110,35 @@ export function createInput(canvas){
         input.joystick.hunt = false;
     };
 
+    // @ds:5d92a6ef
+    canvas.addEventListener('contextmenu', e => e.preventDefault());
     canvas.addEventListener('mousemove', e => setPointer(e.clientX, e.clientY, true));
     canvas.addEventListener('mouseleave', () =>{ input.pointer.active = false; input.pointerDown = false; });
     canvas.addEventListener('mousedown', e =>{ setPointer(e.clientX, e.clientY); input.pointerDown = true; });
     window.addEventListener('mouseup', () =>{ input.pointerDown = false; });
     canvas.addEventListener('touchstart', e =>{
+        e.preventDefault();
         input.touchCount = e.touches.length;
         const touch = e.touches[0];
         if( !touch ) return;
         setPointer(touch.clientX, touch.clientY);
         input.touchDown = true;
-    }, { passive: true });
+    }, { passive: false });
     canvas.addEventListener('touchmove', e =>{
+        e.preventDefault();
         input.touchCount = e.touches.length;
         const touch = e.touches[0];
         if( !touch ) return;
         setPointer(touch.clientX, touch.clientY, true);
-    }, { passive: true });
+    }, { passive: false });
     canvas.addEventListener('touchend', e =>{
+        e.preventDefault();
         input.touchCount = e.touches.length;
         const touch = e.touches[0];
         input.touchDown = Boolean(touch);
         if( touch ) setPointer(touch.clientX, touch.clientY);
         else input.pointer.active = false;
-    });
+    }, { passive: false });
 
     window.addEventListener('keydown', e =>{
         const key = normalizeKey(e.key);

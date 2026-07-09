@@ -31,6 +31,32 @@ leave_game:
     output: leaveRequest?
     rule: "explicit UI command requests conversion of current user fish to NPC through multiplayer.leave-game unless predation attack-block rule denies it"
 
+join_after_leave:
+  from: ds:controls.join-after-leave
+  contract:
+    name: joinAfterLeave
+    inputs: [leaveResult, joinFormState]
+    output: entryUiState
+    rule: >
+      after a successful explicit leave, the current client returns to the entry
+      state: the leave command becomes an enter command, the enter command opens
+      the start form with name, color, and existing paid/free choice, and submitting
+      that form creates a new user fish for this client instance through the normal
+      join-world identity flow.
+
+game_surface_input_ownership:
+  from: ds:controls.game-surface-input-ownership
+  contract:
+    name: bindGameSurfaceInputOwnership
+    inputs: [gameSurface, gameControls, joinForm, ordinaryUiControls]
+    output: browserGesturePolicy
+    rule: >
+      the game surface and game controls are owned by game input, so text
+      selection, element selection, context gestures, scrolling, zooming, and
+      browser navigation touch gestures yield to game controls there. The join
+      form and ordinary UI controls keep their normal typing, selection, click,
+      and activation behavior.
+
 input:
   device:
     from: ds:controls.device-type

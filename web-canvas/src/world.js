@@ -11,6 +11,13 @@ export function wrapPosition(fish, world){
     fish.pos.y = ((fish.pos.y % world.height) + world.height) % world.height;
 }
 
+// @ds:c83f4c1e
+export function wrapPoint(pos, world){
+    pos.x = ((pos.x % world.width) + world.width) % world.width;
+    pos.y = ((pos.y % world.height) + world.height) % world.height;
+    return pos;
+}
+
 // Compatibility name retained for callers; DSR now requires wrapping, not clamping.
 export const clampToBounds = wrapPosition;
 
@@ -116,6 +123,10 @@ export function scaleWorldEntities(world, nextSize){
         fish.pos.x *= sx;
         fish.pos.y *= sy;
     }
+    for( const shred of world.shreds || [] ){
+        shred.pos.x *= sx;
+        shred.pos.y *= sy;
+    }
     world.width = nextSize.width;
     world.height = nextSize.height;
     world.nextSizeStep = { ...nextSize };
@@ -142,6 +153,11 @@ export function findLowestDensitySpawn(world, rng){
             const dy = candidate.y - other.pos.y;
             score += 1 / Math.max(80, Math.hypot(dx, dy));
         }
+        for( const shred of world.shreds || [] ){
+            const dx = candidate.x - shred.pos.x;
+            const dy = candidate.y - shred.pos.y;
+            score += 0.6 / Math.max(80, Math.hypot(dx, dy));
+        }
         if( score < bestScore ){
             bestScore = score;
             best = candidate;
@@ -150,7 +166,26 @@ export function findLowestDensitySpawn(world, rng){
     return best || { x: world.width / 2, y: world.height / 2 };
 }
 
+// @ds:eccfca7e
+export function controlledObjectCount(world){
+    return (world.fish?.length || 0) + (world.shreds?.length || 0);
+}
+
+// @ds:eccfca7e
+export function canAddControlledObjects(world, addedCount = 1){
+    const limit = Number(WORLD.maxControlledObjects);
+    if( !Number.isFinite(limit) || limit <= 0 ) return true;
+    return controlledObjectCount(world) + Math.max(0, addedCount) <= limit;
+}
+
+// @ds:d140effd
+export function isOldAgeSuspended(world){
+    const limit = Number(WORLD.maxControlledObjects);
+    if( !Number.isFinite(limit) || limit <= 0 ) return false;
+    return controlledObjectCount(world) / limit > WORLD.oldAgeSuspendFillRatio;
+}
+
 // @ia 5a6b7c8d
 export function makeWorld(width = WORLD.initialWidth, height = WORLD.initialHeight){
-    return { width, height, nextSizeStep: null, fish: [], bubbles: [], tick: 0 };
+    return { width, height, nextSizeStep: null, fish: [], shreds: [], bubbles: [], tick: 0, nextShredId: 1 };
 }

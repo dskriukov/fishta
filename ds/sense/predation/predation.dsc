@@ -77,6 +77,34 @@ effect:
       - "if b is an NPC fish: remove b from world; grow a; NPC density maintenance may later spawn replacement"
       - "if b is a user fish: grow a and respawn that user's fish at start size"
 
+feeding_batch:
+  from: [ds:predation.feeding-batch, ds:predation.feeding-success-factor, ds:predation.feeding-batch-area-limit, ds:predation.feeding-batch-cooldown, ds:fish.feeding-success, ds:fish.growth, ds:fish.geometry.collision-area, ds:shred.eating-eligibility, ds:shred.growth-effect]
+  contract:
+    name: resolveFeedingBatches
+    inputs: [world, rng]
+    output: world'
+    rule: >
+      For each fish whose feedingCooldown is 0, server collects edible fish and
+      shred candidates that satisfy their own contact and eligibility rules.
+      Candidates are sorted by expected nutrition from largest to smallest.
+      The server processes candidates sequentially with current
+      feedingSuccessFactor probability, capped to 0.4 when the first candidate
+      in the series is a shred. After every processed attempt, successful or not,
+      feedingSuccessFactor is multiplied by the food-type decay factor: 0.75 for
+      fish attempts and 0.9 for shred attempts. Successful fish candidates add
+      70% of the victim fish canonical area to the predator growth model.
+      Successful shred candidates consume the next available layer group and add
+      the computed nutrition mass. The sum of successfully swallowed canonical
+      area in one series must not exceed the feeder fish canonical area. After a
+      non-empty processed series, feedingCooldown becomes 0.35 seconds.
+  area_limit:
+    feeder_capacity: "feeder canonical circle area"
+    fish_candidate_area: "victim canonical circle area"
+    shred_candidate_area: "geometric area of the next consumed layer group"
+  ordering:
+    fish_expected_nutrition: "70% of victim canonical area"
+    shred_expected_nutrition: "next layer group area * shred nutrition multiplier * applicable color factor"
+
 symmetry:
   from: ds:predation.symmetry
   rule: "predation is symmetric across fish; user fish can be predator or prey according to paid/free eligibility"

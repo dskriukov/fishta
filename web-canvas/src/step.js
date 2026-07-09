@@ -4,11 +4,12 @@
 // @ds b28b7af6 22fd3ab4 55c13a4f 10baf178 7ce238da 8869f043 579e4888 31cb7a0d e9fb3705 e6ecfbdd d6cebf86 0c8d4e2a 6f1b0a3c
 
 import { FISH } from './constants.js';
-import { integrate, runExhaleCycle, requestExhale } from './fish.js';
-import { chooseNpcIntent, preySteer, capPreySpeed, maintainPopulation, advanceFryGrowth } from './prey.js';
+import { advanceFeedingState, integrate, runExhaleCycle, requestExhale } from './fish.js';
+import { chooseNpcIntent, preySteer, capPreySpeed, maintainPopulation, advanceFryGrowth, expireOldNpcFish } from './prey.js';
 import { huntSteer } from './hunt.js';
 import { playerSteer, huntMode } from './controls.js';
-import { resolveEating } from './predation.js';
+import { resolveEating, resolveFeedingBatches } from './predation.js';
+import { advanceShreds } from './shred.js';
 import { emitBubble, advanceBubbles } from './world.js';
 import { normalize, scale } from './vec.js';
 
@@ -86,9 +87,12 @@ export function stepAuthoritativeWorld(state, inputsByClient, dt, rng){
         fish.prevAccel = { ...accel };
         integrate(fish, accel, world, dt);
         if( fish.ownerKind === 'npc' ) capPreySpeed(fish);
+        advanceFeedingState(fish, dt);
     }
 
-    resolveEating({ world, rng });
+    advanceShreds(world, dt); // @ds:8b62d9ce
+    expireOldNpcFish(world, rng); // @ds:a6c9e8b4
+    resolveFeedingBatches(world, rng); // @ds:9b41d2ac @ds:6c80e3b4 @ds:f2ad71c9 @ds:a8f03d2e
     maintainPopulation({ world }, rng);
     world.bubbles = [];
     return state;

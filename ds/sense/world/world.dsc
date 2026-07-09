@@ -55,7 +55,63 @@ npc_density:
     name: findLowestFishDensityArea
     inputs: [allFish[], worldSize]
     output: spawnArea
-    rule: "density for spawn and respawn location selection is computed from all fish, not only dangerous fish or NPC fish"
+    rule: "density for spawn and respawn location selection is computed from all fish and persistent nutrient chunks, not only dangerous fish or NPC fish"
+
+controlled_objects:
+  from: [ds:world.controlled-object-limit, ds:world.high-load-old-age-suspension]
+  counted_entities: [fish, shreds]
+  excluded_entities: [client_decor, bubbles, exhale_visuals]
+  max_count: configurable
+  high_load_threshold: 0.9
+  contract:
+    name: controlledObjectCount + canAddControlledObjects + isOldAgeSuspended
+    inputs: [world, addedCount]
+    output: boolean
+    rule: >
+      controlled object count is the number of server-synchronized fish plus
+      server-synchronized shreds. Shred creation may add only the count that
+      keeps the total within max_count. Old-age NPC expiry is suspended while
+      controlledObjectCount(world) / max_count is greater than 0.9 and resumes
+      when the ratio is not greater than that threshold.
+
+nutrients:
+  from: [ds:world.nutrient-chunks, ds:world.nutrient-chunk-feeding, ds:world.nutrient-chunk-drift, ds:npc.lifetime-aging]
+  authority: server
+  entity:
+    id: NutrientChunk
+    properties: [id, pos, vel, size, radius, areaValue, initialAreaValue]
+  contract:
+    name: spawnNutrientChunksFromAgedNpc
+    inputs: [expiredNpcFish, world, rng]
+    output: world.nutrientChunks'
+    rule: >
+      when an NPC dies of old age, create edible drifting nutrient chunks with
+      total canonical circular area about 50% of that fish's canonical circular
+      area. Each chunk's geometric size is capped at the smallest ordinary NPC
+      size.
+  feeding:
+    name: resolveNutrientEating
+    inputs: [world, rng]
+    output: world'
+    rule: >
+      nutrient chunks are eaten in hunting contact phases between one fish and
+      one chunk. A phase starts when a fish in burst enters overlap with the
+      chunk and ends when overlap or burst state stops. Each new phase gets one
+      random bite attempt with 40% success probability. A successful bite gives
+      the fish up to 30% of the chunk's remaining areaValue using the same
+      area-growth principle as ordinary prey, decreases the chunk areaValue, and
+      does not increment eaten-fish count. Chunk visual opacity follows
+      areaValue / initialAreaValue. The chunk disappears when its edible
+      areaValue is exhausted.
+  drift:
+    name: advanceNutrientChunks
+    inputs: [world.nutrientChunks, world.fish, dt]
+    output: world.nutrientChunks'
+    rule: >
+      chunks are inert server-owned drifting objects. They keep position and
+      velocity, wrap in the world, and receive a small wake acceleration from
+      nearby passing fish: 70% along fish movement direction and 30% perpendicular
+      toward the passing trajectory, weakened by distance.
 
 dynamics:
   drag:
