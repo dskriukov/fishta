@@ -132,23 +132,23 @@ decor:
     asset: ds/assets/back.png
     contract:
       name: updateWorldBackgroundCss
-      inputs: [cameraViewport, cssBackgroundLayer]
+      inputs: [followedFishVelocity, frameDt, cssBackgroundLayer]
       output: cssBackgroundPosition
       rule: >
         the game surface has a muted CSS background layer from back.png under a
         transparent canvas and all game objects. The background repeats along both
-        axes and moves by a weak parallax factor, about 0.2x of camera movement
-        on both x and y. CSS opacity keeps fish, shreds, bubbles, HUD, and
-        controls readable. The layer is visual-only and does not affect
-        simulation, input, collision, or network synchronization.
+        axes and moves by a weak parallax factor, about 0.2x of the followed
+        fish's displayed velocity integrated over the render frame on both x and
+        y. CSS opacity keeps fish, shreds, bubbles, HUD, and controls readable.
+        The layer is visual-only and does not affect simulation, input, collision,
+        or network synchronization.
     continuity:
       from: fix:world-background-parallax-continuity
       rule: >
-        the background parallax phase is render-only and continuous across
-        toroidal world boundaries. It changes from the nearest toroidal camera
-        delta between frames and preserves its current CSS phase when the followed
-        focus or world dimensions reset, so the tile offset remains visually
-        smooth on both axes.
+        the background parallax phase is render-only and is advanced only by the
+        followed fish's displayed velocity and render-frame dt. Absolute fish
+        positions, toroidal wrapping, server synchronization corrections, followed
+        focus changes, and world-dimension changes preserve the current CSS phase.
   background_depth_haze:
     from: ds:world.background.depth-haze
     authority: client-only
@@ -163,6 +163,24 @@ decor:
         under all game objects: lighter near the top of the viewport and darker
         near the bottom. The haze is visual-only and keeps fish, shreds, bubbles,
         debug overlays, HUD, and controls readable.
+  background_living_decor:
+    from: ds:world.background.living-decor
+    authority: client-only
+    mutates_domain_state: false
+    server_responsibility: false
+    contract:
+      name: drawLivingBackgroundDecor
+      inputs: [canvasViewport, renderTime]
+      output: canvasDecorLayer
+      rule: >
+        render a low-opacity procedural decor layer after clearing the transparent
+        game canvas and before transforming into world coordinates. It contains
+        slow drifting haze, sparse particles and bubbles, small distant fish shoals,
+        and rare large marine-animal silhouettes. All motion is derived locally
+        from render time and viewport size; it does not read or mutate world state,
+        networking state, input, collision, or gameplay state. The decor uses
+        bounded counts and subdued opacity so it remains behind gameplay objects,
+        debug overlays, and HUD without reducing their readability.
   bubbles:
     from: [ds:world.decor.bubbles, ia:world.bubble.radius-formula, ia:world.bubble.animation, ia:world.bubble.rise-speed, ia:world.bubble.burst-sequence]
     authority: client-only

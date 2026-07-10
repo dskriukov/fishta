@@ -256,6 +256,7 @@ function frame(now){
     if( debugMode ) recordDebugPositionTraces(now, visibleState.world);
     render(ctx, {
         ...visibleState,
+        frameDt: dt,
         viewportFishCapacity,
         clientBubbles,
         sizeDeltaLabels: sizeDeltaLabelState.labels,

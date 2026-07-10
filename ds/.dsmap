@@ -1,6 +1,6 @@
 ds/sense/controls/controls.ds#56571d82 - 323e0d97
 ds/sense/controls/controls.ia#ea72de17 - 3ab6da12
-ds/fix/background.fix#0778747e - 8bccf725
+ds/fix/background.fix#e93dab34 - 8bccf725
 ds/sense/fish/fish.ds#785684de - 0e1af7e8
 ds/sense/fish/fish.ia#54e70523 - 2b751007
 ds/sense/main.ds#332ed63e - d3cd9207
@@ -12,7 +12,7 @@ ds/sense/predation/predation.ds#8b07d043 - c4f0fe31
 ds/sense/prey/prey.ds#3bc922ec - 3fbd0a6d
 ds/sense/prey/prey.ia#54167961 - b73de1c3
 ds/sense/shred/shred.ds#9266404c - 51ad0f77
-ds/sense/world/world.ds#29d4896d - 0c44252a
+ds/sense/world/world.ds#69cc46af - 0c44252a
 ds/sense/world/world.ia#d1b53549 - a45699db
 
 ds:controls.camera - 7b9a7984 323e0d97
@@ -152,6 +152,7 @@ ds:shred.tunables - 5a9c0e77 51ad0f77
 ds:world.bounds - c83f4c1e 0c44252a
 ds:world.background.tile-parallax - 2b3e71e0 0c44252a
 ds:world.background.depth-haze - a43de7ec 0c44252a
+ds:world.background.living-decor - d84e6b39 0c44252a
 ds:world.coordinates - 459e191b 0c44252a
 ds:world.decor.bubbles - d6cebf86 0c44252a
 ds:world.drag - ca07d970 0c44252a
