@@ -35,6 +35,8 @@ debug:                       # from ds:debug.mode, ds:debug.world-repeat-bounds,
   mutates_domain_state: false
   mutates_server_state: false
   affects_network_sync: false
+  activation:
+    source: "game menu debug toggle"
   overlays:
     worldRepeatBounds:
       shape: rectangle
@@ -86,6 +88,23 @@ constraints:                 # from ds:intent.game
   single_user_mode: "single-player experience over the same server-authoritative world"
 
 ui:
+  game_menu:
+    from: [ds:ui.game-menu, ds:ui.version-visible, ds:debug.mode, ds:controls.mode-select, ds:controls.leave-game]
+    authority: client-display
+    contract:
+      name: updateGameMenu
+      trigger: "top-left button with three horizontal bars"
+      contents:
+        - control mode selector
+        - current game version
+        - debug mode activation
+        - leave-game command
+        - active control mode help
+      help_modes:
+        keyboard: "keyboard movement and keyboard burst levels"
+        pointer: "mouse pointer movement and mouse burst"
+        touch: "primary touch movement and second-touch burst levels"
+        joystick: "joystick movement and radial burst levels"
   version_visible:
     from: ds:ui.version-visible
     authority: client-display
@@ -94,7 +113,7 @@ ui:
       name: showAppVersion
       inputs: [buildOrLaunchDate, commitDigest]
       output: versionText
-      rule: "interface has a persistent service UI area that shows date-derived build/run version plus commit digest for local verification and bug discussion"
+      rule: "game menu shows date-derived build/run version plus commit digest for local verification and bug discussion"
   world_snapshot_info:
     from: ds:ui.world-snapshot-info
     authority: client-display
@@ -103,7 +122,7 @@ ui:
       name: updateWorldSnapshotInfo
       inputs: [world.fish, world.shreds]
       output: worldSnapshotInfoText
-      placement: "compact translucent top-right client UI panel"
+      placement: "compact translucent bottom-left client UI panel"
       metrics:
         fishCount: "number of fish rows currently present in the synchronized client world"
         fishArea: "sum of canonical circular fish areas from synchronized fish radii"

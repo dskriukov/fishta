@@ -37,10 +37,10 @@ client_messages:
     fields:
       x: { type: signed_thousandths, range: [-999, 999], width: 4, example: "-123" }
       y: { type: signed_thousandths, range: [-999, 999], width: 4, example: "+050" }
-      mods: { type: string, flags: { b: burst } }
+      mods: { type: string, flags: { v1..v99: speedLevel } }
     example:
-      message: "c-123+050b"
-      value: { x: -0.123, y: 0.050, burst: true }
+      message: "c-123+050v50"
+      value: { x: -0.123, y: 0.050, speedLevel: 50 }
 
 client_delta_input:
   from: ds:ws-protocol.client-delta-input
@@ -53,7 +53,7 @@ client_delta_input:
     rule: "when control does not change, client sends only ping and does not repeat zero/control messages"
   changed_control:
     message: "c${x}${y}${mods}"
-    trigger: "direction, control buttons, or burst mode change"
+    trigger: "direction, control buttons, or burst level change"
     rule: "send only changed control state"
 
 handshake:
@@ -123,11 +123,11 @@ state_mods:
   from: ds:ws-protocol.state-mods
   flags:
     a: "fish is under threat / can be attacked"
-    b: "hunt or burst mode"
+    v1..v99: "current relative speed level"
     f: "fear mode"
     e: "fish is eaten"
   combinations:
-    ba: "fish hunts/bursts while also under threat"
+    threat_with_speed_level: "fish moves while also under threat"
   eaten_lifecycle:
     rule: "after sending e, server removes the fish from the world and does not send that ID in following sync messages"
 

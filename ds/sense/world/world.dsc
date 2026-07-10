@@ -187,8 +187,8 @@ decor:
       rule: "new bubbles begin with zero alpha and zero current radius, quickly animate alpha and radius up to their normal values, then rise upward at near-constant speed close to median fish cruise speed, drift slightly, fade out, and are removed when expired or out of world; the fill is nearly transparent while the contour remains visible and may subtly pulse in the vertical axis"
     exhale_trigger:
       from: [ds:world.exhale.accel-start-trigger, ds:world.exhale.burst-start-trigger, ia:world.exhale.accel-start-trigger]
-      name: triggerExhaleDecor
-      inputs: [fish, accel, prevAccel, previousMode]
-      output: exhaleRequest?
+      name: triggerMotionBubbleCue
+      inputs: [fish, previousMode, currentMode, previousMotionDirection, currentMotionDirection]
+      output: bubbles[1..2]?
       authority: client-only
-      rule: "client may locally auto-trigger @fn:exhale when acceleration transitions from zero to nonzero, and must locally trigger @fn:exhale when a displayed fish transitions from cruise to burst; burst-start triggering is edge-based and does not repeat while the fish remains in burst; server does not create, store, sync, or transmit exhale/bubble state"
+      rule: "client locally emits 1-2 ordinary bubbles when a displayed fish transitions cruise<->burst or when its movement direction changes by more than 100 degrees; changes between target burst speeds inside active burst do not trigger this cue by themselves; server does not create, store, sync, or transmit cue bubble state"

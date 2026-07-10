@@ -1,8 +1,8 @@
 // imp/web-canvas/src/protocol.js
 // Compact WebSocket string protocol.
-// @ds:839f8cd0 @ds:5a4d3d6d @ds:671e9773 @ds:4fad33f8 @ds:682570c7 @ds:ea18a088 @ds:f51a5030 @ds:a16328a6 @ds:ed2b4f19 @ds:a2d5936f @ds:2e91f6d4
+// @ds:839f8cd0 @ds:5a4d3d6d @ds:671e9773 @ds:e6be3c03 @ds:4fad33f8 @ds:682570c7 @ds:ea18a088 @ds:f51a5030 @ds:a16328a6 @ds:ed2b4f19 @ds:a2d5936f @ds:2e91f6d4
 
-import { FISH, SHRED } from './constants.js';
+import { FISH, REGIME, SHRED } from './constants.js';
 
 export function encodeName(name){
     const bytes = new TextEncoder().encode(String(name || ''));
@@ -32,10 +32,12 @@ export function encodeClientPing(n){
     return `p:${n}`;
 }
 
-export function encodeClientControl({ accel, hunt }){
-    const x = encodeSignedThousand(accel?.x || 0);
-    const y = encodeSignedThousand(accel?.y || 0);
-    return `c${x}${y}${hunt ? 'b' : ''}`;
+export function encodeClientControl(payload = {}){
+    const x = encodeSignedThousand(payload.accel?.x || 0);
+    const y = encodeSignedThousand(payload.accel?.y || 0);
+    const level = normalizeSpeedLevel(payload.speedLevel);
+    const keyboardCruise = payload.cruiseControl === 'keyboard' && level > 0 && level <= REGIME.cruiseMaxSpeedLevel;
+    return `c${x}${y}${level > 0 ? `v${level}` : ''}${keyboardCruise ? 'k' : ''}`;
 }
 
 export function parseClientMessage(raw){
@@ -54,13 +56,16 @@ export function parseClientMessage(raw){
     if( kind === 'q' ) return { type: 'leave' };
     if( kind === 'p' ) return { type: 'ping', n: Number(text.slice(2)) || 0 };
     if( kind === 'c' ){
+        const mods = text.slice(9);
+        const speedLevel = parseSpeedLevelMod(mods);
         return {
             type: 'input',
             accel: {
                 x: decodeSignedThousand(text.slice(1, 5)),
                 y: decodeSignedThousand(text.slice(5, 9)),
             },
-            hunt: text.slice(9).includes('b'),
+            speedLevel,
+            cruiseControl: mods.includes('k') && speedLevel > 0 && speedLevel <= REGIME.cruiseMaxSpeedLevel ? 'keyboard' : null,
         };
     }
     return { type: 'unknown' };
@@ -264,7 +269,8 @@ export function parseFishRow(row, byId = new Map(), absolute = false){
     const facing = Math.abs(vx) > FISH.facingThreshold
         ? (vx < 0 ? -1 : 1)
         : previousFacing;
-    const burstMode = mods.includes('b');
+    const speedLevel = parseSpeedLevelMod(mods);
+    const burstMode = speedLevel >= REGIME.burstStartSpeedLevel;
     const absolutePos = absolute || !previous;
     const parsed = {
         ...(previous || {}),
@@ -288,6 +294,7 @@ export function parseFishRow(row, byId = new Map(), absolute = false){
             y: vy,
         },
         mode: burstMode ? 'burst' : 'cruise',
+        speedLevel,
         shredEatCueCounter: parseShredCueMod(mods, previous?.shredEatCueCounter || 0),
         fryAge: parseFryAgeMod(mods, ownerKind, previous?.fryAge),
         playerActiveAge: parsePlayerActiveAgeMod(mods, ownerKind, previous?.playerActiveAge || 0),
@@ -316,7 +323,7 @@ function fishSnapshot(fish){
 function stateMods(fish){
     let mods = '';
     if( fish.ownerKind === 'npc' && fish.npcRole === 'abandoned-user-fish' ) mods += 'a';
-    if( fish.mode === 'burst' ) mods += 'b';
+    if( (fish.speedLevel || 0) > 0 ) mods += `v${Math.max(1, normalizeSpeedLevel(fish.speedLevel))}`;
     if( (fish.eyeFear || 0) > 0.2 ) mods += 'f';
     if( (fish.shredEatCueCounter || 0) > 0 ) mods += `s${Math.min(999, Math.floor(fish.shredEatCueCounter))}`;
     if( fish.ownerKind === 'user' && fish.fryAge !== null && fish.fryAge !== undefined ){
@@ -326,6 +333,16 @@ function stateMods(fish){
         mods += `l${encodeAgeTenths(fish.playerActiveAge || 0, 9999)}`;
     }
     return mods || '=';
+}
+
+function parseSpeedLevelMod(mods){
+    const match = /v(\d{1,2})/.exec(mods || '');
+    if( !match ) return 0;
+    return normalizeSpeedLevel(match[1]);
+}
+
+function normalizeSpeedLevel(level){
+    return Math.max(0, Math.min(REGIME.speedLevels, Math.floor(Number(level) || 0)));
 }
 
 function parseShredCueMod(mods, previous){

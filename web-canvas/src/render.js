@@ -1,6 +1,6 @@
 // imp/web-canvas/src/render.js
 // Read-only over domain state (workspace.air rule: render never mutates domain).
-// @ds 975ca168 bd354b7a 906be50b d6cebf86 2b3e71e0 a43de7ec a44b9d2c b28b7af6 1f3abc43 8f2c91ad 6f3a9c20 73b91e4c 0b8e71d4 3ad65f20
+// @ds 975ca168 bd354b7a 906be50b d6cebf86 2b3e71e0 a43de7ec a44b9d2c b28b7af6 1f3abc43 8f2c91ad 6f3a9c20 73b91e4c 0b8e71d4 3ad65f20 c5a92431
 // @ia 2f6e7a91 3983084a
 // @fix 4bbc0692
 
@@ -367,8 +367,9 @@ function clamp(value, min, max){
     return Math.max(min, Math.min(max, value));
 }
 
-function drawFishLabel(ctx, f){
-    if( f.ownerKind !== 'user' || !f.userName ) return;
+// @ds:c5a92431
+function drawFishLabel(ctx, f, currentUserFishId){
+    if( f.id === currentUserFishId || f.ownerKind !== 'user' || !f.userName ) return;
     ctx.save();
     ctx.fillStyle = '#edf8ff';
     ctx.font = `${Math.max(10, Math.min(16, f.radius * 0.42))}px system-ui, sans-serif`;
@@ -400,7 +401,7 @@ export function render(ctx, state){
 
     for( const bubble of renderWorld.bubbles ) drawBubble(ctx, bubble); // ds:d6cebf86
     for( const shred of renderWorld.shreds || [] ) drawShred(ctx, shred, (state.debug?.now || performance.now()) / 1000); // @ds:6f3a9c20
-    for( const f of renderWorld.fish ) drawFish(ctx, f); // ds:1f3abc43
+    for( const f of renderWorld.fish ) drawFish(ctx, f, state.currentUserFishId); // ds:1f3abc43
     for( const label of state.sizeDeltaLabels || [] ){
         const fishForLabel = renderWorld.fish.find(fishItem => fishItem.id === label.fishId);
         if( fishForLabel ) drawSizeDeltaLabel(ctx, label, fishForLabel);
@@ -733,7 +734,7 @@ function drawSizeDeltaLabel(ctx, label, fish){
 }
 
 // @ds:df06827a @ds:bd354b7a @ds:906be50b @ia:2f6e7a91
-function drawFish(ctx, f){
+function drawFish(ctx, f, currentUserFishId){
     const visualScale = Math.max(0.5, f.visualScale || 1);
     const r = f.radius * visualScale;
     const swimPhase = f.swimPhase || 0;
@@ -760,5 +761,5 @@ function drawFish(ctx, f){
         ctx.restore();
     }
 
-    drawFishLabel(ctx, f);
+    drawFishLabel(ctx, f, currentUserFishId);
 }

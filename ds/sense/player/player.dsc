@@ -65,7 +65,7 @@ lifetime:
       name: updatePlayerLifetimeBar
       inputs: [currentUserFish, clientTime, PLAYER.maxLifetimeSeconds]
       output: lifetimeBarState
-      placement: "noticeable bottom-center client UI"
+      placement: "noticeable top-center client UI"
       rule: "client renders remaining active lifetime from the current user fish synchronized playerActiveAge and PLAYER.maxLifetimeSeconds; while playerActiveAge is 0 during the start window the bar stays full, and any change to PLAYER.maxLifetimeSeconds directly changes the fill ratio without hardcoded local duration or size-based lifetime inference"
       urgency_colors:
         active: "normal active color when remaining active lifetime is 10 seconds or more"
@@ -77,5 +77,18 @@ lifetime:
       name: updatePlayerSizeMetric
       inputs: [currentUserFish]
       output: playerSizeText
-      placement: "next to player lifetime indicator in the same noticeable bottom-center client UI"
+      placement: "next to player lifetime indicator in the same noticeable top-center client UI"
       rule: "client renders the current synchronized size of the current user fish with the numeric value as the primary visual element and the size label as secondary text, using an empty placeholder when no current user fish is present"
+  speed_mode_ui:
+    from: ds:player.speed-mode-ui
+    contract:
+      name: updatePlayerSpeedMetric
+      inputs: [currentUserFish, activeControlMode]
+      output: playerSpeedMetricState
+      placement:
+        joystick: "above the visual joystick UI"
+        other_controls: "bottom-right viewport corner"
+      value_rule: "when synchronized current user fish speed rounds to a non-zero two-decimal value, render an integer percent from 1 to 99 based on current real speed divided by the maximum possible speed of that user fish, plus the real speed with two decimal places"
+      visibility_rule: "fade the whole metric in when the displayed speed becomes non-zero and fade it out when the displayed speed returns to zero or no current user fish is present"
+      color_rule: "the integer percent value is green during cruise and uses a burst intensity gradient from green-pink at low speed to pink-red near the maximum speed during burst"
+      typography: "the metric value font size matches the numeric player size metric font size"

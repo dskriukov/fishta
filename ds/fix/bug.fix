@@ -1,5 +1,21 @@
 # Bugs
 
+- [x] **[bug:joystick-burst-rings-inside-cruise-zone]**\
+  Визуальный джойстик должен отображать центральную cruise-зону и burst-кольца в одной радиальной системе: burst-уровень `1` находится на границе cruise-зоны, а все остальные burst-уровни располагаются только за её пределами.
+  Source: user report 2026-07-10; affected requirement/DSR/code: `ds/sense/controls/controls.ds#ds:controls.mobile-joystick-hunt`, `ds/sense/controls/controls.ds#ds:controls.burst-endurance-joystick-ui`, `ds/dsr/imp/web-canvas.dsr#mobile_joystick_layout`, `style.css#joystick-base::before`, `style.css#joystick-burst-rings`.
+
+- [x] **[bug:joystick-unavailable-rings-after-size-loss]**\
+  Визуальный джойстик должен обновлять доступные и недоступные burst-кольца после уменьшения размера собственной пользовательской рыбы так же стабильно, как при стартовом отображении: уровни выше текущего доступного максимума остаются приглушёнными, а уровни до доступного максимума сохраняют обычный стиль.
+  Source: user report 2026-07-10; affected DSR/code: `ds/dsr/imp/web-canvas.dsr#mobile_joystick_layout`, `index.html#joystick-burst-rings`, `style.css#joystick-burst-rings`, `main.js#renderJoystickBurstRings`.
+
+- [x] **[bug:joystick-current-burst-ring-aliased]**\
+  Текущий применяемый burst-уровень на визуальном джойстике должен отображаться цельным стабильным кругом без сегментных разрывов и мерцания при неизменном уровне.
+  Source: user report 2026-07-10; affected DSR/code: `ds/dsr/imp/web-canvas.dsr#mobile_joystick_layout`, `index.html#joystick-current-burst-ring`, `style.css#joystick-current-burst-ring`, `main.js#updateJoystickCurrentBurstRing`.
+
+- [x] **[bug:joystick-gradient-rings-fill]**\
+  Визуальный джойстик должен отображать доступные burst-уровни отдельными концентрическими кольцами вокруг cruise-зоны; при доступном уровне ниже максимума область за последним доступным уровнем остаётся визуально приглушённой, а фактическое доступное кольцо располагается на радиусе этого уровня.
+  Source: user report 2026-07-10; affected DSR/code: `ds/dsr/imp/web-canvas.dsr#mobile_joystick_layout`, `main.js#renderJoystickBurstRings`.
+
 - [x] **[bug:user-color-not-full-body]**\
   пользовательский цвет рыбы применяется не ко всей рыбе ![alt text](fish-color.png) - декор на теле можно сделать через наложение полупрозрачных черных и белых фрагментов, чтобы фон просвечивал через них - тогда не надо будет подбирать цвета каждый раз
   Source: user report 2026-07-03; affected DSR/code: `ds/dsr/imp/web-canvas.dsr#join_identity`, `ds/dsr/imp/web-canvas.dsr#fish_body_color_visual`, `render.js#drawFish`.

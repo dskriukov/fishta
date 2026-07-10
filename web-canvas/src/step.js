@@ -1,10 +1,10 @@
 // imp/web-canvas/src/step.js
 // Implements: dsr/use/ecs-loop.dsr — PURE domain step: state' = step(state, input, dt)
 // Composes behaviours from world/fish/prey/predation/controls. No canvas here.
-// @ds b28b7af6 22fd3ab4 55c13a4f 10baf178 7ce238da 8869f043 579e4888 31cb7a0d e9fb3705 e6ecfbdd d6cebf86 0c8d4e2a 6f1b0a3c 4c7a2b91 c18e5b42 b7a4c391
+// @ds b28b7af6 22fd3ab4 e6be3c03 55c13a4f 10baf178 7ce238da 8869f043 07320d39 9ce87fee 703efd43 579e4888 31cb7a0d e9fb3705 e6ecfbdd d6cebf86 0c8d4e2a 6f1b0a3c 4c7a2b91 c18e5b42 b7a4c391
 
-import { FISH, PLAYER } from './constants.js';
-import { advanceFeedingState, integrate, runExhaleCycle, requestExhale } from './fish.js';
+import { FISH, PLAYER, REGIME } from './constants.js';
+import { advanceFeedingState, availableSpeedLevelForSize, integrate, normalizeSpeedLevel, runExhaleCycle, requestExhale } from './fish.js';
 import { chooseNpcIntent, preySteer, capPreySpeed, maintainPopulation, advanceFryGrowth, expireOldNpcFish } from './prey.js';
 import { advanceUserFryStage, placeUserSpawn, startUserFryStage } from './player.js';
 import { huntSteer } from './hunt.js';
@@ -27,7 +27,8 @@ export function step(state, input, dt, rng){
         return stepAuthoritativeWorld(state, input, dt, rng);
     }
     // ds:22fd3ab4 ds:55c13a4f ds:10baf178 ds:7ce238da
-    state.player.mode = huntMode(input);
+    state.player.speedLevel = availableSpeedLevelForSize(state.player.size, input.speedLevel ?? (huntMode(input) === 'burst' ? REGIME.burstStartSpeedLevel : 0));
+    state.player.mode = state.player.speedLevel >= REGIME.burstStartSpeedLevel ? 'burst' : 'cruise';
     const playerAccel = playerSteer(state.player, input);
     triggerExhaleOnAccelStart(state.player, playerAccel, state.player.prevAccel);
     state.player.prevAccel = { ...playerAccel };
@@ -42,10 +43,12 @@ export function step(state, input, dt, rng){
         const steer = hunt.accel ? hunt : preySteer(p, threats, dt, rng);
         const accel = steer.accel ?? { x: 0, y: 0 };
         p.mode = steer.mode;
+        p.speedLevel = p.mode === 'burst' ? availableSpeedLevelForSize(p.size, REGIME.npcMaxBurstLevel) : REGIME.cruiseMaxSpeedLevel;
+        const previousSpeed = Math.hypot(p.vel.x, p.vel.y);
         triggerExhaleOnAccelStart(p, accel, p.prevAccel);
         p.prevAccel = { ...accel };
         integrate(p, accel, state.world, dt);
-        capPreySpeed(p);
+        capPreySpeed(p, previousSpeed);
     }
 
     // ds:e9fb3705 ds:d867989f
@@ -77,19 +80,24 @@ export function stepAuthoritativeWorld(state, inputsByClient, dt, rng){
             const inFryStage = advanceUserFryStage(fish, dt);
             if( !inFryStage ) fish.playerActiveAge = (fish.playerActiveAge || 0) + dt;
             const input = inputsByClient.get(fish.clientId) || {};
-            fish.mode = input.hunt ? 'burst' : 'cruise';
+            fish.speedLevel = normalizeSpeedLevel(input.speedLevel);
+            fish.cruiseControl = input.cruiseControl === 'keyboard' ? 'keyboard' : null;
+            fish.mode = fish.speedLevel >= REGIME.burstStartSpeedLevel ? 'burst' : 'cruise';
             accel = input.accel ? scale(normalize(input.accel), FISH.accel) : accel;
         }else{
             advanceFryGrowth(fish, dt);
+            fish.cruiseControl = null;
             const steer = chooseNpcIntent(fish, world, rng, dt);
             accel = steer.accel ?? accel;
             fish.mode = steer.mode;
+            fish.speedLevel = fish.mode === 'burst' ? availableSpeedLevelForSize(fish.size, REGIME.npcMaxBurstLevel) : REGIME.cruiseMaxSpeedLevel;
         }
 
+        const previousSpeed = Math.hypot(fish.vel.x, fish.vel.y);
         triggerExhaleOnAccelStart(fish, accel, fish.prevAccel);
         fish.prevAccel = { ...accel };
         integrate(fish, accel, world, dt);
-        if( fish.ownerKind === 'npc' ) capPreySpeed(fish);
+        if( fish.ownerKind === 'npc' ) capPreySpeed(fish, previousSpeed);
         advanceFeedingState(fish, dt);
     }
 

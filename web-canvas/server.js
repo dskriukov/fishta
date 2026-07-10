@@ -1,6 +1,6 @@
 // imp/web-canvas/server.js
 // Static file server, WebSocket endpoint, authoritative world loop.
-// @ds:f359ebf2 @ds:27fa3caa @ds:4bfe0352 @ds:4c7a2b91 @ds:93a64773 @ds:704ab317 @ds:e559831a
+// @ds:f359ebf2 @ds:27fa3caa @ds:4bfe0352 @ds:4c7a2b91 @ds:93a64773 @ds:704ab317 @ds:e559831a @ds:e6be3c03
 
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
@@ -8,7 +8,7 @@ import { execFileSync } from 'node:child_process';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
-import { SERVER, SYNC, RECONNECT } from './src/constants.js';
+import { SERVER, SYNC, RECONNECT, REGIME } from './src/constants.js';
 import { makeFish, updateAbandonedGradient } from './src/fish.js';
 import { startUserFryStage } from './src/player.js';
 import { makeWorld, findLowestDensitySpawn, nextWorldSize, scaleWorldEntities } from './src/world.js';
@@ -208,9 +208,11 @@ function findClientFish(meta){
 }
 
 function normalizeInput(message){
+    const speedLevel = Math.max(0, Math.min(REGIME.speedLevels, Math.floor(Number(message.speedLevel) || 0)));
     return {
         accel: message.accel || { x: 0, y: 0 },
-        hunt: Boolean(message.hunt),
+        speedLevel,
+        cruiseControl: message.cruiseControl === 'keyboard' && speedLevel > 0 && speedLevel <= REGIME.cruiseMaxSpeedLevel ? 'keyboard' : null,
     };
 }
 

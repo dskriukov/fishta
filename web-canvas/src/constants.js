@@ -1,7 +1,7 @@
 // imp/web-canvas/src/constants.js
 // Tunables. Each value is traceable back to an .air interpretation id.
 // Editing these is "implementation tuning"; editing behaviour means editing sense/*.ds.
-// @ds b28b7af6 ca07d970 c83f4c1e d6cebf86 2b3e71e0 a43de7ec cbc1225a 7ce238da 8869f043 f51831f5 6aa7c828 d867989f 975ca168 bd354b7a 906be50b 55c13a4f 10baf178 22fd3ab4 31cb7a0d 579e4888 e6ecfbdd 1e66d817 a3e394a8 98224ab9 e9fb3705 39305789 4c7a2b91 9d62f0a7 b7a4c391 2e91f6d4 8f2c91ad 92d5b0c1 7cb92a44 4f58a1cd c6d7e8f9 e13d7a52 7c2f91ad 918d4b63 0b8e71d4 f0a6c5d8 c14f7a08 b6f08d21 73b91e4c 5a9c0e77 31a8f5c2 ed2b4f19
+// @ds b28b7af6 ca07d970 c83f4c1e d6cebf86 2b3e71e0 a43de7ec cbc1225a 7ce238da 8869f043 07320d39 f51831f5 6aa7c828 d867989f 975ca168 bd354b7a 906be50b 55c13a4f 10baf178 22fd3ab4 e6be3c03 0eef2d19 31cb7a0d 579e4888 703efd43 e6ecfbdd 1e66d817 a3e394a8 98224ab9 e9fb3705 39305789 4c7a2b91 9d62f0a7 b7a4c391 2e91f6d4 8f2c91ad 92d5b0c1 7cb92a44 4f58a1cd c6d7e8f9 e13d7a52 7c2f91ad 918d4b63 0b8e71d4 f0a6c5d8 c14f7a08 b6f08d21 73b91e4c 5a9c0e77 31a8f5c2 ed2b4f19
 // @ia 3983084a
 // @fix 4bbc0692
 
@@ -30,11 +30,11 @@ export const BACKGROUND = {
 
 export const FISH = {
     baseRadius: 16,         // px; radius = baseRadius * sqrt(size) — fish.air#ia:1e2f3a4b, ds:cbc1225a
-    baseSpeed: 320,         // px/s — fish.air#ia:3e4f5a6b, ds:7ce238da
-    speedDecay: 0.08,       // maxSpeed shrinks with size — fish.air#ia:3e4f5a6b, ds:8869f043
-    speedFloor: 0.35,       // lower bound — fish.air#ia:3e4f5a6b, ds:8869f043
+    baseNoDragSpeed: 1000,   // px/s before size water-drag penalty — fish.air#ia:3e4f5a6b, ds:8869f043
+    waterDragByLinearSize: 0.32, // size is area; drag grows with sqrt(size) — @ds:8869f043
+    minLinearSpeedSize: 0.6, // prevents tiny fish from gaining unbounded speed — @ds:8869f043
     minBurstSpeed: 220,     // > PREY.maxSpeed + PREY.speedMargin; user hunt floor — @ds:8869f043 @ds:d4f6a1c2
-    accel: 1400,            // px/s^2 steering force — ds:55c13a4f ds:10baf178 ds:7ce238da
+    accel: 1000,            // px/s^2 steering force — ds:55c13a4f ds:10baf178 ds:7ce238da
     facingThreshold: 8,     // velocity.x deadzone to avoid flip jitter — fish.air#ia:9a0b1c2d, ds:8d0ca6a8
 };
 
@@ -42,7 +42,7 @@ export const PLAYER = {
     startSize: 1,           // player nominal start size after fry growth — @ds:4c7a2b91 @ds:39305789
     fryStartSize: 0.03,     // practically a point, still visible — @ds:4c7a2b91
     fryGrowthSeconds: 3,    // @ds:4c7a2b91 @ds:9d62f0a7 @ds:b7a4c391
-    maxLifetimeSeconds: 30, // longer than NPC lifetime — @ds:b7a4c391
+    maxLifetimeSeconds: 120, // longer than NPC lifetime — @ds:b7a4c391
 };
 
 export const SERVER = {
@@ -87,7 +87,14 @@ export const LEAVE = {
 };
 
 export const REGIME = {
-    cruiseFactor: 0.55,     // cruiseSpeed = 0.55 * maxSpeed — fish.air#ia:5e6f7a8b, ds:8869f043
+    cruiseFactor: 0.7,      // joystick/touch cruise speed = maxSpeed * v/100 * factor
+    keyboardCruiseSpeed: 97, // px/s at v30 for keyboard movement, capped by maxSpeedOf(size)
+    speedLevels: 99,        // relative speed scale v1..v99 — @ds:8869f043 @ds:07320d39
+    cruiseMaxSpeedLevel: 30, // v1..v30 are cruise speed levels — @ds:8869f043
+    burstStartSpeedLevel: 31, // v31 is the first burst speed — @ds:8869f043
+    enduranceReserveSeconds: 5, // @ds:07320d39
+    enduranceSimulationStepSeconds: 0.1, // @ds:07320d39
+    npcMaxBurstLevel: 70,   // NPC target burst percent cap — @ds:703efd43
 };
 
 export const GROWTH = {
@@ -99,6 +106,7 @@ export const ENERGY = {
     refSizes: 100,          // reference distance = refSizes * size ("100 размеров")
     minSize: 0.2,           // size floor so radius>0 & predation stays defined — ia:7c8d9e0f
     userMinSize: 0.36,      // > PREY.minSize * PREDATION.eatRatio (0.3 * 1.15) — @ds:6aa7c828
+    burstExtraSpendFactor: 20, // v31 x1, v99 x21 — @ds:f51831f5
 };
 
 export const PREDATION = {
@@ -146,7 +154,7 @@ export const NPC = {
     decisionIntervalSeconds: 0.18, // @ds:c6d7e8f9 @ia:8a4b2f19
     maxTurnRateDegPerSecond: 220, // @ds:c6d7e8f9 @ia:8a4b2f19
     accelResponsePerSecond: 7, // @ds:c6d7e8f9 @ia:8a4b2f19
-    maxLifetimeSeconds: 20, // @ds:a6c9e8b4
+    maxLifetimeSeconds: 120, // @ds:a6c9e8b4
 };
 
 export const SHRED = {

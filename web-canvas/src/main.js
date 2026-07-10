@@ -1,13 +1,13 @@
 // imp/web-canvas/src/main.js
 // Bootstraps world + game loop (dsr/use/ecs-loop.dsr). Glue/I-O layer.
-// @ds b28b7af6 27fa3caa ec8cb052 c95ca496 48c4fc99 b433f1bc d2e8a84c 5fb1ff09 c83f4c1e ca07d970 d6cebf86 2b3e71e0 3ddf8f67 1f3abc43 cbc1225a 7ce238da c4073e51 ee07d6da 8869f043 f51831f5 8d0ca6a8 d867989f 975ca168 bd354b7a 906be50b 91e32235 55c13a4f 10baf178 22fd3ab4 7b9a7984 ad8d81d8 31cb7a0d 579e4888 e699c42d e6ecfbdd 1e66d817 a3e394a8 98224ab9 e9fb3705 fcdfb2b7 0c8d4e2a 6f1b0a3c 39305789 2e91f6d4 b9136c2e e42a7c19 a2d5936f 73b91e4c ed2b4f19
+// @ds b28b7af6 27fa3caa ec8cb052 ab1e4f02 c95ca496 48c4fc99 b433f1bc d2e8a84c 5fb1ff09 c83f4c1e ca07d970 d6cebf86 2b3e71e0 3ddf8f67 1f3abc43 cbc1225a 7ce238da c4073e51 ee07d6da 8869f043 07320d39 f51831f5 8d0ca6a8 d867989f 975ca168 bd354b7a 906be50b 91e32235 55c13a4f 10baf178 22fd3ab4 e6be3c03 0eef2d19 cff27cd5 7b9a7984 ad8d81d8 31cb7a0d 579e4888 e699c42d e6ecfbdd 1e66d817 a3e394a8 98224ab9 e9fb3705 fcdfb2b7 0c8d4e2a 6f1b0a3c 39305789 2e91f6d4 b9136c2e c5a92431 c656f0ec e42a7c19 a2d5936f 73b91e4c ed2b4f19
 // @ia 3983084a
 
-import { DEBUG, EXHALE, FISH, LOOP, MOUTH, PLAYER, SHRED, SIZE_DELTA_LABEL, SWIM, SYNC } from './constants.js';
-import { advanceBubbles, emitBubble, makeWorld } from './world.js';
-import { requestExhale, runExhaleCycle, serializeFish } from './fish.js';
-import { createControlModeState, createInput, keySteer, pointerSteer, joystickSteer, huntMode } from './controls.js';
-import { buildToroidalRenderWorld, loadFishGeometry, loadShredGeometry, render, viewportToWorld } from './render.js';
+import { DEBUG, ENERGY, EXHALE, FISH, LOOP, MOUTH, PLAYER, REGIME, SHRED, SIZE_DELTA_LABEL, SWIM, SYNC } from './constants.js';
+import { advanceBubbles, emitBubble, makeBubble, makeWorld } from './world.js';
+import { BURST_ENDURANCE_SIZE_THRESHOLDS, availableSpeedLevelForSize, burstEnergyFactorOf, maxSpeedOf, requestExhale, runExhaleCycle, serializeFish, speedCapOf } from './fish.js';
+import { createControlModeState, createInput, keySteer, pointerSteer, joystickSteer, speedLevel, speedLevelToControlMagnitude } from './controls.js';
+import { buildToroidalRenderWorld, loadFishGeometry, loadShredGeometry, render, viewportToWorld, worldToViewport } from './render.js';
 import { dist, normalize, scale, v } from './vec.js';
 import { createClientNet } from './client-net.js';
 
@@ -15,6 +15,10 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const playerMetrics = document.getElementById('player-metrics');
 const playerSizeValue = document.getElementById('player-size-value');
+const playerName = document.getElementById('player-name');
+const playerSpeedMetric = document.getElementById('player-speed-metric');
+const playerSpeedPercent = document.getElementById('player-speed-percent');
+const playerSpeedReal = document.getElementById('player-speed-real');
 const hudEaten = document.getElementById('eaten');
 const hudStatus = document.getElementById('status');
 const lifetimeBar = document.getElementById('lifetime-bar');
@@ -28,14 +32,20 @@ const joinName = document.getElementById('join-name');
 const joinColor = document.getElementById('join-color');
 const joinTier = document.getElementById('join-tier');
 const leaveButton = document.getElementById('leave-game');
-const debugToggle = document.getElementById('debug-toggle');
+const gameMenuToggle = document.getElementById('game-menu-toggle');
+const gameMenu = document.getElementById('game-menu');
+const debugModeToggle = document.getElementById('debug-mode-toggle');
 const controlModes = document.getElementById('control-modes');
 const controlModeButtons = [...document.querySelectorAll('[data-control-mode]')];
-const hudHint = document.querySelector('#hud .hint');
+const controlHelp = document.getElementById('control-help');
+const burstEnduranceRows = document.getElementById('burst-endurance-rows');
 const joystickPanel = document.getElementById('joystick-panel');
 const joystickBase = document.getElementById('joystick-base');
+const joystickBurstRings = document.getElementById('joystick-burst-rings');
 const joystickKnob = document.getElementById('joystick-knob');
-const joystickHunt = document.getElementById('joystick-hunt');
+const joystickCurrentBurstRing = document.getElementById('joystick-current-burst-ring');
+let joystickAvailableLevel = REGIME.speedLevels;
+let joystickRenderedAvailabilityLevel = null;
 const appVersion = document.getElementById('app-version');
 
 let state = { world: makeWorld(), currentUserFishId: null };
@@ -46,12 +56,14 @@ const clientFishDecor = new Map();
 let serializeKeyLatch = false;
 let lastSentInputKey = null;
 let lastInputFlushAt = 0;
+let gameMenuOpen = false;
 let debugMode = false;
 let debugPositionTraces = [];
 let latestAbsoluteServerPositions = new Map();
 let lastDebugTraceAt = 0;
 let lastVisibleState = state;
 let entrySessionReady = false;
+let burstEnduranceTableKey = '';
 let net = null;
 const controlMode = createControlModeState();
 const sizeDeltaLabelState = {
@@ -160,9 +172,13 @@ if( joinForm ){
 if( leaveButton ){
     leaveButton.addEventListener('click', handleLeaveGameButton);
 }
-if( debugToggle ){
-    debugToggle.addEventListener('click', toggleDebugMode);
-    debugToggle.setAttribute('aria-pressed', 'false');
+if( gameMenuToggle ){
+    gameMenuToggle.addEventListener('click', toggleGameMenu);
+    gameMenuToggle.setAttribute('aria-expanded', 'false');
+}
+if( debugModeToggle ){
+    debugModeToggle.addEventListener('click', toggleDebugMode);
+    debugModeToggle.setAttribute('aria-pressed', 'false');
 }
 setupControlModes();
 setupJoystickControls();
@@ -195,15 +211,21 @@ function setJoinedUiState(joined, { showJoinForm = false, sessionReady = entrySe
     entrySessionReady = Boolean(sessionReady);
     const joinVisible = entrySessionReady && !joined && showJoinForm;
     const gameControlsVisible = entrySessionReady && joined;
+    if( gameMenuToggle ) gameMenuToggle.hidden = !entrySessionReady;
+    if( !entrySessionReady ){
+        gameMenuOpen = false;
+        if( gameMenu ) gameMenu.hidden = true;
+    }
     if( leaveButton ){
         leaveButton.textContent = joined ? 'Выйти' : 'Войти';
         leaveButton.hidden = !entrySessionReady || joinVisible;
     }
     if( joinPanel ) joinPanel.hidden = !joinVisible;
     if( controlModes ) controlModes.hidden = !gameControlsVisible;
-    if( hudHint ) hudHint.hidden = !gameControlsVisible;
+    if( controlHelp ) controlHelp.hidden = !gameControlsVisible;
     updateJoystickPanelVisibility();
     updatePlayerMetricsVisibility(currentUserFish());
+    updateGameMenu();
 }
 
 // @ds:9772e9ac
@@ -246,19 +268,78 @@ function frame(now){
 
     const fish = currentUserFish();
     updatePlayerSizeMetric(fish);
+    updatePlayerNameMetric(fish);
+    updatePlayerSpeedMetric(fish);
     updatePlayerMetricsVisibility(fish);
-    hudEaten.textContent = `eaten: ${fish ? fish.eatenFishCount : 0}`;
+    updateJoystickBurstAvailability(fish);
+    hudEaten.textContent = `${fish ? fish.eatenFishCount : 0}`;
     updatePlayerLifetimeBar(fish);
     updateWorldSnapshotInfo(state.world);
+    updateGameMenu();
     if( fish ) hudStatus.textContent = fish.userTier === 'paid' ? 'paid' : 'free';
 
     requestAnimationFrame(frame);
+}
+
+// @ds:c5a92431
+function updatePlayerNameMetric(fish){
+    if( !playerName ) return;
+    playerName.textContent = fish?.userName || '-';
 }
 
 // @ds:b9136c2e
 function updatePlayerSizeMetric(fish){
     if( !playerSizeValue ) return;
     playerSizeValue.textContent = fish ? fish.size.toFixed(1) : '-';
+}
+
+// @ds:c656f0ec
+function updatePlayerSpeedMetric(fish){
+    if( !playerSpeedMetric || !playerSpeedPercent || !playerSpeedReal ) return;
+    const speed = fish ? Math.hypot(fish.vel?.x || 0, fish.vel?.y || 0) : 0;
+    const displayed = Number(speed.toFixed(2));
+    const visible = entrySessionReady && net?.isJoined && fish && displayed > 0;
+    playerSpeedMetric.classList.toggle('is-visible', Boolean(visible));
+    playerSpeedMetric.setAttribute('aria-hidden', visible ? 'false' : 'true');
+    playerSpeedReal.textContent = displayed.toFixed(2);
+    if( !fish || displayed <= 0 ){
+        playerSpeedPercent.textContent = '0';
+        playerSpeedPercent.style.color = '#7bd88f';
+        return;
+    }
+
+    const maxPossibleSpeed = maxSpeedOf(fish.size, 'user') * 0.99;
+    const percent = Math.max(1, Math.min(99, Math.round(speed / Math.max(1, maxPossibleSpeed) * 100)));
+    playerSpeedPercent.textContent = String(percent);
+    playerSpeedPercent.style.color = fish.mode === 'burst'
+        ? burstSpeedColor(percent)
+        : '#7bd88f';
+}
+
+function burstSpeedColor(percent){
+    const t = Math.max(0, Math.min(1, (percent - 1) / 98));
+    return mixHexColor('#d58fb3', '#ff4f62', t);
+}
+
+// @ds:e41821af
+function joystickCurrentSpeedColor(speedLevel){
+    return speedLevel <= REGIME.cruiseMaxSpeedLevel ? '#4da3ff' : burstSpeedColor(speedLevel);
+}
+
+function mixHexColor(from, to, t){
+    const a = parseHexColor(from);
+    const b = parseHexColor(to);
+    const channel = index => Math.round(a[index] + (b[index] - a[index]) * t);
+    return `rgb(${channel(0)}, ${channel(1)}, ${channel(2)})`;
+}
+
+function parseHexColor(hex){
+    const value = hex.replace('#', '');
+    return [
+        parseInt(value.slice(0, 2), 16),
+        parseInt(value.slice(2, 4), 16),
+        parseInt(value.slice(4, 6), 16),
+    ];
 }
 
 // @ds:2e91f6d4 @ds:b9136c2e
@@ -379,7 +460,7 @@ function applyClientFishDecor(world, bubbles, dt, rng){
     }
     for( const fish of world.fish || [] ){
         const decor = clientFishDecor.get(fish.id) || makeClientDecor(fish);
-        updateClientDecorState(decor, fish, dt);
+        updateClientDecorState(decor, fish, dt, bubbles, rng);
         clientFishDecor.set(fish.id, decor);
         fish.exhale = decor.exhale;
         fish.visualScale = decor.visualScale;
@@ -399,6 +480,7 @@ function makeClientDecor(fish){
         burstKick: 0,
         wasBurstSwimming: false,
         wasBurstActive: fish.mode === 'burst',
+        lastDirection: null,
         visualScale: fish.visualScale || 1,
         exhale: {
             requested: false,
@@ -421,12 +503,17 @@ function makeClientDecor(fish){
     };
 }
 
-function updateClientDecorState(decor, fish, dt){
+function updateClientDecorState(decor, fish, dt, bubbles, rng){
     const speed = Math.hypot(fish.vel?.x || 0, fish.vel?.y || 0);
     const burstActive = fish.mode === 'burst';
     const burstSwimming = burstActive && speed > FISH.facingThreshold;
-    if( burstActive && !decor.wasBurstActive ) requestExhale({ exhale: decor.exhale }); // @ds:3ddf8f67 @fn:a9a3ed12
+    if( burstActive !== decor.wasBurstActive ) emitMotionCueBubbles(fish, bubbles, rng); // @ds:3ddf8f67
     decor.wasBurstActive = burstActive;
+    const direction = speed > FISH.facingThreshold ? normalize(fish.vel) : null;
+    if( direction && decor.lastDirection && directionTurnDegrees(decor.lastDirection, direction) > 100 ){
+        emitMotionCueBubbles(fish, bubbles, rng); // @ds:3ddf8f67
+    }
+    if( direction ) decor.lastDirection = direction;
     if( burstSwimming && !decor.wasBurstSwimming ) decor.burstKick = 1;
     decor.wasBurstSwimming = burstSwimming;
     decor.burstKick = Math.max(0, decor.burstKick - dt * SWIM.kickDecay);
@@ -456,6 +543,18 @@ function updateClientDecorState(decor, fish, dt){
     const chaseOpen = burstSwimming && !closeForEating ? MOUTH.chaseOpenRatio : 0;
     const eatOpen = decor.mouthHold > 0 ? Math.min(1, decor.mouthEatenSize / Math.max(1, fish.size || 1)) : 0;
     decor.mouthOpen = closeForEating ? 0 : Math.max(chaseOpen, eatOpen);
+}
+
+// @ds:3ddf8f67 @ds:d6cebf86
+function emitMotionCueBubbles(fish, bubbles, rng){
+    if( !Array.isArray(bubbles) ) return;
+    const count = 1 + Math.floor(rng() * 2);
+    for( let i = 0; i < count; i++ ) bubbles.push(makeBubble(fish, rng));
+}
+
+function directionTurnDegrees(a, b){
+    const dot = Math.max(-1, Math.min(1, (a.x || 0) * (b.x || 0) + (a.y || 0) * (b.y || 0)));
+    return Math.acos(dot) * 180 / Math.PI;
 }
 
 // @ds:c2d7f4a1
@@ -522,23 +621,29 @@ function advanceSizeDeltaLabelLifetimes(dt){
     sizeDeltaLabelState.labels = sizeDeltaLabelState.labels.filter(label => label.age < label.life);
 }
 
+// @ds:93b8abba @ds:10baf178 @ds:b43d2f95
 function buildInputPayload(){
     const fish = currentUserFish();
     let accel = keySteer(input.keys);
+    const keyboardAccel = Boolean(accel);
     if( !accel ){
-        if( controlMode.active === 'pointer' && fish && input.pointer.active && !input.pointer.lockedByKeyboard ){
+        if( controlMode.active === 'pointer' && fish && input.pointer.active ){
             const worldPointer = viewportToWorld(input.pointer.pos, state.world, fish, canvas);
             accel = pointerSteer(fish.pos, { active: true, pos: worldPointer });
         }else if( controlMode.active === 'touch' && fish && input.pointer.active && input.touchDown ){
-            const worldPointer = viewportToWorld(input.pointer.pos, state.world, fish, canvas);
-            accel = pointerSteer(fish.pos, { active: true, pos: worldPointer });
-        }else if( controlMode.active === 'joystick' ){
+            input.pointer.vector = controlVectorFromFish(fish, input.pointer.pos);
+            accel = scale(normalize(input.pointer.vector), FISH.accel * Math.min(1, Math.hypot(input.pointer.vector.x, input.pointer.vector.y)));
+        }else{
             accel = joystickSteer(input.joystick);
         }
     }
+    const desiredLevel = speedLevel(input, controlMode.active);
+    const level = fish ? availableSpeedLevelForSize(fish.size, desiredLevel) : desiredLevel;
+    const keyboardCruise = keyboardAccel && level > 0 && level <= REGIME.cruiseMaxSpeedLevel;
     return {
         accel: accel ? normalize(accel) : v(0, 0),
-        hunt: huntMode(input, controlMode.active) === 'burst',
+        speedLevel: level,
+        cruiseControl: keyboardCruise ? 'keyboard' : null,
     };
 }
 
@@ -587,13 +692,46 @@ function inputPayloadKey(payload){
     const accel = payload?.accel || {};
     const x = Math.max(-999, Math.min(999, Math.round((accel.x || 0) * 1000)));
     const y = Math.max(-999, Math.min(999, Math.round((accel.y || 0) * 1000)));
-    return `${x}:${y}:${payload?.hunt ? 'b' : '-'}`;
+    return `${x}:${y}:v${payload?.speedLevel || 0}:${payload?.cruiseControl || ''}`;
+}
+
+function currentUserFishViewportPos(fish){
+    const viewport = worldToViewport(state.world, fish, canvas);
+    return v(fish.pos.x * viewport.scale + viewport.offsetX, fish.pos.y * viewport.scale + viewport.offsetY);
+}
+
+function controlVectorFromFish(fish, point){
+    const center = currentUserFishViewportPos(fish);
+    const raw = v((point?.x || 0) - center.x, (point?.y || 0) - center.y);
+    const radius = invisibleJoystickRadius();
+    const distance = Math.min(radius, Math.hypot(raw.x, raw.y));
+    const direction = normalize(raw);
+    return scale(direction, distance / radius);
+}
+
+function invisibleJoystickRadius(){
+    return Math.max(1, Math.min(Math.min(window.innerWidth, window.innerHeight) * 0.4, 212));
+}
+
+// @ds:ab1e4f02
+function toggleGameMenu(){
+    gameMenuOpen = !gameMenuOpen;
+    updateGameMenu();
 }
 
 // @ds:59c118f5
 function toggleDebugMode(){
     debugMode = !debugMode;
-    if( debugToggle ) debugToggle.setAttribute('aria-pressed', debugMode ? 'true' : 'false');
+    updateGameMenu();
+}
+
+// @ds:ab1e4f02 @ds:59c118f5 @ds:70871bc5 @ds:22fd3ab4
+function updateGameMenu(){
+    if( gameMenuToggle ) gameMenuToggle.setAttribute('aria-expanded', gameMenuOpen ? 'true' : 'false');
+    if( gameMenu ) gameMenu.hidden = !gameMenuOpen || !entrySessionReady;
+    if( debugModeToggle ) debugModeToggle.setAttribute('aria-pressed', debugMode ? 'true' : 'false');
+    updateControlHelp();
+    updateBurstEnduranceTable(currentUserFish());
 }
 
 // @ds:70871bc5
@@ -605,22 +743,150 @@ function setupControlModes(){
 }
 
 function setControlMode(mode){
-    controlMode.active = mode || controlMode.active;
+    controlMode.active = mode === 'keyboard' ? 'joystick' : (mode || controlMode.active);
     for( const button of controlModeButtons ){
         const active = button.dataset.controlMode === controlMode.active;
         button.setAttribute('aria-pressed', active ? 'true' : 'false');
     }
     updateJoystickPanelVisibility();
-    input.pointer.lockedByKeyboard = controlMode.active === 'keyboard';
+    input.pointer.lockedByKeyboard = false;
     input.joystick.active = false;
     input.joystick.vector = v(0, 0);
+    input.joystick.rawVector = v(0, 0);
     if( joystickKnob ) joystickKnob.style.transform = 'translate(-50%, -50%)';
+    updateControlHelp();
     lastSentInputKey = null;
 }
 
-// @ds:cd1c5776 @ds:9772e9ac
+// @ds:ab1e4f02 @ds:22fd3ab4 @ds:93b8abba
+function updateControlHelp(){
+    if( !controlHelp ) return;
+    const help = {
+        keyboard: 'Клавиши активны всегда: WASD/стрелки — движение; Space или 1 — v31, 2 — v65, 3 — v99.',
+        pointer: 'Экспериментальная мышь: указатель задаёт направление; удержание кнопки мыши — v31. Клавиши активны.',
+        touch: 'Экспериментальный тач: касание вокруг рыбы задаёт направление и v0..v99. Клавиши активны.',
+        joystick: 'Визуальный джойстик: рукоятка задаёт направление и v0..v99. Клавиши активны.',
+    };
+    controlHelp.textContent = `${help[controlMode.active] || help.keyboard} Клик по рыбе — serialize.`;
+}
+
+// @ds:cff27cd5
+function updateBurstEnduranceTable(fish){
+    if( !burstEnduranceRows || !gameMenuOpen ) return;
+    const currentSize = Number(fish?.size);
+    const key = Number.isFinite(currentSize) ? currentSize.toFixed(3) : 'none';
+    if( key === burstEnduranceTableKey ) return;
+    burstEnduranceTableKey = key;
+    const rows = [];
+    for( let level = 1; level <= REGIME.speedLevels; level++ ){
+        const threshold = BURST_ENDURANCE_SIZE_THRESHOLDS[level] || 0;
+        const burst = level >= REGIME.burstStartSpeedLevel;
+        const available = !burst || (Number.isFinite(currentSize) && currentSize >= threshold);
+        const energyFactor = burst ? burstEnergyFactorOf(level) : 0;
+        const loss = burst && Number.isFinite(currentSize)
+            ? currentSize * ENERGY.lossPerRef * energyFactor
+            : 0;
+        const speed = Number.isFinite(currentSize) ? speedCapOf(currentSize, 'user', level) : 0;
+        const seconds = burst && speed > 0 ? (ENERGY.refSizes * currentSize) / speed : 0;
+        rows.push(`<tr class="${available ? 'is-available' : 'is-locked'}"><td>${level}</td><td>${burst ? 'burst' : 'cruise'}</td><td>${burst ? formatThresholdSize(threshold) : '-'}</td><td>${energyFactor.toFixed(2)}</td><td>${loss.toFixed(3)} / ${seconds.toFixed(1)}s</td><td>${available ? 'yes' : '-'}</td></tr>`);
+    }
+    burstEnduranceRows.innerHTML = rows.join('');
+}
+
+function formatThresholdSize(size){
+    if( !Number.isFinite(size) ) return '-';
+    return size < 10 ? size.toFixed(2) : size.toFixed(1);
+}
+
+// @ds:cd1c5776 @ds:9772e9ac @ds:93b8abba
 function updateJoystickPanelVisibility(){
-    if( joystickPanel ) joystickPanel.hidden = !(entrySessionReady && net?.isJoined && controlMode.active === 'joystick');
+    if( joystickPanel ) joystickPanel.hidden = !isJoystickPanelVisible();
+}
+
+function isJoystickPanelVisible(){
+    return Boolean(entrySessionReady && net?.isJoined && controlMode.active !== 'pointer' && controlMode.active !== 'touch');
+}
+
+// @ds:0eef2d19 @ds:e6be3c03 @ds:e41821af
+function updateJoystickBurstAvailability(fish){
+    if( !joystickBase ) return;
+    joystickAvailableLevel = fish ? availableSpeedLevelForSize(fish.size, REGIME.speedLevels) : REGIME.speedLevels;
+    if( joystickAvailableLevel !== joystickRenderedAvailabilityLevel ){
+        renderJoystickBurstRings(joystickAvailableLevel);
+        joystickRenderedAvailabilityLevel = joystickAvailableLevel;
+    }
+    updateJoystickCurrentBurstRing(fish);
+    if( input.joystick.active ){
+        input.joystick.vector = clampJoystickVectorToAvailableBurst(input.joystick.rawVector);
+        renderJoystickKnob(input.joystick.vector);
+    }
+}
+
+function renderJoystickBurstRings(availableLevel){
+    if( !joystickBurstRings ) return;
+    const maxLevel = Math.max(1, Math.min(REGIME.speedLevels, Math.floor(Number(availableLevel) || 1)));
+    const ringLevels = [30, 43, 56, 69, 82, 99];
+    const ringSpecs = ringLevels.map(level => ({
+        level,
+        diameter: speedLevelToControlMagnitude(level) * 100,
+        color: level <= maxLevel ? 'rgba(255, 228, 92, 0.24)' : 'rgba(150, 158, 164, 0.07)',
+        width: level === maxLevel ? 1.4 : 1,
+    }));
+    for( const level of ringLevels ){
+        if( level === maxLevel ) return renderJoystickRingSpecs(ringSpecs);
+    }
+    ringSpecs.push({
+        level: maxLevel,
+        diameter: speedLevelToControlMagnitude(maxLevel) * 100,
+        color: 'rgba(255, 228, 92, 0.28)',
+        width: 1.6,
+    });
+    renderJoystickRingSpecs(ringSpecs.sort((a, b) => a.diameter - b.diameter));
+}
+
+function renderJoystickRingSpecs(ringSpecs){
+    if( !joystickBurstRings ) return;
+    while( joystickBurstRings.children.length > ringSpecs.length ) joystickBurstRings.lastElementChild.remove();
+    while( joystickBurstRings.children.length < ringSpecs.length ){
+        const ring = document.createElement('div');
+        ring.className = 'joystick-burst-ring';
+        joystickBurstRings.appendChild(ring);
+    }
+    ringSpecs.forEach((spec, index) =>{
+        const ring = joystickBurstRings.children[index];
+        ring.style.setProperty('--burst-ring-diameter', `${spec.diameter.toFixed(2)}%`);
+        ring.style.setProperty('--burst-ring-color', spec.color);
+        ring.style.setProperty('--burst-ring-width', `${spec.width}px`);
+    });
+}
+
+function updateJoystickCurrentBurstRing(fish){
+    if( !joystickCurrentBurstRing ) return;
+    const appliedLevel = Math.max(0, Math.min(REGIME.speedLevels, Math.floor(Number(fish?.speedLevel) || 0)));
+    const visible = appliedLevel > 0;
+    joystickCurrentBurstRing.classList.toggle('is-visible', visible);
+    if( !visible ) return;
+    const diameter = speedLevelToControlMagnitude(appliedLevel) * 100;
+    joystickCurrentBurstRing.style.setProperty('--current-burst-diameter', `${diameter.toFixed(2)}%`);
+    joystickCurrentBurstRing.style.setProperty('--current-burst-color', joystickCurrentSpeedColor(appliedLevel));
+}
+
+function clampJoystickVectorToAvailableBurst(rawVector){
+    const raw = rawVector || v(0, 0);
+    const magnitude = Math.min(1, Math.hypot(raw.x, raw.y));
+    if( magnitude < 1e-3 ) return v(0, 0);
+    const availableMagnitude = speedLevelToControlMagnitude(joystickAvailableLevel);
+    return scale(normalize(raw), Math.min(magnitude, availableMagnitude));
+}
+
+function renderJoystickKnob(vector){
+    if( !joystickBase || !joystickKnob ) return;
+    const rect = joystickBase.getBoundingClientRect();
+    const radius = Math.max(1, rect.width / 2);
+    const magnitude = Math.min(1, Math.hypot(vector.x, vector.y));
+    const direction = magnitude > 1e-3 ? normalize(vector) : v(0, 0);
+    const distance = magnitude * radius;
+    joystickKnob.style.transform = `translate(calc(-50% + ${direction.x * distance}px), calc(-50% + ${direction.y * distance}px))`;
 }
 
 // @ds:b43d2f95 @ds:cd1c5776
@@ -635,15 +901,15 @@ function setupJoystickControls(){
         const distance = Math.min(radius, Math.hypot(raw.x, raw.y));
         const direction = normalize(raw);
         input.joystick.active = true;
-        input.joystick.vector = scale(direction, distance / radius);
-        if( joystickKnob ){
-            joystickKnob.style.transform = `translate(calc(-50% + ${direction.x * distance}px), calc(-50% + ${direction.y * distance}px))`;
-        }
+        input.joystick.rawVector = scale(direction, distance / radius);
+        input.joystick.vector = clampJoystickVectorToAvailableBurst(input.joystick.rawVector);
+        renderJoystickKnob(input.joystick.vector);
     };
     const resetJoystick = () =>{
         activePointerId = null;
         input.joystick.active = false;
         input.joystick.vector = v(0, 0);
+        input.joystick.rawVector = v(0, 0);
         if( joystickKnob ) joystickKnob.style.transform = 'translate(-50%, -50%)';
     };
     joystickBase.addEventListener('pointerdown', e =>{
@@ -657,20 +923,6 @@ function setupJoystickControls(){
     });
     joystickBase.addEventListener('pointerup', resetJoystick);
     joystickBase.addEventListener('pointercancel', resetJoystick);
-    if( joystickHunt ){
-        joystickHunt.addEventListener('pointerdown', e =>{
-            e.preventDefault();
-            input.joystick.hunt = true;
-            joystickHunt.setAttribute('aria-pressed', 'true');
-        });
-        const stopHunt = () =>{
-            input.joystick.hunt = false;
-            joystickHunt.setAttribute('aria-pressed', 'false');
-        };
-        joystickHunt.addEventListener('pointerup', stopHunt);
-        joystickHunt.addEventListener('pointercancel', stopHunt);
-        joystickHunt.addEventListener('pointerleave', stopHunt);
-    }
 }
 
 // @ds:727e9afe

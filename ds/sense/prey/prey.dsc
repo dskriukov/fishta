@@ -32,6 +32,13 @@ behaviours:
         else burst away from nearest: |accel| ∝ proximity (closer -> stronger);
         SKIP burst (mode=cruise, accel:0) if speed(self) > speed(nearest) + SPEED_MARGIN.
     status: refined          # уточнён: форсаж пропорционален близости + «не зря»
+  burst_endurance:
+    from: [ds:prey.burst-endurance, ds:fish.burst-endurance]
+    contract:
+      name: clampNpcSpeedLevel
+      inputs: [self.size, desiredSpeedLevel, REGIME.npcMaxBurstLevel, fish.burstEnduranceThresholds]
+      output: speedLevel
+      rule: "NPC desired burst relative speed is capped by REGIME.npcMaxBurstLevel, initially 70, then reduced to the nearest available speedLevel for the NPC current size using the shared fish burst-endurance table"
   risk_aware_hunt_choice:
     from: [ds:npc.risk-aware-hunt-choice, ds:npc.danger-aware-steering, ds:npc.hunt-danger-correction, ds:npc.flee-safest-direction, ds:npc.decision-inertia, ds:npc.courage-selection, ds:fish.growth, ds:predation.rule, ia:npc.steering-tunables]
     contract:

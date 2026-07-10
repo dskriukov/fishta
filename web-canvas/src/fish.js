@@ -1,6 +1,8 @@
 // imp/web-canvas/src/fish.js
 // Implements: fish.dsc (entity, integrateMotion, grow, updateFacing, spendEnergy, derived radius/maxSpeed)
 // Decisions: fish.air#ia:fish.radius-formula..ia:fish.decor.fear-eye-state
+// @ds:07320d39
+// @ds:9ce87fee
 
 import { FISH, GROWTH, ENERGY, REGIME, MOUTH, SWIM, FEAR_EYE, BUBBLE, EXHALE, PREDATION } from './constants.js';
 import { add, sub, scale, normalize, clampLen, len } from './vec.js';
@@ -15,9 +17,93 @@ export function radiusOf(size){
 
 // ds:8869f043
 export function maxSpeedOf(size, ownerKind = null){
-    const factor = Math.max(FISH.speedFloor, 1 - size * FISH.speedDecay);
-    const sizeCap = FISH.baseSpeed * factor;
+    const area = Math.max(0, Number(size) || 0);
+    const linearSize = Math.max(FISH.minLinearSpeedSize, Math.sqrt(area));
+    const dragDenominator = 1 + FISH.waterDragByLinearSize * (linearSize - 1);
+    const sizeCap = FISH.baseNoDragSpeed / Math.max(0.01, dragDenominator);
     return ownerKind === 'user' ? Math.max(FISH.minBurstSpeed, sizeCap) : sizeCap;
+}
+
+export const BURST_ENDURANCE_SIZE_THRESHOLDS = buildBurstEnduranceThresholds();
+
+// @ds:8869f043
+export function speedCapOf(size, ownerKind, speedLevel, cruiseControl = null){
+    const level = normalizeSpeedLevel(speedLevel);
+    if( level <= 0 ) return 0;
+    const maxSpeed = maxSpeedOf(size, ownerKind);
+    if( level <= REGIME.cruiseMaxSpeedLevel ){
+        if( cruiseControl === 'keyboard' ){
+            const cruiseSpeed = REGIME.keyboardCruiseSpeed * (level / REGIME.cruiseMaxSpeedLevel);
+            return Math.min(maxSpeed, cruiseSpeed);
+        }
+        return maxSpeed * (level / 100) * REGIME.cruiseFactor;
+    }
+    return maxSpeed * (level / 100);
+}
+
+// @ds:f51831f5
+export function burstEnergyFactorOf(speedLevel){
+    const n = normalizeSpeedLevel(speedLevel);
+    if( n < REGIME.burstStartSpeedLevel ) return 0;
+    return 1 + ENERGY.burstExtraSpendFactor * (n - REGIME.burstStartSpeedLevel) / (REGIME.speedLevels - REGIME.burstStartSpeedLevel);
+}
+
+export function normalizeSpeedLevel(level){
+    return Math.max(0, Math.min(REGIME.speedLevels, Math.floor(Number(level) || 0)));
+}
+
+// @ds:07320d39
+export function availableSpeedLevelForSize(size, desiredLevel = REGIME.speedLevels){
+    const desired = normalizeSpeedLevel(desiredLevel);
+    if( desired < REGIME.burstStartSpeedLevel ) return desired;
+    const currentSize = Number(size) || 0;
+    for( let level = desired; level >= REGIME.burstStartSpeedLevel; level-- ){
+        if( currentSize >= BURST_ENDURANCE_SIZE_THRESHOLDS[level] ) return level;
+    }
+    return REGIME.burstStartSpeedLevel;
+}
+
+// @ds:07320d39
+function buildBurstEnduranceThresholds(){
+    const thresholds = Array(REGIME.speedLevels + 1).fill(0);
+    const maxSearchSize = 80;
+    for( let level = REGIME.burstStartSpeedLevel; level <= REGIME.speedLevels; level++ ){
+        let lo = ENERGY.userMinSize;
+        let hi = ENERGY.userMinSize;
+        while( hi < maxSearchSize && !canSustainBurst(hi, level) ) hi *= 1.18;
+        if( hi >= maxSearchSize && !canSustainBurst(hi, level) ){
+            thresholds[level] = maxSearchSize;
+            continue;
+        }
+        for( let i = 0; i < 28; i++ ){
+            const mid = (lo + hi) / 2;
+            if( canSustainBurst(mid, level) ) hi = mid;
+            else lo = mid;
+        }
+        thresholds[level] = hi;
+    }
+    return thresholds;
+}
+
+function canSustainBurst(initialSize, level){
+    let size = initialSize;
+    let elapsed = 0;
+    const dt = REGIME.enduranceSimulationStepSeconds;
+    while( elapsed < REGIME.enduranceReserveSeconds ){
+        if( size <= ENERGY.userMinSize ) return false;
+        const step = Math.min(dt, REGIME.enduranceReserveSeconds - elapsed);
+        const speed = speedCapOf(size, 'user', level);
+        size = sizeAfterBurstDistance(size, level, speed * step, ENERGY.userMinSize);
+        elapsed += step;
+    }
+    return size > ENERGY.userMinSize;
+}
+
+function sizeAfterBurstDistance(size, level, distance, minSize){
+    if( level < REGIME.burstStartSpeedLevel || size <= minSize ) return size;
+    const refDist = Math.max(1e-6, ENERGY.refSizes * Math.max(minSize, size));
+    const lossFrac = ENERGY.lossPerRef * burstEnergyFactorOf(level) * (distance / refDist);
+    return Math.max(minSize, size * (1 - lossFrac));
 }
 
 // ds:1f3abc43
@@ -46,6 +132,7 @@ export function makeFish({
         radius: radiusOf(size),
         facing: 1,          // 1 = right, -1 = left
         mode: 'cruise',
+        speedLevel: 0,
         age: 0,
         eatenFishCount: 0,
         feedingSuccessFactor: 1,     // @ds:4e2a91f0
@@ -104,18 +191,23 @@ export function updateAbandonedGradient(fish){
 }
 
 // ds:7ce238da
+// @ds:9ce87fee
 // contract: fish.integrateMotion  (v += a*dt; v = drag(v); p += v*dt)
 export function integrate(fish, accel, world, dt){
     fish.age += dt;
-    fish.vel = add(fish.vel, scale(accel, dt));
-    const speedCap = fish.mode === 'burst'
-        ? maxSpeedOf(fish.size, fish.ownerKind)
-        : maxSpeedOf(fish.size) * REGIME.cruiseFactor;  // ds:ee07d6da
-    fish.vel = clampLen(fish.vel, speedCap);
+    const level = normalizeSpeedLevel(fish.speedLevel);
+    const thrusting = level > 0 && len(accel) > 1e-6;
+    const previousSpeed = len(fish.vel);
+    if( thrusting ){
+        fish.vel = add(fish.vel, scale(accel, dt));
+        const speedCap = speedCapOf(fish.size, fish.ownerKind, level, fish.cruiseControl);
+        fish.vel = clampLen(fish.vel, Math.max(speedCap, previousSpeed));
+    }
     fish.vel = applyDrag(fish.vel, dt, fish.size);
     const move = scale(fish.vel, dt);
     fish.pos = add(fish.pos, move);
-    spendEnergy(fish, len(move));   // ds:f51831f5
+    const activeBurstThrust = thrusting && level >= REGIME.burstStartSpeedLevel;
+    spendEnergy(fish, activeBurstThrust ? len(move) : 0);   // ds:f51831f5
     if( fish.spawnGrace > 0 ){
         fish.spawnGrace = Math.max(0, fish.spawnGrace - dt);
     }else{
@@ -144,14 +236,13 @@ export function serializeFish(fish){
 }
 
 // @ds:f51831f5 @ds:6aa7c828
+// @ds:9ce87fee
 // Drift (no thrust) is free; traveling 100*size with thrust => -1% size.
 export function spendEnergy(fish, distance){
-    if( fish.mode !== 'burst' || distance <= 0 ) return;
+    if( normalizeSpeedLevel(fish.speedLevel) < REGIME.burstStartSpeedLevel || distance <= 0 ) return;
     if( fish.ownerKind === 'user' && fish.fryAge !== null && fish.fryAge !== undefined ) return; // @ds:4c7a2b91
-    const refDist = ENERGY.refSizes * fish.size;            // "100 текущих размеров"
-    const lossFrac = ENERGY.lossPerRef * (distance / refDist);
     const minSize = fish.ownerKind === 'user' ? ENERGY.userMinSize : ENERGY.minSize;
-    fish.size = Math.max(minSize, fish.size * (1 - lossFrac));
+    fish.size = sizeAfterBurstDistance(fish.size, fish.speedLevel, distance, minSize);
     fish.radius = radiusOf(fish.size);
 }
 

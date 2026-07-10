@@ -41,35 +41,62 @@
     </div>
     <div id="hud">
         <div class="hud-row">
-            <span id="eaten">eaten: 0</span>
-            <span id="status">alive</span>
-            <span id="app-version">version: loading</span>
-            <button id="debug-toggle" type="button">Debug</button>
-            <button id="leave-game" type="button" hidden>Выйти</button>
+            <button id="game-menu-toggle" type="button" aria-label="Menu" aria-controls="game-menu" aria-expanded="false"><span></span><span></span><span></span></button>
+            <div id="user-fish-metrics" aria-label="user fish metrics">
+                <span id="eaten-metric"><span>eaten:</span> <strong id="eaten">0</strong></span>
+            </div>
+            <button id="debug-mode-toggle" type="button" aria-pressed="false">Debug</button>
         </div>
-        <div id="control-modes" class="hud-row" hidden>
-            <button type="button" data-control-mode="keyboard">Клавиши</button>
+    </div>
+    <!-- @ds:ab1e4f02 -->
+    <aside id="game-menu" hidden>
+        <div id="control-modes" class="menu-row" hidden>
+            <button type="button" data-control-mode="joystick">Джойстик</button>
             <button type="button" data-control-mode="pointer">Мышь</button>
             <button type="button" data-control-mode="touch">Тач</button>
-            <button type="button" data-control-mode="joystick">Джойстик</button>
         </div>
-        <span class="hint" hidden>Space/мышь/второй палец/Burst — форсаж, клик по рыбе — serialize</span>
-    </div>
-    <!-- @ds:2e91f6d4 @ds:b9136c2e -->
+        <div class="menu-row menu-meta">
+            <span id="app-version">version: loading</span>
+            <span id="status">alive</span>
+            <button id="leave-game" type="button" hidden>Выйти</button>
+        </div>
+        <!-- @ds:cff27cd5 -->
+        <section id="burst-endurance-panel" aria-label="burst endurance table">
+            <table id="burst-endurance-table">
+                <thead>
+                    <tr><th>v</th><th>mode</th><th>size</th><th>factor</th><th>loss</th><th>now</th></tr>
+                </thead>
+                <tbody id="burst-endurance-rows"></tbody>
+            </table>
+        </section>
+        <p id="control-help" hidden></p>
+    </aside>
+    <!-- @ds:2e91f6d4 @ds:b9136c2e @ds:c5a92431 -->
     <div id="player-metrics" aria-label="player metrics" hidden>
+        <span id="player-life">
+            <strong id="player-name">-</strong>
+            <span id="lifetime" aria-label="life time"><span id="lifetime-bar"></span></span>
+        </span>
         <span id="player-size"><span id="player-size-label">size</span><strong id="player-size-value">-</strong></span>
-        <span id="lifetime" aria-label="life time"><span id="lifetime-bar"></span></span>
     </div>
     <!-- @ds:e42a7c19 -->
     <div id="world-info" aria-label="world snapshot info">
-        <div><span>fish</span><strong id="world-fish-count">0</strong><em id="world-fish-area">0</em></div>
-        <div><span>nutrients</span><strong id="world-nutrient-count">0</strong><em id="world-nutrient-area">0</em></div>
+        <span class="world-info-item"><span>fish</span><strong id="world-fish-count">0</strong></span>
+        <span class="world-info-item"><span>area</span><em id="world-fish-area">0</em></span>
+        <span class="world-info-item"><span>nutrients</span><strong id="world-nutrient-count">0</strong></span>
+        <span class="world-info-item"><span>area</span><em id="world-nutrient-area">0</em></span>
+        <span id="world-speed-info" class="world-info-item"><span>speed</span><strong id="player-speed-real">0.00</strong></span>
     </div>
     <div id="joystick-panel" hidden>
         <div id="joystick-base" aria-label="joystick">
+            <div id="joystick-burst-rings"></div>
+            <div id="joystick-current-burst-ring"></div>
+            <!-- @ds:c656f0ec -->
+            <div id="player-speed-metric" aria-label="player relative speed" aria-hidden="true">
+                <strong id="player-speed-percent">0</strong>
+            </div>
             <div id="joystick-knob"></div>
         </div>
-        <button id="joystick-hunt" type="button" aria-pressed="false">Burst</button>
     </div>
     <script type="module" src="./src/main.js"></script>
 </body>

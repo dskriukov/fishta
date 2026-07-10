@@ -469,8 +469,9 @@ export function advanceFryGrowth(fish, dt){
 
 // @ia 2d3e4f5a
 // @ds:d4f6a1c2
-export function capPreySpeed(p){
-    p.vel = clampLen(p.vel, PREY.maxSpeed);
+// @ds:9ce87fee
+export function capPreySpeed(p, previousSpeed = PREY.maxSpeed){
+    p.vel = clampLen(p.vel, Math.max(PREY.maxSpeed, previousSpeed));
 }
 
 function clamp(value, min, max){

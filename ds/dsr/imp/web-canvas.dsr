@@ -94,15 +94,19 @@ contract_map:
   controls.immediateInputFlush:              main.js#sendInputIfChanged client-net.js#sendInput  # @ds:10baf178 @ds:22fd3ab4 @ds:671e9773
   controls.touchSteer:                      controls.js#touchSteer  # @ds:3c41aad0
   controls.joystickSteer:                   controls.js#joystickSteer  # @ds:b43d2f95
-  controls.huntMode:                        controls.js#huntMode  # @ds:22fd3ab4 @ds:27129cfa @ds:cd1c5776 @ia:6b7c8d9e
-  controls.joystickHuntPlacement:           style.css##joystick-panel style.css##joystick-hunt  # @ds:cd1c5776
+  controls.speedControl:                    controls.js#huntMode controls.js#speedLevel  # @ds:22fd3ab4 @ds:27129cfa @ds:cd1c5776 @ds:e6be3c03 @ia:6b7c8d9e
+  controls.joystickRadialHunt:              controls.js#joystickSteer main.js#setupJoystickControls style.css##joystick-panel  # @ds:cd1c5776
+  controls.burstEnduranceJoystickUi:        main.js#updateJoystickBurstAvailability main.js#renderJoystickBurstRings main.js#updateJoystickCurrentBurstRing style.css##joystick-base  # @ds:0eef2d19 @ds:e41821af
+  controls.primaryKeyboardAndJoystick:      controls.js#createControlModeState main.js#buildInputPayload main.js#updateJoystickPanelVisibility main.js#setControlMode  # @ds:93b8abba @ds:10baf178 @ds:b43d2f95
+  controls.burstEnduranceMenuTable:         main.js#updateBurstEnduranceTable index.html#burst-endurance-table style.css#burst-endurance-table  # @ds:cff27cd5
   controls.inspectClick:                    main.js#handleInspectClick  # @ds:2e1570ed
   controls.camera:                          render.js#worldToViewport  # @ds:7b9a7984
   world.backgroundTileParallax:             style.css#body::before render.js#updateWorldBackgroundCss render.js#backgroundCameraDelta render.js#render  # @ds:2b3e71e0 @fix:4bbc0692 @ia:3983084a
   world.backgroundDepthHaze:                style.css#body::after  # @ds:a43de7ec
   controls.toroidalViewportProjection:      render.js#buildToroidalRenderWorld render.js#nearestToroidalCoordinate  # @ds:7b9a7984 @ds:c83f4c1e @ia:dd909d1a
   client.decorState:                         main.js#applyClientFishDecor main.js#updateClientDecorState  # @ds:975ca168 @ds:bd354b7a @ds:3ddf8f67 @ds:a44b9d2c @fn:a9a3ed12 @ia:9c0d1e2f @ia:3a4b5c6e
-  debug.toggleMode:                         main.js#toggleDebugMode  # @ds:59c118f5
+  ui.gameMenu:                              main.js#toggleGameMenu main.js#updateGameMenu index.html#game-menu-toggle index.html#game-menu style.css#game-menu-toggle style.css#game-menu  # @ds:ab1e4f02 @ds:8d13f6a2 @ds:59c118f5 @ds:70871bc5 @ds:fb11044e
+  debug.toggleMode:                         main.js#toggleDebugMode index.html#debug-mode-toggle  # @ds:59c118f5
   debug.drawWorldRepeatBounds:              render.js#drawDebugWorldRepeatBounds  # @ds:7435b6ce
   debug.recordPositionTraces:               main.js#recordDebugPositionTraces protocol.js#applyWorldSync  # @ds:727e9afe
   debug.drawPositionTraces:                 render.js#drawDebugPositionTraces  # @ds:727e9afe
@@ -123,7 +127,9 @@ contract_map:
   player.fryProtection:                      predation.js#canBeVictimOf predation.js#collectFeedingCandidates  # @ds:9d62f0a7 @ds:32745a4f
   player.lifetimeAging:                      player.js#advancePlayerLifecycle player.js#expireOldUserFish step.js#stepAuthoritativeWorld  # @ds:b7a4c391 @ds:e13d7a52
   player.lifetimeUi:                         protocol.js#encodeFishRow protocol.js#parseFishRow main.js#updatePlayerLifetimeBar index.html#player-metrics index.html#lifetime-bar style.css#player-metrics style.css#lifetime  # @ds:2e91f6d4
+  player.nameMetric:                         main.js#updatePlayerNameMetric index.html#player-name style.css#player-name render.js#drawFishLabel  # @ds:c5a92431 @ds:2e91f6d4
   player.sizeUi:                             main.js#updatePlayerSizeMetric index.html#player-size style.css#player-size  # @ds:b9136c2e
+  player.speedModeUi:                        main.js#updatePlayerSpeedMetric index.html#player-speed-metric style.css#player-speed-metric  # @ds:c656f0ec
   shred.spawn:                               shred.js#spawnShredsFromFish prey.js#expireOldNpcFish player.js#expireOldUserFish  # @ds:e13d7a52 @ds:7c2f91ad @ds:918d4b63 @ds:d5e7a01c @ds:a6c9e8b4 @ds:b7a4c391 @ds:eccfca7e
   shred.drift:                               shred.js#advanceShreds  # @ds:8b62d9ce @ds:ed2b4f19 @ds:d3187816 @ds:31a8f5c2
   shred.decayRefresh:                        shred.js#refreshShredDecay predation.js#collectFeedingCandidates predation.js#refreshCandidate predation.js#processFeedingBatch  # @ds:fb0f32c4
@@ -135,15 +141,15 @@ contract_map:
   world.advanceBubbles:                     world.js#advanceBubbles  # @ds:d6cebf86 @ia:3c4d5e6f
   world.clientLocalBubbles:                  main.js#advanceClientBubbles render.js#drawBubble  # @ds:d6cebf86 @ia:3c4d5e6f
   world.triggerExhaleOnAccelStart:          step.js#triggerExhaleOnAccelStart  # @ds:67f150ce @ia:d87fe07b
-  world.triggerExhaleOnBurstStart:          main.js#updateClientDecorState main.js#applyClientFishDecor  # @ds:3ddf8f67 @fn:a9a3ed12
+  world.triggerMotionBubbleCue:             main.js#updateClientDecorState main.js#emitMotionCueBubbles world.js#makeBubble  # @ds:3ddf8f67 @ds:d6cebf86
   fish.makeFish:                            fish.js#makeFish  # @ds:1f3abc43 @ds:58050922 @ia:32288dfb
-  fish.integrateMotion:                     fish.js#integrate  # @ds:7ce238da @ds:8869f043
+  fish.integrateMotion:                     fish.js#integrate fish.js#speedCapOf fish.js#availableSpeedLevelForSize  # @ds:7ce238da @ds:8869f043 @ds:07320d39 @ds:9ce87fee
   fish.wrapInWorld:                         fish.js#integrate  # @ds:c4073e51
   fish.geometryAsset:                       render.js#loadFishGeometry render.js#drawFish  # @ds:df06827a @ds:b024b514
   fish.grow:                                fish.js#grow  # @ds:d867989f @ds:b024b514
   fish.feedingState:                        fish.js#makeFish fish.js#advanceFeedingState  # @ds:4e2a91f0
   fish.updateFacing:                        fish.js#updateFacing  # @ds:8d0ca6a8 @ia:0bdc556b
-  fish.spendEnergy:                         fish.js#spendEnergy  # @ds:f51831f5 @ds:6aa7c828
+  fish.spendEnergy:                         fish.js#spendEnergy fish.js#burstEnergyFactorOf  # @ds:f51831f5 @ds:6aa7c828 @ds:9ce87fee
   fish.maxSpeedOf:                          fish.js#maxSpeedOf prey.js#capPreySpeed  # @ds:8869f043 @ds:d4f6a1c2
   fish.updateMouth:                         fish.js#updateMouth  # @ds:975ca168 @ia:9c0d1e2f @ia:0bdc556b
   fish.updateSwimMotion:                    fish.js#updateSwimMotion render.js#drawFish  # @ds:bd354b7a @ds:df06827a @ia:3a4b5c6e
@@ -188,10 +194,11 @@ data_model:
       snapshotBuffer: "recent authoritative world snapshots with receivedAt timestamps"
       clientBubbles: "client-owned bubble array; never assigned from protocol snapshots"
       clientBubbleEmitters: "Map fishId -> { bubbleTimer, bubbleBurstRemaining } for client-only decorative bubble generation"
-      debugMode: "boolean toggled by client UI/keyboard; never sent to server"
+      gameMenuOpen: "boolean controlling the top-left game menu panel"
+      debugMode: "boolean toggled by game menu UI/keyboard; never sent to server"
       debugPositionTraces: "array of { kind:'relative'|'absolute', pos:{x,y}, createdAt, fadeStartAt, alpha?, fishId? }"
       debugFishMinimap: "render-only 200x200 px overlay computed from current world.fish positions; never stored in world state"
-      worldSnapshotInfo: "top-right render-only DOM panel derived from the latest WebSocket-synchronized world.fish and world.shreds arrays"
+      worldSnapshotInfo: "bottom-left render-only DOM panel derived from the latest WebSocket-synchronized world.fish and world.shreds arrays"
       latestAbsoluteServerPositions: "Map fishId -> absolute server pos captured from absolute sync diagnostics"
       lastDebugTraceAt: "timestamp of last debug trace sample, used to cap trace density"
       lastSentInputKey: "encoded comparison key for immediate input flush"
@@ -206,6 +213,7 @@ data_model:
       - radius
       - facing
       - mode                   # cruise|burst
+      - speedLevel             # 0 for no thrust, 1..30 cruise relative speed, 31..99 burst relative speed
       - age
       - playerActiveAge          # user active lifetime after start window, synchronized for lifetime UI
       - fryAge                   # active for NPC fry and user 3s start-window protection
@@ -290,7 +298,7 @@ implementation_instructions:
     when the WebSocket opens with no stored temporaryConnectionCode, call
     onInitialCommunication({ kind:'new' }); when an identity message is received
     for a reconnect or join, call onInitialCommunication({ kind:'restored' }) once
-    before/with onIdentity. main.js starts with #join, #control-modes, #hud .hint,
+    before/with onIdentity. main.js starts with #join, #control-modes, #control-help,
     #leave-game, #joystick-panel, and #player-metrics hidden; it shows the join
     form only after first communication establishes a new session, and shows game
     controls only after joined=true.
@@ -368,15 +376,13 @@ implementation_instructions:
     parsed.fryAge = N / 10, clears fryAge to null when `gN` is absent on a user
     row, reads `lN` into parsed.playerActiveAge = N / 10, and preserves the
     previous active age when `lN` is absent.
-    index.html contains #player-metrics as a fixed bottom-center UI group. It holds
+    index.html contains #player-metrics as a fixed top-center UI group. It holds
     #player-size with nested #player-size-label and #player-size-value, plus
     #lifetime, so the current user fish size stays next to the active lifetime
     indicator instead of being mixed into the top-left HUD.
     style.css#player-metrics makes the group noticeable and keeps pointer-events
     disabled; #lifetime is wider and thicker than the old compact HUD bar and
-    remains centered in that group. The group is positioned above the lower control
-    zone so it does not sit on top of bottom-screen fish controls or near-edge fish
-    visuals.
+    remains centered in that group under the top HUD/debug controls.
     main.js#updatePlayerLifetimeBar(fish):
       - when no current user fish exists, reset the bar to empty;
       - keep #player-metrics hidden unless a current ownerKind='user' fish exists
@@ -400,9 +406,36 @@ implementation_instructions:
     hidden in that state. style.css keeps #player-size-value as the dominant
     high-contrast number and #player-size-label as secondary text. frame() calls
     it with the same current user fish used for the lifetime bar so both
-    bottom-center metrics update together from the latest client snapshot.  # @ds:b9136c2e
+    top-center metrics update together from the latest client snapshot.  # @ds:b9136c2e
+  player_speed_mode_ui: |
+    index.html contains #player-speed-metric outside #player-metrics so it can move
+    between the visual joystick area and the bottom-right viewport corner.
+    main.js#updatePlayerSpeedMetric(fish):
+      - compute realSpeed from the synchronized current user fish velocity;
+      - treat speed as displayable only when it rounds to a non-zero two-decimal value;
+      - compute maximum possible user-fish speed as maxSpeedOf(fish.size, 'user') * 0.99;
+      - compute the integer speed percent as round(realSpeed / maximumPossibleSpeed * 100), clamped to 1..99;
+      - write the percent integer and the real speed with two decimals into the metric;
+      - set the percent color to green when fish.mode is cruise;
+      - when fish.mode is burst, set the percent color from a low-speed green-pink to a high-speed pink-red based on the displayed percent;
+      - add a joystick placement class when the joystick panel is visible, otherwise use the bottom-right placement;
+      - fade the whole metric in for displayable speed and fade it out when speed is zero, no current user fish exists, or the joined UI is not active.
+    style.css#player-speed-metric uses the same font size as #player-size-value for the main percent number and keeps pointer-events disabled.  # @ds:c656f0ec
+  game_menu_ui: |
+    index.html contains #game-menu-toggle as a top-left three-bar icon button and #game-menu as the opened menu panel.
+    #game-menu contains #control-modes, #app-version, #debug-mode-toggle, #leave-game, and #control-help.
+    main.js owns gameMenuOpen and toggles #game-menu from #game-menu-toggle without changing world state or input state.
+    showAppVersion writes the version text into #app-version inside #game-menu.
+    setupControlModes keeps the joystick, pointer, and touch screen-mode buttons inside #game-menu and updates #control-help whenever the active screen mode changes. Keyboard is not a selectable screen mode because it remains active in every mode.
+    updateControlHelp writes mode-specific help:
+      - keyboard/default: movement keys and Space/1/2/3 speed levels 31/65/99 remain active with the visible joystick screen input;
+      - pointer: experimental pointer movement and mouse-hold v31 while keyboard stays active;
+      - touch: experimental primary touch around the user fish controls direction and speed v=0..99 while keyboard stays active;
+      - joystick: visible lower-right radial joystick controls direction and speed v=0..99 while keyboard stays active.
+    #debug-mode-toggle toggles only debugMode and does not own menu visibility.
+    #leave-game remains the explicit leave/enter command inside the menu and keeps the same joined-state behavior.  # @ds:ab1e4f02 @ds:8d13f6a2 @ds:59c118f5 @ds:70871bc5 @ds:fb11044e @ds:22fd3ab4
   world_snapshot_info_ui: |
-    index.html contains #world-info in the top-right overlay layer. It has four
+    index.html contains #world-info in the bottom-left overlay layer. It has four
     value spans: #world-fish-count, #world-fish-area, #world-nutrient-count, and
     #world-nutrient-area.
     main.js#updateWorldSnapshotInfo(world) reads only the latest world object
@@ -412,7 +445,7 @@ implementation_instructions:
       - fishArea = sum(Math.PI * fish.radius^2) for finite synchronized fish radii;
       - nutrientCount = world.shreds.length;
       - nutrientArea = sum(shred.geometricArea) for finite synchronized shreds.
-    style.css#world-info anchors the panel at top right, uses a compact
+    style.css#world-info anchors the panel at bottom left, uses a compact
     translucent background, and leaves pointer-events disabled.  # @ds:e42a7c19
   join_after_leave: |
     main.js owns the local entry/game UI state.
@@ -688,45 +721,54 @@ implementation_instructions:
     considered together in this one sorted batch so larger expected nutrition
     wins the earlier attempt.  # @ds:9b41d2ac @ds:6c80e3b4 @ds:f2ad71c9 @ds:a8f03d2e @ds:4e2a91f0 @ds:e9fb3705 @ds:75a5aa4f @ds:d867989f @ds:b024b514 @ia:0bdc556b @ds:c14f7a08 @ds:9e4c1b7a @ds:b6f08d21 @ds:4d7c2e93 @ds:f0a6c5d8 @ds:3ad65f20 @ds:a2d5936f @ds:ed2b4f19
   movement_and_energy: |
-    integrate uses mode to select cruiseSpeedOf(size) or maxSpeedOf(size).
+    integrate treats fish.speedLevel as a target thrust level, not as an instant actual-speed assignment. speedLevel 0 applies no active thrust and lets current velocity decay through drag. speedLevel 1..30 uses maxSpeedOf(size, ownerKind) * speedLevel/100 * REGIME.cruiseFactor, where REGIME.cruiseFactor is 0.61. speedLevel 31..99 uses maxSpeedOf(size, ownerKind) * speedLevel/100. mode is derived from speedLevel: burst for >=31, cruise otherwise.
+    In fish.js#integrate, record previous actual speed before adding acceleration. When active thrust is present, add acceleration, then clamp only upward acceleration: if actual speed exceeds the current target cap because the target speed decreased, preserve that higher previous speed and let applyDrag reduce it. If active thrust would raise speed beyond max(previousActualSpeed,currentTargetCap), clamp to that allowed speed. This gives all fish inertial burst ramp-up and drag-only braking without adding protocol fields.
+    fish.js builds BURST_ENDURANCE_SIZE_THRESHOLDS at module initialization for speed levels 31..99; levels 1..30 are always available and have threshold 0. For each burst level, simulate continuous burst movement in REGIME.enduranceSimulationStepSeconds increments for REGIME.enduranceReserveSeconds using the same speed cap and size-loss formula as runtime spendEnergy, with speed recomputed after each size decrease. availableSpeedLevelForSize(size, desiredLevel) returns desired levels 0..30 unchanged, returns level 31 for any requested burst level when no higher threshold is available, and otherwise the nearest available level not greater than desiredLevel.
     applyDrag is linear damping.
-    maxSpeedOf(size, ownerKind) computes the size-decayed burst cap, then applies a predator hunt floor, not a fleeing-prey floor:
+    maxSpeedOf(size, ownerKind) computes a water-drag speed cap from fish area, then applies a predator hunt floor, not a fleeing-prey floor:
+      - treat fish.size as area and derive linearSize=max(FISH.minLinearSpeedSize, sqrt(size));
+      - compute the raw cap as FISH.baseNoDragSpeed / (1 + FISH.waterDragByLinearSize * (linearSize - 1));
       - for ownerKind==='user', the returned burst cap must be at least FISH.minBurstSpeed;
       - FISH.minBurstSpeed must be greater than PREY.maxSpeed + PREY.speedMargin, so even the largest depleted user fish in burst has a speed advantage over the smallest ordinary NPC prey while that prey is fleeing/accelerating;
-      - ordinary NPC prey remains capped by PREY.maxSpeed in prey.js#capPreySpeed even when mode==='burst';
+      - ordinary NPC prey uses PREY.maxSpeed as an active-acceleration ceiling in prey.js#capPreySpeed even when mode==='burst'; if an NPC is already above PREY.maxSpeed from a previous higher target, capPreySpeed preserves the previous actual speed and lets drag brake it;
       - capPreySpeed must not raise fleeing prey to FISH.minBurstSpeed; that floor belongs to hunter/predator burst movement, not prey escape movement.
-    spendEnergy runs only in burst; cruise and drift preserve size.
+    spendEnergy runs only for active burst thrust: speedLevel >= 31 and a non-zero acceleration vector in the current tick. speedLevel 0..30 and inertial braking after burst thrust stops preserve size, even while actual velocity is still above the cruise range. In burst, multiply the base size loss by burstEnergyFactorOf(fish.speedLevel): 1 + ENERGY.burstExtraSpendFactor*(speedLevel-31)/68 for levels 31..99. Level 31 remains available at the minimum size and does not reduce size below the owner-specific minimum.
     spendEnergy clamps NPC fish to ENERGY.minSize and user fish to ENERGY.userMinSize.
-    ENERGY.userMinSize must be greater than PREY.minSize * PREDATION.eatRatio, with a small margin, so the smallest fully grown ordinary NPC remains edible by a maximally depleted user fish.  # @ds:f51831f5 @ds:6aa7c828 @ds:d4f6a1c2
+    ENERGY.userMinSize must be greater than PREY.minSize * PREDATION.eatRatio, with a small margin, so the smallest fully grown ordinary NPC remains edible by a maximally depleted user fish.  # @ds:f51831f5 @ds:6aa7c828 @ds:d4f6a1c2 @ds:9ce87fee
   player_input: |
     Pointer, keyboard, touch, and joystick input affect only the current client's user fish.
-    The active control-mode switch selects which movement source is processed.
-    Ordinary pointer devices can use pointer or keyboard modes.
-    Mobile/touch devices can use touch or joystick modes.
-    createControlModeState(deviceType) initializes activeControlMode to keyboard
-    for ordinary pointer devices and joystick for mobile/touch devices; later user
-    selection through the existing mode switch owns changes to activeControlMode.
-    Hunt/burst comes from Space in every selected control mode, or from mouse/touch hold, or from joystick hunt state.
+    Keyboard input is always active after join and has movement priority over pointer, touch, and joystick steering in every selected mode.
+    The active control-mode switch selects only the experimental screen-input override: pointer or touch. The visual joystick is the default screen input whenever the active mode is not pointer or touch.
+    createControlModeState(deviceType) initializes activeControlMode to joystick for every device type; later user selection through the existing mode switch can choose pointer or touch as experimental overrides or return to joystick/default.
+    Relative speed is represented as speedLevel 0..99. Levels 1..30 are cruise, levels 31..99 are burst.
+    Keyboard movement keys select speedLevel 30 when no higher keyboard speed key is held. Keyboard Space and key 1 select speedLevel 31, key 2 selects speedLevel 65, key 3 selects speedLevel 99; when several are held, use the highest selected level.
+    Pointer mode mouse hold selects speedLevel 31.
+    Touch mode uses a single primary touch around the current user fish screen position. Compute the vector from that screen position to the touch, divide by the invisible touch control radius, clamp to 0..1, and map linearly to speedLevel round(unit*99). This same vector direction is used for steering.
+    Joystick mode uses the visible joystick base in the lower-right interface area. Compute the vector from the joystick base center to the pointer/touch and divide by the joystick base radius, clamped to 0..1. Map joystick radial unit to speedLevel with an expanded cruise radius: unit 0..(30/99*1.5) maps to speedLevel 0..30, and the remaining outer unit range maps to speedLevel 31..99. This same vector direction is used for steering.
+    The touch control radius is min(112px, 80% of min viewport side / 2) and is centered on the current user fish screen position only in activeControlMode == touch, so its invisible diameter is twice the unchanged 112px visible joystick diameter unless the viewport cap is smaller.
+    controls.js#speedLevelToControlMagnitude is the inverse of the joystick radial mapping and is used by availability clamping and ring placement. The cruise/burst visual boundary is level 30 at 1.5*(30/99) of joystick radius.
     No separate vulnerability toggle exists in UI or input state.
     Implement buildInputPayload() in main.js:
       - read keySteer(input.keys) first;
       - if keySteer returns a vector, use it and ignore pointer steering for that frame;
-      - otherwise use pointerSteer only when pointer.active and not pointer.lockedByKeyboard;
+      - otherwise use pointerSteer only when activeControlMode is pointer and pointer.active;
+      - otherwise use pointerSteer only when activeControlMode is touch and pointer.active and touchDown is active, using the pointer vector relative to the current user fish;
+      - otherwise use joystickSteer;
       - normalize the selected vector before sending;
-      - set hunt=true when huntMode(input)==='burst'.
-    controls.js#huntMode must check Space before mode-specific controls so Space can enable burst in keyboard, pointer, touch, and joystick modes.
+      - set desiredLevel=speedLevel(input, activeControlMode), then set speedLevel=availableSpeedLevelForSize(currentUserFish.size, desiredLevel).
+    controls.js#speedLevel must check keyboard speed keys before mode-specific controls so Space can enable v31 in keyboard, pointer, touch, and joystick modes.
     Implement sendInputIfChanged(now):
       - compute payload = buildInputPayload();
-      - compute key = signed-thousand x/y plus hunt flag, using the same quantization as protocol.encodeClientControl;
+      - compute key = signed-thousand x/y plus speedLevel, using the same quantization as protocol.encodeClientControl;
       - if key differs from lastSentInputKey, call net.input(payload) immediately and update lastSentInputKey/lastInputFlushAt;
       - otherwise call net.idle() only when now-lastInputFlushAt >= 1000ms.
     Implement controls.js key state cleanup:
-      - keydown adds normalized movement keys and Space to input.keys, and prevents default browser scrolling for those controls;
+      - keydown adds normalized movement keys, Space, and keys 1/2/3 to input.keys, and prevents default browser scrolling/action for those controls;
       - keyup removes normalized keys;
       - window blur and document visibilitychange clear input.keys, pointerDown, and touchDown so lost keyup events cannot leave movement or burst stuck;
-      - when any movement key is pressed, pointer.lockedByKeyboard=true until an explicit pointer/touch move unlocks it.
+      - keyboard movement does not change activeControlMode and does not need a pointer lock flag because keySteer is always read before experimental pointer/touch or joystick steering.
     Client input is encoded as cXXYYmods where X/Y are signed thousandths
-    of normalized steering and b in mods means burst.  # @ds:91e32235 @ds:70871bc5 @ds:c2aeb63a @ds:cf6ad7d6 @ds:5377d065 @ds:671e9773
+    of normalized steering and v1..v99 in mods means speedLevel. Absence of v means speedLevel 0. The legacy b modifier is not supported.  # @ds:91e32235 @ds:70871bc5 @ds:c2aeb63a @ds:cf6ad7d6 @ds:5377d065 @ds:671e9773 @ds:e6be3c03
   game_surface_input_ownership: |
     CSS and input event handlers split browser interaction by surface:
       - #game, #hud game buttons, #control-modes, and #joystick-panel use
@@ -749,10 +791,12 @@ implementation_instructions:
     plus "unknown" digest rather than hiding the field.  # @ds:8d13f6a2
   mobile_joystick_layout: |
     style.css owns the on-screen joystick layout.
-    #joystick-panel remains fixed near the bottom of the viewport and keeps pointer-events enabled.
-    #joystick-base is positioned on the right side so the right thumb controls steering.
-    #joystick-hunt is positioned on the left side so the left thumb controls burst.
-    The button must remain press-and-hold: pointerdown sets input.joystick.hunt=true and pointerup/pointercancel/pointerleave clears it.  # @ds:cd1c5776
+    #joystick-panel is a fixed lower interface area shown after join whenever activeControlMode is not pointer or touch, and hidden while pointer or touch experimental mode is active.
+    #joystick-base is the visible circular joystick control anchored to the lower-right of #joystick-panel and keeps its unchanged 112px diameter.
+    Joystick speed comes from pointer displacement from the visible joystick base center in the same radial control that owns steering.
+    setupJoystickControls stores input.joystick.rawVector as the normalized actual displacement with magnitude 0..1, and stores input.joystick.vector as the same direction clamped to the current available speed radius for internal consistency. controls.js#joystickSteer uses rawVector so steering strength follows the held pointer position; controls.js#speedLevel maps rawVector magnitude to desired speedLevel 0..99 with the expanded cruise radius before buildInputPayload clamps it through availableSpeedLevelForSize. main.js#updateJoystickBurstAvailability computes the current available speedLevel for the user fish and redraws rings for v=30 cruise boundary plus selected burst availability levels. If the current user fish has applied speedLevel 1..99, main.js#updateJoystickCurrentBurstRing shows #joystick-current-burst-ring at speedLevelToControlMagnitude(fish.speedLevel), uses a 2px border, and colors it through main.js#joystickCurrentSpeedColor: levels 1..30 return the blue cruise color, and levels 31..99 return the existing pink burstSpeedColor scale. speedLevel 0 hides that ring.  # @ds:cd1c5776 @ds:0eef2d19 @ds:e41821af
+    index.html#game-menu contains #burst-endurance-table with rows for speedLevel v=1..99. main.js#updateBurstEnduranceTable reads BURST_ENDURANCE_SIZE_THRESHOLDS and currentUserFish.size, writes mode, minimum size threshold, current availability, energy factor, expected size loss, and the time window for each speed. updateGameMenu refreshes the table while the menu is open and whenever current fish state changes.  # @ds:cff27cd5
+    The visible joystick layout remains independent from the current user fish screen position.  # @ds:b43d2f95 @ds:cd1c5776
   predation_eligibility: |
     canEat(predator, victim) requires burst, size eligibility, and canBeVictimOf.
     canBeVictimOf rules:
@@ -804,7 +848,7 @@ implementation_instructions:
       - protocol rows must not encode or decode mouthOpen, teeth state, swimPhase, burstKick, mouth timers, or any other visual-only fish decor field;
       - server authority over movement must not become server authority over mouth, teeth, or fin animation.
       - clientFishDecor stores an exhale state object per fish id with the same shape as fish.js#makeFish.exhale; this state is client-only and removed when the fish id is absent from the newest visible world.
-      - updateClientDecorState tracks previous displayed mode separately from burstSwimming; when fish.mode transitions from any non-burst value to 'burst', call requestExhale on the decor exhale state once for that edge. Do not require speed > FISH.facingThreshold for this trigger.
+      - updateClientDecorState tracks previous displayed mode separately from burstSwimming and stores the last confident movement direction. When fish.mode transitions cruise<->burst, call emitMotionCueBubbles once to append 1..2 ordinary bubbles to clientBubbles. When the current confident movement direction differs from the previous confident movement direction by more than 100 degrees, call the same cue. Do not emit this cue solely because speedLevel changes inside active burst.
       - updateClientDecorState stores lastEatenFishCount per fish id. When a visible fish's synchronized eatenFishCount increases, call requestExhale on decor.exhale with an eating red-bubble ratio of 0.4; this request is client-only and may queue behind an already active exhale cycle.
       - updateClientDecorState also starts a 0.3s eatingCruiseHold when eatenFishCount increases. During that hold, set the visible fish's mouthOpen to 0 and render it through the cruise visual state locally. Do not write this cruise hold to protocol rows or server fish.mode.
       - updateClientDecorState stores lastShredEatCueCounter per fish id. Initialize this field to 0 when client decor is first created so a fish that first appears with a positive synchronized shredEatCueCounter still plays the cue instead of treating that value as already consumed.
@@ -875,7 +919,7 @@ implementation_instructions:
   debug_visualization: |
     main.js owns a client-only debugMode boolean and a debugPositionTraces array.
     main.js owns lastDebugTraceAt and samples trace points no more often than DEBUG.traceSampleMs, so long sessions cannot append one trace per animation frame per fish.
-    toggleDebugMode() flips debugMode from a local UI control or debug key; it must not send any socket message and must not alter state.world.
+    #debug-mode-toggle is a game-menu control; toggleDebugMode() flips debugMode from this control or debug key, must not send any socket message, and must not alter state.world.
     protocol.js#applyWorldSync already identifies absolute sync messages; extend its diagnostics so each absolute parsed fish row exposes `{ id, pos }` using the server absolute position before client extrapolation.
     main.js stores those absolute server positions in latestAbsoluteServerPositions during onSnapshot/onDiagnostics handling.
     recordDebugPositionTraces(now, visibleWorld):
@@ -903,7 +947,7 @@ implementation_instructions:
       - encodeClientJoin({userColor,userName,userTier}) => n:${hexNoHash}:${base64urlName}:${u|p}
       - encodeClientReconnect(token) => r:${token}
       - encodeClientPing(n) => p:${n}
-      - encodeClientControl({accel,hunt}) => c${signedThousandX}${signedThousandY}${hunt?'b':''}
+      - encodeClientControl({accel,speedLevel}) => c${signedThousandX}${signedThousandY}${speedLevel>0 ? `v${speedLevel}` : ''}
       - parseClientMessage mirrors these shapes and clamps invalid control digits to 0.
     Implement server message codecs:
       - encodeIdentity(id,token) => i:${id}:${token}
@@ -927,6 +971,8 @@ implementation_instructions:
     lifetime as `lN`, where N is seconds in tenths. parseFishRow exposes them as
     fish.fryAge and fish.playerActiveAge seconds so start growth suppression and
     the lifetime bar are bound to synchronized server state and PLAYER.maxLifetimeSeconds.
+    encodeFishRow encodes burst fish state as `bN` where N is clamped to 1..99.
+    parseFishRow decodes `vN` into fish.speedLevel=N and derives mode from that value; rows with no v mod decode as fish.mode='cruise' and speedLevel=0.
     encodeWorldSync includes one shred row for each current world.shreds item
     after fish rows. Delta sync may send shreds as absolute shred rows each tick;
     applyWorldSync replaces world.shreds with the parsed shred rows from the
@@ -952,7 +998,7 @@ implementation_instructions:
       - use the elapsed time since the previous sync and the previous client velocity to predict the client-side current position at receive time;
       - print a compact console table with id, role, previous client position, predicted client position, absolute server position, elapsed ms, error dx/dy, and error distance;
       - skip rows with no previous client position.
-    State mods include a, b, f, e, sN, gN, and lN. Names use base64url; colors use hex without #; type is u/p/n.
+    State mods include a, bN, f, e, sN, gN, and lN. Names use base64url; colors use hex without #; type is u/p/n.
     State mods are domain/network facts only. Do not add protocol fields or mods for visual-only mouth, teeth, fin, swim phase, burst kick, or mouth hold state.  # @ds:839f8cd0 @ds:5a4d3d6d @ds:671e9773 @ds:4fad33f8 @ds:682570c7 @ds:ea18a088 @ds:f51a5030 @ds:a16328a6
   input_latency: |
     Do not throttle changed input in client-net.js.
@@ -1029,6 +1075,17 @@ new_or_changed_constants:
   SYNC.maxExtrapolationMs: 180        # @ds:e559831a @ds:7b9a7984
   RECONNECT.graceSeconds: 3           # @ds:93a64773
   LEAVE.attackWindowSeconds: 2        # @ds:8917ad63
+  REGIME.burstSpeedFactor: 1          # @ds:8869f043
+  REGIME.speedLevels: 99              # @ds:8869f043 @ds:07320d39
+  REGIME.cruiseMaxSpeedLevel: 30      # @ds:8869f043
+  REGIME.burstStartSpeedLevel: 31     # @ds:8869f043
+  REGIME.enduranceReserveSeconds: 5   # @ds:07320d39
+  REGIME.npcMaxBurstLevel: 70         # @ds:703efd43
+  REGIME.burstSpeedExtraFactor: 0.2   # @ds:8869f043
+  FISH.baseNoDragSpeed: 650           # @ds:8869f043
+  FISH.waterDragByLinearSize: 0.32    # @ds:8869f043
+  FISH.minLinearSpeedSize: 0.6        # @ds:8869f043
+  ENERGY.burstExtraSpendFactor: 20    # @ds:f51831f5
   WORLD.initialViewportScale: 1.5     # @ds:19c14fea
   WORLD.resizeHysteresisUsers: 1      # @ds:19c14fea
   WORLD.npcDensity: "tunable per area" # @ds:53db39eb
@@ -1069,7 +1126,7 @@ new_or_changed_constants:
   SHRED.hueWeight/saturationWeight: "HSV similarity weights" # @ds:b6f08d21
   SHRED.layerRotationMin/MaxDeg: "3..5 degrees" # @ds:73b91e4c
   SHRED.layerDriftPx: "small visual drift amplitude" # @ds:73b91e4c
-  REGIME.cruiseFactor: 0.55           # @ia:5e6f7a8b
+  REGIME.cruiseFactor: 0.61           # @ia:5e6f7a8b
   PLAYER.startSize: 1                 # @ds:39305789
   FISH.minBurstSpeed: "greater than PREY.maxSpeed + PREY.speedMargin; predator/user hunt floor, not fleeing-prey cap" # @ds:8869f043 @ds:d4f6a1c2 @ia:2d3e4f5a
   GROWTH.fishAreaGainRatio: 0.7       # @ds:d867989f
@@ -1157,10 +1214,11 @@ verification_checks:
   - "Removed fish disappear on clients immediately after an e tombstone delta row."
   - "Keyboard key-down/key-up and burst transitions are sent without waiting for the idle input cadence."
   - "Space enables burst in keyboard, pointer, touch, and joystick modes."
-  - "The initial control mode is keyboard on ordinary pointer devices and visual joystick on mobile/touch devices."
+  - "The initial screen control mode is visual joystick/default on every device; keyboard input is always active."
   - "The game surface and game controls suppress browser selection, scrolling, zooming, context gestures, and navigation gestures while the join form remains normally editable."
-  - "The HUD shows a persistent version string derived from launch/build date and commit digest."
-  - "In joystick mode, the steering joystick is on the right side of the screen and the Burst press-and-hold control is on the left."
+  - "The game menu shows a persistent version string derived from launch/build date and commit digest."
+  - "The top-left menu contains control mode selection, version, debug activation, leave command, and help text for the active control mode."
+  - "In joystick mode, the steering joystick is on the right side of the screen and radial distance selects cruise or burst target speed 1..99."
   - "Losing focus clears local key and pointer/touch pressed state so movement and burst cannot remain stuck."
   - "Unchanged input sends p:${N} at one-second cadence, with no faster ping heartbeat."
   - "User fish body decoration preserves the selected user color across the full body through transparent overlays."

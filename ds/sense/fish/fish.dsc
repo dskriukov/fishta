@@ -13,6 +13,7 @@ entity:
     size:     { type: number, gt: 0, from: ds:fish.size }
     facing:   { type: enum[left,right], from: ds:fish.facing }
     mode:     { type: enum[cruise,burst], default: cruise, from: ds:fish.regime }
+    speedLevel: { type: integer, range: [0,99], default: 0, from: ds:fish.regime }
     ownerKind: { type: enum[user,npc], from: ds:fish.entity }
     userName: { type: string?, from: [ds:multiplayer.identity, ds:fish.decor.user-label] }
     userColor: { type: color?, from: [ds:multiplayer.identity, ds:fish.decor.abandoned-gradient] }
@@ -47,23 +48,30 @@ derived:
       - "small and large fish remain visually readable"
   cruiseSpeed:
     from: [ds:fish.regime, ds:fish.size, ia:fish.speed-formula, ia:fish.regime.cruise-factor]
-    rule: "default speed cap is a fixed fraction of maxSpeed; < maxSpeed; decreases slightly with size and has a lower bound"
+    rule: "for speedLevel v=1..30, speed cap is maxSpeed(size, ownerKind) * (v / 100) * 0.61; cap decreases with size through maxSpeed(size, ownerKind)"
   maxSpeed:
     from: [ds:fish.regime, ds:fish.size, ds:fish.thrust, ia:fish.speed-formula]
-    rule: "burst speed cap; reachable only when mode==burst; decreases slightly with size and has a lower bound"
+    rule: "maxSpeed(size) models water drag from fish area: linearSize=max(minLinearSpeedSize, sqrt(size)); maxSpeed=baseNoDragSpeed/(1+waterDragByLinearSize*(linearSize-1)); for speedLevel v=31..99, speed cap is maxSpeed(size, ownerKind) * (v / 100)"
 
 behaviours:
   swim:
-    from: ds:fish.movement.swim
+    from: [ds:fish.movement.swim, ds:fish.burst-inertia]
     contract:
       name: integrateMotion
-      inputs: [position, velocity, acceleration, drag, mode, dt]
+      inputs: [position, velocity, acceleration, drag, mode, speedLevel, dt]
       output: [position', velocity']
-      notes: "v += a*dt; v = clamp(v, mode==burst ? maxSpeed : cruiseSpeed); v = drag(v); p += v*dt"
+      notes: "when speedLevel>0 and acceleration is active, velocity += accel*dt and active thrust may increase speed only up to the current target cap; if the fish is already above the current cap because the target level decreased, do not clamp downward instantly. speedLevel 1..30 uses maxSpeedOf(size, ownerKind)*(speedLevel/100)*0.61; speedLevel 31..99 uses maxSpeedOf(size, ownerKind)*(speedLevel/100). speedLevel 0 applies no thrust. After thrust handling, apply the same water drag damping used for inertial objects and integrate position."
+  burst_endurance:
+    from: ds:fish.burst-endurance
+    contract:
+      name: availableSpeedLevelForSize
+      inputs: [size, desiredSpeedLevel, enduranceReserveSeconds, burstEnduranceThresholds]
+      output: speedLevel
+      rule: "at application start compute one size-threshold table for burst speedLevels 31..99 using integral simulation of size loss down to the minimum allowed size; desired speedLevel 0..30 is returned unchanged, desired burst speedLevel 31..99 is reduced to the nearest available level not greater than desired, and level 31 is always available"
   thrust:
-    from: ds:fish.thrust
+    from: [ds:fish.thrust, ds:fish.burst-inertia]
     rule: "accelerate toward target; speed cap depends on mode (cruise vs burst)"
-    note: "ramp up/down EMERGES from accel + world.drag + speed clamp; no separate state (fish.air#ia:fish.thrust.emergent-ramp)"
+    note: "ramp up emerges from finite acceleration; ramp down emerges from world.drag damping, not from an instant downward speed clamp"
   wrapInWorld:
     from: ds:fish.movement.bounds
     uses: world.bounds.wrapPosition
@@ -223,18 +231,19 @@ growth:
       - "bigger prey -> bigger gain"
 
 energy:
-  from: [ds:fish.energy, ds:fish.user-min-size]
+  from: [ds:fish.energy, ds:fish.user-min-size, ds:fish.burst-inertia]
   status: refined               # уточнён: расход только в burst
   resolves_dse: [DSE-003, DSE-004]
   # DSE-004: "any thrust drains size" -> prey starved while wandering; fixed by mode gating
   contract:
     name: spendEnergy
-    inputs: [size, mode, distanceMoved]
+    inputs: [size, mode, speedLevel, activeBurstThrust, distanceMoved]
     output: size'
-    rule: "if mode==burst: size' = max(userMinSize for user fish, npcMinSize for NPC fish, size * (1 - 0.01 * (distance / (100*size)))); else size unchanged"
+    rule: "if activeBurstThrust and speedLevel>=31: size' = max(userMinSize for user fish, npcMinSize for NPC fish, size * (1 - 0.01 * burstEnergyFactor(speedLevel) * (distance / (100*size)))); else size unchanged; burstEnergyFactor(N)=1 + burstExtraSpendFactor * (N - 31) / 68 for N in 31..99"
     properties:
-      - "cruise and drift cost nothing (ordinary swimming preserves size)"
-      - "traveling 100*size in burst => -1% size"
+      - "speedLevel 0..30 costs nothing"
+      - "inertial braking after burst thrust stops costs nothing even while actual speed remains above cruise range"
+      - "traveling 100*size at v=31 => -1% size; v=99 applies the maximum configured extra spend factor"
       - "NPC size never drops below a positive NPC minimum (fish.air#ia:fish.energy.burst-only)"
       - "userMinSize is above PREY.minSize by the predation eat-ratio margin, so the smallest fully grown ordinary NPC remains edible by a maximally depleted user fish"
 

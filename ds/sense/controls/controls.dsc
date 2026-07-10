@@ -84,10 +84,9 @@ input:
       name: selectControlMode
       inputs: [deviceType, selectedMode]
       output: activeControlMode
-      allowed_by_device:
-        pointer: [keyboard, pointer]
-        touch: [touch, joystick]
-      rule: "client uses an explicit control-mode switch; only input belonging to the selected mode is processed"
+      screen_modes: [joystick, pointer, touch]
+      experimental_screen_modes: [pointer, touch]
+      rule: "client uses an explicit control-mode switch for experimental pointer/touch screen input; keyboard input remains active in every mode and joystick is the default screen input outside pointer/touch"
       automatic_last_input_switching: false
   initial_mode:
     from: ds:controls.initial-mode
@@ -95,7 +94,14 @@ input:
       name: initialControlMode
       inputs: [deviceType]
       output: activeControlMode
-      rule: "when the web app opens, pointer devices start in keyboard mode and mobile/touch devices start in joystick mode; the explicit control-mode switch can change the mode after join"
+      rule: "when the web app opens, the screen input mode starts as joystick/default; the explicit control-mode switch can choose experimental pointer or touch mode after join"
+  primary_keyboard_and_joystick:
+    from: ds:controls.primary-keyboard-and-joystick
+    contract:
+      name: primaryKeyboardAndJoystickInput
+      inputs: [activeControlMode, keysDown, joystickVector]
+      output: activeInputSources
+      rule: "keyboard movement and burst keys are always processed after join; visual joystick is visible and active whenever activeControlMode is not pointer or touch"
   pointer:
     from: ds:controls.pointer
     contract:
@@ -107,42 +113,66 @@ input:
     from: [ds:controls.keys, ia:controls.key-layout-equivalents, ia:controls.key-combo-compose]
     contract:
       name: keySteer
-      inputs: [activeControlMode, keysDown]
+      inputs: [keysDown]
       output: acceleration
       mapping: { ArrowUp/W: up, ArrowDown/S: down, ArrowLeft/A: left, ArrowRight/D: right }
       compose: "simultaneous movement keys compose one acceleration vector"
       layout_equivalents: "where possible, keyboard-layout equivalents are accepted"
-      rule: "when activeControlMode == keyboard, movement keys produce one composed acceleration vector; pointer input is ignored in this mode"
+      rule: "movement keys produce one composed acceleration vector in every activeControlMode, have priority over pointer, touch, and joystick steering, and select cruise speedLevel 30 when no higher keyboard speed key is held"
   mobile_touch:
     from: ds:controls.mobile-touch
     contract:
       name: touchSteer
-      inputs: [activeControlMode, primaryTouch, userFishPos]
-      output: acceleration
-      rule: "when activeControlMode == touch, the first active touch defines movement from current client's user fish toward that touch point; releasing the primary touch stops directed movement"
+      inputs: [activeControlMode, primaryTouch, currentUserFishViewportPos, viewportSize]
+      output: { acceleration, speedLevel: integer[0,99] }
+      rule: "when activeControlMode == touch, the first active touch defines direction from the current user fish screen position toward the touch point and maps radial distance from that fish position to relative speed v=0..99; releasing the touch stops directed movement and returns speedLevel to 0"
   mobile_joystick:
     from: ds:controls.mobile-joystick
     contract:
       name: joystickSteer
-      inputs: [activeControlMode, joystickVector]
-      output: acceleration
-      rule: "when activeControlMode == joystick, the screen joystick defines the movement vector; releasing it stops directed movement"
+      inputs: [activeControlMode, joystickBaseRect, pointerOrTouchPoint]
+      output: { acceleration, speedLevel: integer[0,99] }
+      rule: "when activeControlMode is not pointer or touch, the visible joystick base in the lower-right interface area defines movement direction and speedLevel from pointer displacement relative to its own center; releasing it stops directed movement and returns speedLevel to 0"
   hunt:
     from: [ds:controls.hunt, ds:controls.mobile-hunt, ds:controls.mobile-joystick-hunt, ia:controls.hunt-binding]
     contract:
-      name: huntMode
-      inputs: [activeControlMode, keysDown, pointerDown, touches, joystickHuntControl]
-      output: mode                 # burst while Space or mouse held, else cruise
+      name: speedControl
+      inputs: [activeControlMode, keysDown, pointerDown, primaryTouch, joystickVector]
+      output: { mode: enum[cruise,burst], speedLevel: integer[0,99] }
       rule: >
-        for current client's user fish: Space enables burst in every active
-        control mode; pointer mode also uses held mouse button, touch mode also
-        uses the second simultaneous touch, and joystick mode also uses a
-        separate on-screen hunt control. The joystick hunt control is placed on
-        the left side of the screen so movement can be handled with the right
-        hand and burst with the left. Hunt switches only cruise/burst regime;
-        steering remains defined by the active movement mode. In touch mode,
-        releasing the primary touch stops directed movement but can preserve
-        burst while the second touch is still held.
+        for current client's user fish: movement keys select speedLevel 30,
+        Space and key 1 select speedLevel 31,
+        key 2 selects speedLevel 65, and key 3 selects speedLevel 99; the highest
+        active key-selected level wins in every activeControlMode. Pointer mode uses held mouse button as
+        speedLevel 31 only when selected as the experimental screen mode. Touch mode derives speedLevel linearly from radial distance to the current user fish screen position. Joystick mode derives speedLevel from radial distance to the visible joystick base center with an expanded cruise radius: values 0..30 occupy 1.5 * (30/99) of the joystick radius, and values 31..99 occupy the remaining radius. Mode is cruise for speedLevel 0..30 and burst for speedLevel 31..99. Steering remains defined by the active movement source with keyboard priority.
+  burst_endurance_limit:
+    from: ds:controls.burst-endurance-limit
+    contract:
+      name: clampUserSpeedInput
+      inputs: [desiredSpeedLevel, currentUserFish.size, fish.burstEnduranceThresholds]
+      output: speedLevel
+      rule: "before sending input, the client preserves cruise speedLevel 0..30 and reduces burst speedLevel 31..99 to the nearest available target speed for the current user fish size"
+  burst_endurance_joystick_ui:
+    from: ds:controls.burst-endurance-joystick-ui
+    contract:
+      name: updateJoystickBurstAvailability
+      inputs: [currentUserFish.size, fish.burstEnduranceThresholds]
+      output: joystickRingStyles
+      rule: "visual speed availability uses v=31..99 only for burst constraints; cruise values v=1..30 are always available"
+  joystick_current_burst_indicator:
+    from: ds:controls.joystick-current-burst-indicator
+    contract:
+      name: updateJoystickCurrentBurstIndicator
+      inputs: [currentUserFish.mode, currentUserFish.speedLevel]
+      output: joystickCurrentBurstRingStyle
+      rule: "when the current user fish has speedLevel 1..99, the visual joystick draws one extra ring at that relative-speed radius with double normal ring thickness; speedLevel 1..30 uses a blue cruise ring, and speedLevel 31..99 uses a pink burst intensity scale from calm pink at minimum burst to bright pink-red at maximum burst"
+  burst_endurance_menu_table:
+    from: ds:controls.burst-endurance-menu-table
+    contract:
+      name: updateBurstEnduranceTable
+      inputs: [currentUserFish.size, fish.burstEnduranceThresholds]
+      output: menuBurstEnduranceRows
+      rule: "game menu renders a compact scrollable table for speedLevel v=1..99 with mode, minimum size threshold, availability, energy factor, expected size loss, and the time window used for that loss; v=1..30 has zero energy factor and zero expected loss"
   inspect_click:
     from: ds:controls.inspect-click
     contract:

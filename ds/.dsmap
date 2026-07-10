@@ -1,26 +1,30 @@
-ds/sense/controls/controls.ds#3a309855 - 323e0d97
-ds/sense/controls/controls.ia#3eb8e8e5 - 3ab6da12
+ds/sense/controls/controls.ds#61a89e8e - 323e0d97
+ds/sense/controls/controls.ia#ea72de17 - 3ab6da12
 ds/fix/background.fix#0778747e - 8bccf725
-ds/sense/fish/fish.ds#f832c3b3 - 0e1af7e8
+ds/sense/fish/fish.ds#785684de - 0e1af7e8
 ds/sense/fish/fish.ia#54e70523 - 2b751007
-ds/sense/main.ds#7c3a97d2 - d3cd9207
+ds/sense/main.ds#332ed63e - d3cd9207
 ds/sense/main.ia#c266c5dc - feab7d75
 ds/sense/multiplayer/multiplayer.ds#4de5b311 - 021f8c6b
-ds/sense/multiplayer/ws-protocol.ds#9c9a61e3 - 9c9a61e3
-ds/sense/player/player.ds#d57e2041 - 6f2d8c10
+ds/sense/multiplayer/ws-protocol.ds#75cc25db - 9c9a61e3
+ds/sense/player/player.ds#fae8d62d - 6f2d8c10
 ds/sense/predation/predation.ds#8b07d043 - c4f0fe31
 ds/sense/prey/prey.ds#3bc922ec - 3fbd0a6d
 ds/sense/prey/prey.ia#54167961 - b73de1c3
 ds/sense/shred/shred.ds#9266404c - 51ad0f77
-ds/sense/world/world.ds#739f0bcf - 0c44252a
+ds/sense/world/world.ds#29d4896d - 0c44252a
 ds/sense/world/world.ia#d1b53549 - a45699db
 
 ds:controls.camera - 7b9a7984 323e0d97
 ds:controls.device-type - cf6ad7d6 323e0d97
 ds:controls.game-surface-input-ownership - 5d92a6ef 323e0d97
 ds:controls.hunt - 22fd3ab4 323e0d97
+ds:controls.burst-endurance-limit - e6be3c03 323e0d97
+ds:controls.burst-endurance-joystick-ui - 0eef2d19 323e0d97
+ds:controls.burst-endurance-menu-table - cff27cd5 323e0d97
 ds:controls.inspect-click - 2e1570ed 323e0d97
 ds:controls.initial-mode - c2aeb63a 323e0d97
+ds:controls.joystick-current-burst-indicator - e41821af 323e0d97
 ds:controls.join-after-leave - 9772e9ac 323e0d97
 ds:controls.join-world - 34ba255b 323e0d97
 ds:controls.keys - 10baf178 323e0d97
@@ -33,6 +37,7 @@ ds:controls.mode-select - 70871bc5 323e0d97
 ds:controls.no-vulnerability-control - 5377d065 323e0d97
 ds:controls.player - 91e32235 323e0d97
 ds:controls.pointer - 55c13a4f 323e0d97
+ds:controls.primary-keyboard-and-joystick - 93b8abba 323e0d97
 ds:controls.start-background - 58200142 323e0d97
 ds:domain.modules - ec8cb052 d3cd9207
 ds:debug.mode - 59c118f5 d3cd9207
@@ -50,6 +55,8 @@ ds:fish.decor.swim_motion - bd354b7a 0e1af7e8
 ds:fish.decor.user-label - c5a92431 0e1af7e8
 ds:fish.energy - f51831f5 0e1af7e8
 ds:fish.entity - 1f3abc43 0e1af7e8
+ds:fish.burst-inertia - 9ce87fee 0e1af7e8
+ds:fish.burst-endurance - 07320d39 0e1af7e8
 ds:fish.facing - 8d0ca6a8 0e1af7e8
 ds:fish.feeding-success - 4e2a91f0 0e1af7e8
 ds:fish.geometry.collision-area - b024b514 0e1af7e8
@@ -66,6 +73,7 @@ do:serialize - a7a50f7b 0e1af7e8
 ds:goal.growth - b433f1bc d3cd9207
 ds:intent.game - 27fa3caa d3cd9207
 ds:project.mode - dd674a52 d3cd9207
+ds:ui.game-menu - ab1e4f02 d3cd9207
 ds:ui.version-visible - 8d13f6a2 d3cd9207
 ds:ui.world-snapshot-info - e42a7c19 d3cd9207
 ds:multiplayer.abandoned-fish-visual - bfd5a97a 021f8c6b
@@ -101,9 +109,11 @@ ds:player.fry-feeding-and-invulnerability - 9d62f0a7 6f2d8c10
 ds:player.lifetime-aging - b7a4c391 6f2d8c10
 ds:player.lifetime-ui - 2e91f6d4 6f2d8c10
 ds:player.size-ui - b9136c2e 6f2d8c10
+ds:player.speed-mode-ui - c656f0ec 6f2d8c10
 ds:prey.entity - ad8d81d8 3fbd0a6d
 ds:prey.flee - 579e4888 3fbd0a6d
 ds:prey.flee.effort - e699c42d 3fbd0a6d
+ds:prey.burst-endurance - 703efd43 3fbd0a6d
 ds:prey.npc-fish - 534bb18b 3fbd0a6d
 ds:npc.courage-selection - e29aeb93 3fbd0a6d
 ds:npc.continuous-motion-intent - b47c2d91 3fbd0a6d

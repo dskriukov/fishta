@@ -8,6 +8,11 @@
     --world-haze-top-alpha: 0.16;
     --world-haze-bottom-alpha: 0.26;
     --join-radius: 8px;
+    --joystick-size: 212px;
+    --bottom-info-bar-height: 54px;
+    --top-info-panel-top: 0px;
+    --top-info-panel-height: 68px;
+    --top-info-panel-gap: 10px;
 }
 
 html, body {
@@ -65,26 +70,47 @@ body::after {
 #hud {
     z-index: 3;
     position: fixed;
-    top: 12px;
-    left: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    align-items: flex-start;
+    top: var(--top-info-panel-top);
+    left: 0;
+    right: 0;
+    height: var(--top-info-panel-height);
+    display: block;
     color: #cdeeff;
     font-size: 14px;
     letter-spacing: 0;
     pointer-events: none;
+    padding: 0;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
     user-select: none;
     -webkit-user-select: none;
 }
 
 #hud .hud-row {
-    display: flex;
-    gap: 16px;
+    display: grid;
+    grid-template-columns: 48px 1fr 76px;
+    gap: 14px;
     align-items: center;
-    flex-wrap: wrap;
+    height: 100%;
+    padding: 0 16px;
+}
+
+#user-fish-metrics {
+    justify-self: center;
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 32px;
+    min-width: 0;
+    color: rgba(217, 245, 255, 0.58);
+    font-size: 24px;
+    font-weight: 400;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+#eaten {
+    color: #ffffff;
+    font-weight: 800;
 }
 
 #lifetime {
@@ -141,8 +167,9 @@ body::after {
 }
 
 #leave-game[hidden],
+#game-menu-toggle[hidden],
 #control-modes[hidden],
-#hud .hint[hidden],
+#control-help[hidden],
 #player-metrics[hidden] {
     display: none;
 }
@@ -304,10 +331,10 @@ body::after {
 }
 
 #join-form button,
-#debug-toggle,
+#game-menu-toggle,
+#debug-mode-toggle,
 #leave-game,
-#control-modes button,
-#joystick-hunt {
+#control-modes button {
     border: 1px solid rgba(205, 238, 255, 0.36);
     background: rgba(110, 215, 239, 0.18);
     color: #edf8ff;
@@ -350,9 +377,23 @@ body::after {
     font-size: 12px;
 }
 
-#debug-toggle {
+#game-menu-toggle {
     pointer-events: auto;
-    font-size: 12px;
+    display: inline-grid;
+    place-items: center;
+    gap: 3px;
+    width: 48px;
+    height: 48px;
+    padding: 7px;
+    touch-action: manipulation;
+    justify-self: start;
+}
+
+#game-menu-toggle span {
+    display: block;
+    width: 24px;
+    height: 3px;
+    background: currentColor;
 }
 
 #control-modes {
@@ -366,41 +407,58 @@ body::after {
     padding: 5px 8px;
 }
 
-#debug-toggle[aria-pressed="true"],
-#control-modes button[aria-pressed="true"],
-#joystick-hunt[aria-pressed="true"] {
+#debug-mode-toggle[aria-pressed="true"],
+#control-modes button[aria-pressed="true"] {
     background: rgba(255, 228, 92, 0.22);
     border-color: rgba(255, 228, 92, 0.55);
 }
 
-#hud .hint {
+#control-help {
     opacity: 0.6;
     font-size: 12px;
     max-width: min(80vw, 520px);
+    margin: 0;
 }
 
-/* @ds:2e91f6d4 @ds:b9136c2e */
+/* @ds:2e91f6d4 @ds:b9136c2e @ds:c5a92431 */
 #player-metrics {
     position: fixed;
     z-index: 3;
     left: 50%;
-    bottom: clamp(92px, 14vh, 150px);
+    top: calc(var(--top-info-panel-top) + var(--top-info-panel-height) + var(--top-info-panel-gap));
     transform: translateX(-50%);
     display: flex;
-    align-items: center;
+    align-items: flex-end;
     gap: 18px;
-    min-width: min(82vw, 330px);
+    min-width: 0;
     padding: 10px 14px;
     color: #edf8ff;
     font-size: 15px;
     font-weight: 700;
     letter-spacing: 0;
-    background: rgba(4, 38, 59, 0.72);
-    border: 1px solid rgba(205, 238, 255, 0.42);
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
     pointer-events: none;
     user-select: none;
     -webkit-user-select: none;
+}
+
+#player-life {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+    min-width: 0;
+}
+
+#player-name {
+    max-width: min(42vw, 180px);
+    overflow: hidden;
+    color: #edf8ff;
+    font-size: 26px;
+    font-weight: 800;
+    line-height: 1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 #player-size {
@@ -427,45 +485,178 @@ body::after {
     font-variant-numeric: tabular-nums;
 }
 
+/* @ds:c656f0ec */
+#player-speed-metric {
+    position: absolute;
+    z-index: 4;
+    left: 50%;
+    top: 50%;
+    display: block;
+    color: #7bd88f;
+    font-weight: 800;
+    letter-spacing: 0;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.62);
+    opacity: 0;
+    transform: translate(-50%, -50%);
+    transition: opacity 180ms ease;
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+#player-speed-metric.is-visible {
+    opacity: 1;
+}
+
+#player-speed-percent {
+    font-size: 52px;
+    line-height: 0.95;
+    font-variant-numeric: tabular-nums;
+}
+
+#player-speed-real {
+    color: rgba(217, 245, 255, 0.84);
+    font-variant-numeric: tabular-nums;
+}
+
 /* @ds:e42a7c19 */
 #world-info {
     position: fixed;
     z-index: 3;
-    top: 12px;
-    right: 12px;
-    display: grid;
-    gap: 5px;
-    min-width: 128px;
-    padding: 8px 10px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: var(--bottom-info-bar-height);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: clamp(18px, 5vw, 48px);
+    padding: 7px 18px calc(7px + env(safe-area-inset-bottom));
     color: #d9f5ff;
     font-size: 12px;
     line-height: 1.25;
     letter-spacing: 0;
-    background: rgba(4, 38, 59, 0.42);
-    border: 1px solid rgba(205, 238, 255, 0.18);
+    background: rgba(4, 38, 59, 0.26);
+    border-top: 1px solid rgba(205, 238, 255, 0.24);
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
     pointer-events: none;
     user-select: none;
     -webkit-user-select: none;
 }
 
-#world-info div {
+#world-info .world-info-item {
     display: grid;
-    grid-template-columns: 1fr auto auto;
-    gap: 8px;
-    align-items: baseline;
+    grid-template-columns: auto;
+    gap: 2px;
+    align-items: center;
+    justify-items: center;
+    min-width: 48px;
+}
+
+#world-info .world-info-item span {
+    color: rgba(217, 245, 255, 0.72);
+    font-weight: 400;
 }
 
 #world-info strong,
 #world-info em {
     font-style: normal;
+    font-weight: 800;
     font-variant-numeric: tabular-nums;
-    text-align: right;
+    line-height: 1;
+    text-align: center;
 }
 
 #world-info em {
-    min-width: 42px;
     color: rgba(217, 245, 255, 0.78);
+}
+
+#game-menu {
+    position: fixed;
+    z-index: 4;
+    left: 28px;
+    top: calc(var(--top-info-panel-top) + var(--top-info-panel-height) + 8px);
+    width: min(640px, calc(100vw - 56px));
+    display: grid;
+    gap: 8px;
+    padding: 10px;
+    color: #edf8ff;
+    font-size: 12px;
+    background: rgba(4, 38, 59, 0.78);
+    border: 1px solid rgba(205, 238, 255, 0.34);
+    pointer-events: auto;
+}
+
+#game-menu[hidden] {
+    display: none;
+}
+
+#game-menu .menu-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+}
+
+#game-menu .menu-meta {
+    justify-content: flex-start;
+}
+
+#debug-mode-toggle {
+    justify-self: end;
+    width: 76px;
+    min-height: 36px;
+    padding: 7px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    pointer-events: auto;
+    touch-action: manipulation;
+}
+
+/* @ds:cff27cd5 */
+#burst-endurance-panel {
+    max-height: min(42vh, 320px);
+    overflow: auto;
+    border: 1px solid rgba(205, 238, 255, 0.16);
+    background: rgba(1, 20, 31, 0.22);
+}
+
+#burst-endurance-table {
+    width: 100%;
+    border-collapse: collapse;
+    color: #d9f5ff;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
+
+#burst-endurance-table th,
+#burst-endurance-table td {
+    padding: 3px 7px;
+    border-bottom: 1px solid rgba(205, 238, 255, 0.09);
+    text-align: right;
+    white-space: nowrap;
+}
+
+#burst-endurance-table th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    color: rgba(237, 248, 255, 0.72);
+    font-weight: 700;
+    background: rgba(4, 38, 59, 0.92);
+}
+
+#burst-endurance-table th:first-child,
+#burst-endurance-table td:first-child {
+    text-align: left;
+}
+
+#burst-endurance-table .is-available td:last-child {
+    color: #7bd88f;
+}
+
+#burst-endurance-table .is-locked {
+    color: rgba(217, 245, 255, 0.42);
 }
 
 /* @ds:cd1c5776 */
@@ -474,8 +665,8 @@ body::after {
     z-index: 3;
     left: 24px;
     right: 24px;
-    bottom: 24px;
-    height: 112px;
+    bottom: calc(var(--bottom-info-bar-height) + 24px);
+    height: var(--joystick-size);
     pointer-events: none;
     user-select: none;
     -webkit-user-select: none;
@@ -489,13 +680,64 @@ body::after {
     position: absolute;
     right: 0;
     bottom: 0;
-    width: 112px;
-    height: 112px;
-    border: 1px solid rgba(205, 238, 255, 0.32);
+    width: var(--joystick-size);
+    height: var(--joystick-size);
     border-radius: 50%;
-    background: rgba(4, 38, 59, 0.42);
+    background: radial-gradient(circle, rgba(4, 38, 59, 0.42), rgba(4, 38, 59, 0.58));
     touch-action: none;
     pointer-events: auto;
+}
+
+#joystick-base::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 45.45%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: rgba(110, 215, 239, 0.3);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+#joystick-burst-rings {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.joystick-burst-ring {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: var(--burst-ring-diameter, 0%);
+    aspect-ratio: 1;
+    border: var(--burst-ring-width, 1px) solid var(--burst-ring-color, rgba(150, 158, 164, 0.07));
+    border-radius: 50%;
+    box-sizing: border-box;
+    transform: translate(-50%, -50%);
+}
+
+#joystick-current-burst-ring {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: var(--current-burst-diameter, 0%);
+    aspect-ratio: 1;
+    border: 2px solid var(--current-burst-color, rgba(255, 228, 92, 0));
+    border-radius: 50%;
+    box-sizing: border-box;
+    opacity: 0;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 2;
+}
+
+#joystick-current-burst-ring.is-visible {
+    opacity: 1;
 }
 
 #joystick-knob {
@@ -509,15 +751,5 @@ body::after {
     background: rgba(110, 215, 239, 0.28);
     transform: translate(-50%, -50%);
     pointer-events: none;
-}
-
-#joystick-hunt {
-    position: absolute;
-    left: 0;
-    bottom: 0;
-    min-width: 62px;
-    height: 44px;
-    font-size: 12px;
-    touch-action: none;
-    pointer-events: auto;
+    z-index: 3;
 }

@@ -54,10 +54,15 @@ export function emitBubble(fish, dt, rng){
 
     if( fish.bubbleBurstRemaining <= 0 ) fish.bubbleBurstRemaining = randomBurstCount(rng);
 
-    const targetRadius = fish.radius * BUBBLE.maxRatio * BUBBLE.displayScale;
-    const radius = Math.max(BUBBLE.minRadius, targetRadius * (0.6 + 0.4 * rng()));
     fish.bubbleBurstRemaining--;
     fish.bubbleTimer += fish.bubbleBurstRemaining > 0 ? bubbleGapSeconds(fish, rng) : bubbleCooldown(rng);
+    return makeBubble(fish, rng);
+}
+
+// @ds:d6cebf86
+export function makeBubble(fish, rng){
+    const targetRadius = fish.radius * BUBBLE.maxRatio * BUBBLE.displayScale;
+    const radius = Math.max(BUBBLE.minRadius, targetRadius * (0.6 + 0.4 * rng()));
     return {
         pos: {
             x: fish.pos.x - fish.facing * fish.radius * 0.15,
