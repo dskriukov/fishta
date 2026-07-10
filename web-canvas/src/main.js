@@ -1,9 +1,9 @@
 // imp/web-canvas/src/main.js
 // Bootstraps world + game loop (dsr/use/ecs-loop.dsr). Glue/I-O layer.
-// @ds b28b7af6 27fa3caa ec8cb052 ab1e4f02 c95ca496 48c4fc99 b433f1bc d2e8a84c 5fb1ff09 c83f4c1e ca07d970 d6cebf86 2b3e71e0 3ddf8f67 1f3abc43 cbc1225a 7ce238da c4073e51 ee07d6da 8869f043 07320d39 f51831f5 8d0ca6a8 d867989f 975ca168 bd354b7a 906be50b 91e32235 55c13a4f 10baf178 22fd3ab4 e6be3c03 0eef2d19 cff27cd5 7b9a7984 ad8d81d8 31cb7a0d 579e4888 e699c42d e6ecfbdd 1e66d817 a3e394a8 98224ab9 e9fb3705 fcdfb2b7 0c8d4e2a 6f1b0a3c 39305789 2e91f6d4 b9136c2e c5a92431 c656f0ec e42a7c19 a2d5936f 73b91e4c ed2b4f19
+// @ds b28b7af6 27fa3caa ec8cb052 ab1e4f02 c95ca496 48c4fc99 b433f1bc d2e8a84c 5fb1ff09 c83f4c1e ca07d970 d6cebf86 2b3e71e0 3ddf8f67 1f3abc43 cbc1225a 7ce238da c4073e51 ee07d6da 8869f043 07320d39 f51831f5 8d0ca6a8 d867989f 975ca168 bd354b7a 906be50b 91e32235 55c13a4f 10baf178 22fd3ab4 e6be3c03 0eef2d19 e001d967 cff27cd5 7b9a7984 ad8d81d8 31cb7a0d 579e4888 e699c42d e6ecfbdd 1e66d817 a3e394a8 98224ab9 e9fb3705 fcdfb2b7 0c8d4e2a 6f1b0a3c 39305789 2e91f6d4 b9136c2e c5a92431 c656f0ec e42a7c19 a2d5936f 73b91e4c ed2b4f19
 // @ia 3983084a
 
-import { DEBUG, ENERGY, EXHALE, FISH, LOOP, MOUTH, PLAYER, REGIME, SHRED, SIZE_DELTA_LABEL, SWIM, SYNC } from './constants.js';
+import { DEBUG, ENERGY, EXHALE, FISH, LOOP, MOUTH, PLAYER, REGIME, SHRED, SIZE_DELTA_LABEL, SWIM, SYNC, VIEWPORT_FISH_CAPACITY } from './constants.js';
 import { advanceBubbles, emitBubble, makeBubble, makeWorld } from './world.js';
 import { BURST_ENDURANCE_SIZE_THRESHOLDS, availableSpeedLevelForSize, burstEnergyFactorOf, maxSpeedOf, requestExhale, runExhaleCycle, serializeFish, speedCapOf } from './fish.js';
 import { createControlModeState, createInput, keySteer, pointerSteer, joystickSteer, speedLevel, speedLevelToControlMagnitude } from './controls.js';
@@ -38,6 +38,7 @@ const debugModeToggle = document.getElementById('debug-mode-toggle');
 const controlModes = document.getElementById('control-modes');
 const controlModeButtons = [...document.querySelectorAll('[data-control-mode]')];
 const controlHelp = document.getElementById('control-help');
+const viewportFishCapacitySelect = document.getElementById('viewport-fish-capacity-select');
 const burstEnduranceRows = document.getElementById('burst-endurance-rows');
 const joystickPanel = document.getElementById('joystick-panel');
 const joystickBase = document.getElementById('joystick-base');
@@ -64,6 +65,7 @@ let lastDebugTraceAt = 0;
 let lastVisibleState = state;
 let entrySessionReady = false;
 let burstEnduranceTableKey = '';
+let viewportFishCapacity = VIEWPORT_FISH_CAPACITY.defaultValue;
 let net = null;
 const controlMode = createControlModeState();
 const sizeDeltaLabelState = {
@@ -147,7 +149,7 @@ canvas.addEventListener('click', e =>{
     const rect = canvas.getBoundingClientRect();
     const clickState = lastVisibleState || state;
     const followed = currentUserFish(clickState.world, clickState.currentUserFishId);
-    const clickPos = viewportToWorld(v(e.clientX - rect.left, e.clientY - rect.top), clickState.world, followed, canvas);
+    const clickPos = viewportToWorld(v(e.clientX - rect.left, e.clientY - rect.top), clickState.world, followed, canvas, { viewportFishCapacity });
     const renderWorld = buildToroidalRenderWorld(clickState.world, followed);
     const projectedFish = (renderWorld.fish || []).find(candidate => candidate && dist(clickPos, candidate.pos) <= candidate.radius);
     const fish = projectedFish ? (state.world.fish || []).find(candidate => candidate.id === projectedFish.id) : null;
@@ -180,6 +182,7 @@ if( debugModeToggle ){
     debugModeToggle.addEventListener('click', toggleDebugMode);
     debugModeToggle.setAttribute('aria-pressed', 'false');
 }
+setupViewportFishCapacity();
 setupControlModes();
 setupJoystickControls();
 window.addEventListener('keydown', e =>{
@@ -253,6 +256,7 @@ function frame(now){
     if( debugMode ) recordDebugPositionTraces(now, visibleState.world);
     render(ctx, {
         ...visibleState,
+        viewportFishCapacity,
         clientBubbles,
         sizeDeltaLabels: sizeDeltaLabelState.labels,
         debug: { enabled: debugMode, positionTraces: debugPositionTraces, now },
@@ -628,7 +632,7 @@ function buildInputPayload(){
     const keyboardAccel = Boolean(accel);
     if( !accel ){
         if( controlMode.active === 'pointer' && fish && input.pointer.active ){
-            const worldPointer = viewportToWorld(input.pointer.pos, state.world, fish, canvas);
+            const worldPointer = viewportToWorld(input.pointer.pos, state.world, fish, canvas, { viewportFishCapacity });
             accel = pointerSteer(fish.pos, { active: true, pos: worldPointer });
         }else if( controlMode.active === 'touch' && fish && input.pointer.active && input.touchDown ){
             input.pointer.vector = controlVectorFromFish(fish, input.pointer.pos);
@@ -696,7 +700,7 @@ function inputPayloadKey(payload){
 }
 
 function currentUserFishViewportPos(fish){
-    const viewport = worldToViewport(state.world, fish, canvas);
+    const viewport = worldToViewport(state.world, fish, canvas, { viewportFishCapacity });
     return v(fish.pos.x * viewport.scale + viewport.offsetX, fish.pos.y * viewport.scale + viewport.offsetY);
 }
 
@@ -732,6 +736,21 @@ function updateGameMenu(){
     if( debugModeToggle ) debugModeToggle.setAttribute('aria-pressed', debugMode ? 'true' : 'false');
     updateControlHelp();
     updateBurstEnduranceTable(currentUserFish());
+}
+
+// @ds:e001d967
+function setupViewportFishCapacity(){
+    if( !viewportFishCapacitySelect ) return;
+    viewportFishCapacitySelect.value = viewportFishCapacity;
+    viewportFishCapacitySelect.addEventListener('change', () => setViewportFishCapacity(viewportFishCapacitySelect.value));
+}
+
+// @ds:e001d967
+function setViewportFishCapacity(value){
+    viewportFishCapacity = VIEWPORT_FISH_CAPACITY.options.includes(value)
+        ? value
+        : VIEWPORT_FISH_CAPACITY.defaultValue;
+    if( viewportFishCapacitySelect ) viewportFishCapacitySelect.value = viewportFishCapacity;
 }
 
 // @ds:70871bc5

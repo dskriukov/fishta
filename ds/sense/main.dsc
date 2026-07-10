@@ -89,7 +89,7 @@ constraints:                 # from ds:intent.game
 
 ui:
   game_menu:
-    from: [ds:ui.game-menu, ds:ui.version-visible, ds:debug.mode, ds:controls.mode-select, ds:controls.leave-game]
+    from: [ds:ui.game-menu, ds:ui.version-visible, ds:debug.mode, ds:controls.mode-select, ds:controls.leave-game, ds:controls.viewport-fish-capacity]
     authority: client-display
     contract:
       name: updateGameMenu
@@ -99,6 +99,7 @@ ui:
         - current game version
         - debug mode activation
         - leave-game command
+        - viewport fish-capacity selector
         - active control mode help
       help_modes:
         keyboard: "keyboard movement and keyboard burst levels"

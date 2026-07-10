@@ -173,6 +173,18 @@ input:
       inputs: [currentUserFish.size, fish.burstEnduranceThresholds]
       output: menuBurstEnduranceRows
       rule: "game menu renders a compact scrollable table for speedLevel v=1..99 with mode, minimum size threshold, availability, energy factor, expected size loss, and the time window used for that loss; v=1..30 has zero energy factor and zero expected loss"
+  viewport_fish_capacity:
+    from: ds:controls.viewport-fish-capacity
+    contract:
+      name: selectViewportFishCapacity
+      inputs: [selectedCapacity, viewportWidthPx, viewportHeightPx, world.width, world.height, playerNominalStartDiameterPx]
+      output: viewportScale
+      allowed_values: [10, 20, 30, max]
+      default: 20
+      numeric_rule: "for selected values 10, 20, or 30, compute numericScale = min(viewportWidthPx, viewportHeightPx) / (selectedCapacity * playerNominalStartDiameterPx)"
+      max_rule: "compute maxScale = max(viewportWidthPx, viewportHeightPx) / min(world.width, world.height), so the smaller world side fits the larger screen side without empty margins"
+      effective_rule: "viewportScale = max(numericScale, maxScale) for numeric selected values; viewportScale = maxScale for selected value max"
+      locality: "the setting belongs to client display only; world state, fish size, movement, predation, server authority, and socket rows keep their existing owners"
   inspect_click:
     from: ds:controls.inspect-click
     contract:
@@ -183,8 +195,8 @@ input:
     status: added
 
 camera:
-  from: ds:controls.camera
+  from: [ds:controls.camera, ds:controls.viewport-fish-capacity]
   model: follow-user-fish
-  zoom: none
+  zoom: viewport-fish-capacity
   scroll: none
-  boundary: "viewport is centered around current client's user fish; full world need not fit on screen"
+  boundary: "viewport is centered around current client's user fish; selected fish-capacity controls the local projection scale within the max overview boundary"

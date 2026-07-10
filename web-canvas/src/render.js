@@ -1,10 +1,10 @@
 // imp/web-canvas/src/render.js
 // Read-only over domain state (workspace.air rule: render never mutates domain).
-// @ds 975ca168 bd354b7a 906be50b d6cebf86 2b3e71e0 a43de7ec a44b9d2c b28b7af6 1f3abc43 8f2c91ad 6f3a9c20 73b91e4c 0b8e71d4 3ad65f20 c5a92431
+// @ds 975ca168 bd354b7a 906be50b d6cebf86 2b3e71e0 a43de7ec a44b9d2c b28b7af6 1f3abc43 8f2c91ad 6f3a9c20 73b91e4c 0b8e71d4 3ad65f20 c5a92431 e001d967
 // @ia 2f6e7a91 3983084a
 // @fix 4bbc0692
 
-import { BACKGROUND, BUBBLE, DEBUG, SHRED, SIZE_DELTA_LABEL, SWIM, FEAR_EYE, WORLD } from './constants.js';
+import { BACKGROUND, BUBBLE, DEBUG, FISH, PLAYER, SHRED, SIZE_DELTA_LABEL, SWIM, FEAR_EYE, WORLD } from './constants.js';
 
 const DEFAULT_SVG_GEOMETRY = {
     width: 494,
@@ -391,11 +391,11 @@ export function render(ctx, state){
         bubbles: state.clientBubbles || world.bubbles || state.bubbles || [],
     }, followed, state.debug?.positionTraces || []);
 
-    updateWorldBackgroundCss(world, followed);
+    updateWorldBackgroundCss(world, followed, state.viewportFishCapacity, ctx.canvas);
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
     ctx.save();
-    const viewport = worldToViewport(world, followed, ctx.canvas);
+    const viewport = worldToViewport(world, followed, ctx.canvas, { viewportFishCapacity: state.viewportFishCapacity });
     ctx.translate(viewport.offsetX, viewport.offsetY);
     ctx.scale(viewport.scale, viewport.scale);
 
@@ -419,12 +419,13 @@ export function render(ctx, state){
 }
 
 // @ds:2b3e71e0 @fix:4bbc0692 @ia:3983084a
-export function updateWorldBackgroundCss(world, followed){
+export function updateWorldBackgroundCss(world, followed, viewportFishCapacity, canvas){
     if( typeof document === 'undefined' || !document.documentElement ) return;
     const delta = backgroundCameraDelta(world, followed);
+    const scale = viewportScaleForFishCapacity(world, canvas, viewportFishCapacity);
     backgroundPhase = {
-        x: wrappedTileOffset(backgroundPhase.x - delta.x * WORLD.initialViewportScale * BACKGROUND.parallaxFactor, BACKGROUND.tileWidthPx),
-        y: wrappedTileOffset(backgroundPhase.y - delta.y * WORLD.initialViewportScale * BACKGROUND.parallaxFactor, BACKGROUND.tileHeightPx),
+        x: wrappedTileOffset(backgroundPhase.x - delta.x * scale * BACKGROUND.parallaxFactor, BACKGROUND.tileWidthPx),
+        y: wrappedTileOffset(backgroundPhase.y - delta.y * scale * BACKGROUND.parallaxFactor, BACKGROUND.tileHeightPx),
     };
     const style = document.documentElement.style;
     style.setProperty('--world-bg-x', `${backgroundPhase.x.toFixed(2)}px`);
@@ -466,9 +467,9 @@ function wrappedTileOffset(value, size){
     return ((value % size) + size) % size;
 }
 
-// @ds:7b9a7984
-export function worldToViewport(world, followed, canvas){
-    const scale = WORLD.initialViewportScale;
+// @ds:7b9a7984 @ds:e001d967
+export function worldToViewport(world, followed, canvas, options = {}){
+    const scale = viewportScaleForFishCapacity(world, canvas, options.viewportFishCapacity);
     const focus = followed ? followed.pos : { x: world.width / 2, y: world.height / 2 };
     return {
         scale,
@@ -477,9 +478,25 @@ export function worldToViewport(world, followed, canvas){
     };
 }
 
-// @ds:7b9a7984
-export function viewportToWorld(point, world, followed, canvas){
-    const viewport = worldToViewport(world, followed, canvas);
+// @ds:e001d967
+export function viewportScaleForFishCapacity(world, canvas, value){
+    const minScreenSide = Math.min(canvas?.width || 0, canvas?.height || 0);
+    const maxScreenSide = Math.max(canvas?.width || 0, canvas?.height || 0);
+    const minWorldSide = Math.min(world?.width || 0, world?.height || 0);
+    const maxScale = maxScreenSide > 0 && minWorldSide > 0
+        ? maxScreenSide / minWorldSide
+        : WORLD.initialViewportScale;
+    if( value === 'max' ) return maxScale;
+    const capacity = Number(value);
+    if( !Number.isFinite(capacity) || capacity <= 0 || minScreenSide <= 0 ) return Math.max(WORLD.initialViewportScale, maxScale);
+    const nominalDiameter = FISH.baseRadius * Math.sqrt(PLAYER.startSize) * 2;
+    const numericScale = minScreenSide / (capacity * nominalDiameter);
+    return Math.max(numericScale, maxScale);
+}
+
+// @ds:7b9a7984 @ds:e001d967
+export function viewportToWorld(point, world, followed, canvas, options = {}){
+    const viewport = worldToViewport(world, followed, canvas, options);
     return {
         x: (point.x - viewport.offsetX) / viewport.scale,
         y: (point.y - viewport.offsetY) / viewport.scale,

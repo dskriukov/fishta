@@ -99,13 +99,14 @@ contract_map:
   controls.burstEnduranceJoystickUi:        main.js#updateJoystickBurstAvailability main.js#renderJoystickBurstRings main.js#updateJoystickCurrentBurstRing style.css##joystick-base  # @ds:0eef2d19 @ds:e41821af
   controls.primaryKeyboardAndJoystick:      controls.js#createControlModeState main.js#buildInputPayload main.js#updateJoystickPanelVisibility main.js#setControlMode  # @ds:93b8abba @ds:10baf178 @ds:b43d2f95
   controls.burstEnduranceMenuTable:         main.js#updateBurstEnduranceTable index.html#burst-endurance-table style.css#burst-endurance-table  # @ds:cff27cd5
+  controls.viewportFishCapacity:            constants.js#VIEWPORT_FISH_CAPACITY main.js#viewportFishCapacity main.js#setViewportFishCapacity render.js#viewportScaleForFishCapacity render.js#worldToViewport index.html#viewport-fish-capacity style.css#viewport-fish-capacity  # @ds:e001d967 @ds:7b9a7984
   controls.inspectClick:                    main.js#handleInspectClick  # @ds:2e1570ed
-  controls.camera:                          render.js#worldToViewport  # @ds:7b9a7984
+  controls.camera:                          render.js#worldToViewport  # @ds:7b9a7984 @ds:e001d967
   world.backgroundTileParallax:             style.css#body::before render.js#updateWorldBackgroundCss render.js#backgroundCameraDelta render.js#render  # @ds:2b3e71e0 @fix:4bbc0692 @ia:3983084a
   world.backgroundDepthHaze:                style.css#body::after  # @ds:a43de7ec
   controls.toroidalViewportProjection:      render.js#buildToroidalRenderWorld render.js#nearestToroidalCoordinate  # @ds:7b9a7984 @ds:c83f4c1e @ia:dd909d1a
   client.decorState:                         main.js#applyClientFishDecor main.js#updateClientDecorState  # @ds:975ca168 @ds:bd354b7a @ds:3ddf8f67 @ds:a44b9d2c @fn:a9a3ed12 @ia:9c0d1e2f @ia:3a4b5c6e
-  ui.gameMenu:                              main.js#toggleGameMenu main.js#updateGameMenu index.html#game-menu-toggle index.html#game-menu style.css#game-menu-toggle style.css#game-menu  # @ds:ab1e4f02 @ds:8d13f6a2 @ds:59c118f5 @ds:70871bc5 @ds:fb11044e
+  ui.gameMenu:                              main.js#toggleGameMenu main.js#updateGameMenu index.html#game-menu-toggle index.html#game-menu style.css#game-menu-toggle style.css#game-menu  # @ds:ab1e4f02 @ds:8d13f6a2 @ds:59c118f5 @ds:70871bc5 @ds:fb11044e @ds:e001d967
   debug.toggleMode:                         main.js#toggleDebugMode index.html#debug-mode-toggle  # @ds:59c118f5
   debug.drawWorldRepeatBounds:              render.js#drawDebugWorldRepeatBounds  # @ds:7435b6ce
   debug.recordPositionTraces:               main.js#recordDebugPositionTraces protocol.js#applyWorldSync  # @ds:727e9afe
@@ -796,6 +797,7 @@ implementation_instructions:
     Joystick speed comes from pointer displacement from the visible joystick base center in the same radial control that owns steering.
     setupJoystickControls stores input.joystick.rawVector as the normalized actual displacement with magnitude 0..1, and stores input.joystick.vector as the same direction clamped to the current available speed radius for internal consistency. controls.js#joystickSteer uses rawVector so steering strength follows the held pointer position; controls.js#speedLevel maps rawVector magnitude to desired speedLevel 0..99 with the expanded cruise radius before buildInputPayload clamps it through availableSpeedLevelForSize. main.js#updateJoystickBurstAvailability computes the current available speedLevel for the user fish and redraws rings for v=30 cruise boundary plus selected burst availability levels. If the current user fish has applied speedLevel 1..99, main.js#updateJoystickCurrentBurstRing shows #joystick-current-burst-ring at speedLevelToControlMagnitude(fish.speedLevel), uses a 2px border, and colors it through main.js#joystickCurrentSpeedColor: levels 1..30 return the blue cruise color, and levels 31..99 return the existing pink burstSpeedColor scale. speedLevel 0 hides that ring.  # @ds:cd1c5776 @ds:0eef2d19 @ds:e41821af
     index.html#game-menu contains #burst-endurance-table with rows for speedLevel v=1..99. main.js#updateBurstEnduranceTable reads BURST_ENDURANCE_SIZE_THRESHOLDS and currentUserFish.size, writes mode, minimum size threshold, current availability, energy factor, expected size loss, and the time window for each speed. updateGameMenu refreshes the table while the menu is open and whenever current fish state changes.  # @ds:cff27cd5
+    index.html#game-menu contains #viewport-fish-capacity with option values 10, 20, 30, and max. constants.js exports VIEWPORT_FISH_CAPACITY with options ['10','20','30','max'] and defaultValue '20'. main.js owns viewportFishCapacity as client display state, initializes the select to the default, updates that state from change events through setViewportFishCapacity(value), and passes viewportFishCapacity into render(), viewportToWorld(), and worldToViewport() calls that convert current pointer/touch positions.  # @ds:e001d967
     The visible joystick layout remains independent from the current user fish screen position.  # @ds:b43d2f95 @ds:cd1c5776
   predation_eligibility: |
     canEat(predator, victim) requires burst, size eligibility, and canBeVictimOf.
@@ -892,11 +894,11 @@ implementation_instructions:
       - do not store these bubbles in world.bubbles.
     advanceBubbles owns bubble motion and birth/fade animation: increment `age`, decrement `life`, move by velocity, compute `birth = clamp(age / BUBBLE.birthDuration, 0..1)`, compute `fade = clamp(life / BUBBLE.life, 0..1)`, set `radius = targetRadius * easeOut(birth)` and `alpha = min(birth, fade)`. Bounds removal must use the larger of current radius and targetRadius so a just-born zero-radius bubble is not removed incorrectly.
     render(ctx,state) reads bubbles from state.clientBubbles first, then state.world.bubbles only for legacy single-process mode. render.js#drawBubble uses the ordinary white/blue style when bubble.color is absent and a red fill/stroke style when bubble.color is `red`.
-    Camera viewport follows current client user fish via worldToViewport(world, followed, canvas).
-    Rendering projects game-world units to canvas pixels.  # @ds:e559831a @ds:7b9a7984 @ds:d6cebf86 @ia:3c4d5e6f @ia:5a6b7c8d
+    Camera viewport follows current client user fish via worldToViewport(world, followed, canvas, options).
+    Rendering projects game-world units to canvas pixels. render.js#viewportScaleForFishCapacity(world, canvas, value) computes nominalStartDiameter = FISH.baseRadius * sqrt(PLAYER.startSize) * 2, numericScale = min(canvas.width, canvas.height) / (Number(value) * nominalStartDiameter) for 10/20/30, maxScale = max(canvas.width, canvas.height) / min(world.width, world.height), then returns max(numericScale, maxScale). For value max it returns maxScale. worldToViewport uses that scale and keeps the followed fish centered. The scale is display-only and must not write to world, fish, protocol rows, or server state.  # @ds:e559831a @ds:7b9a7984 @ds:e001d967 @ds:d6cebf86 @ia:3c4d5e6f @ia:5a6b7c8d
   toroidal_viewport_projection: |
     render.js owns viewport projection only; it must not mutate state.world, fish.pos, protocol rows, or snapshotBuffer.
-    worldToViewport(world, followed, canvas) keeps the followed fish's canonical position as the viewport focus.
+    worldToViewport(world, followed, canvas, options) keeps the followed fish's canonical position as the viewport focus.
     Before drawing fish, bubbles, labels, hit-test overlays, and debug relative/absolute traces, render.js builds a derived render world:
       - choose anchor = followed.pos when a followed user fish exists, otherwise world center;
       - for every drawable point p, compute projected p' independently per axis with nearestToroidalCoordinate(pAxis, anchorAxis, worldAxisSize);
@@ -908,7 +910,7 @@ implementation_instructions:
       - keep velocity, facing, size, owner, user identity, and decor fields unchanged.
     render(ctx,state) draws the projected copies, not canonical state.world.fish positions.
     drawDebugWorldRepeatBounds draws at least the canonical rectangle and the neighboring repeated rectangles around the anchor so the dashed boundary remains meaningful when the viewport is centered near an edge.
-    viewportToWorld(point, world, followed, canvas) returns the inverse projected coordinate in continuous viewport space; callers that need canonical simulation coordinates must wrap the result back into [0,width) x [0,height).
+    viewportToWorld(point, world, followed, canvas, options) returns the inverse projected coordinate in continuous viewport space using the same viewportFishCapacity option as rendering; callers that need canonical simulation coordinates must wrap the result back into [0,width) x [0,height).
     main.js#handleInspectClick must hit-test against the same projected fish copies used by render, then report serializeFish for the original canonical fish object.
     main.js#buildInputPayload may use the continuous pointer coordinate relative to the followed fish for steering, but must not write that coordinate into world state.
     Edge examples:
@@ -1087,6 +1089,8 @@ new_or_changed_constants:
   FISH.minLinearSpeedSize: 0.6        # @ds:8869f043
   ENERGY.burstExtraSpendFactor: 20    # @ds:f51831f5
   WORLD.initialViewportScale: 1.5     # @ds:19c14fea
+  VIEWPORT_FISH_CAPACITY.options: [10,20,30,max] # @ds:e001d967
+  VIEWPORT_FISH_CAPACITY.defaultValue: "20"       # @ds:e001d967
   WORLD.resizeHysteresisUsers: 1      # @ds:19c14fea
   WORLD.npcDensity: "tunable per area" # @ds:53db39eb
   FRY.startSize: "below nominal spawn size" # @ds:e6ecfbdd

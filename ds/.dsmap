@@ -1,4 +1,4 @@
-ds/sense/controls/controls.ds#61a89e8e - 323e0d97
+ds/sense/controls/controls.ds#56571d82 - 323e0d97
 ds/sense/controls/controls.ia#ea72de17 - 3ab6da12
 ds/fix/background.fix#0778747e - 8bccf725
 ds/sense/fish/fish.ds#785684de - 0e1af7e8
@@ -22,6 +22,7 @@ ds:controls.hunt - 22fd3ab4 323e0d97
 ds:controls.burst-endurance-limit - e6be3c03 323e0d97
 ds:controls.burst-endurance-joystick-ui - 0eef2d19 323e0d97
 ds:controls.burst-endurance-menu-table - cff27cd5 323e0d97
+ds:controls.viewport-fish-capacity - e001d967 323e0d97
 ds:controls.inspect-click - 2e1570ed 323e0d97
 ds:controls.initial-mode - c2aeb63a 323e0d97
 ds:controls.joystick-current-burst-indicator - e41821af 323e0d97

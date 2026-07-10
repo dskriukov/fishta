@@ -613,6 +613,27 @@ body::after {
     touch-action: manipulation;
 }
 
+/* @ds:e001d967 */
+#viewport-fish-capacity {
+    align-items: center;
+}
+
+#viewport-fish-capacity span {
+    color: rgba(237, 248, 255, 0.76);
+    font-weight: 700;
+}
+
+#viewport-fish-capacity-select {
+    min-width: 84px;
+    border: 1px solid rgba(205, 238, 255, 0.34);
+    background: rgba(4, 38, 59, 0.68);
+    color: #edf8ff;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 8px;
+}
+
 /* @ds:cff27cd5 */
 #burst-endurance-panel {
     max-height: min(42vh, 320px);
