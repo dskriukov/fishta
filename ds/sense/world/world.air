@@ -17,8 +17,7 @@ rationale_notes:
   - "Burst-level jitter is not a bubble cue: motion cue bubbles are emitted on cruise<->burst transitions and sharp movement turns, not on target burst speed changes alone."
   - "Toroidal wrap has two separate concerns: canonical simulation coordinates remain inside [0,width) x [0,height), while viewport rendering may draw a nearby copied image of the same entity outside that canonical rectangle so motion appears continuous around the followed fish."
   - "A render fix for wraparound must not change authoritative fish positions, protocol rows, or client prediction state; it belongs in the viewport projection layer."
-  - "The background tile is a velocity-driven decorative layer: integrate only the followed fish's displayed velocity over render-frame time and never derive its phase from a canonical camera position or a network correction."
-  - "Living background decor is procedural Canvas drawing in viewport space: use time-derived paths and bounded fixed counts rather than server entities, timers, or new network assets."
+  - "Camera-followed decorative layers that derive from focus position need the same render-only continuity principle as toroidal entity projection; a background layer should unwrap its visual focus against the previous rendered focus instead of using raw canonical focus directly."
 
 units:
   position: game-world-units

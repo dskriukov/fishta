@@ -26,12 +26,6 @@ export const BACKGROUND = {
     alpha: 0.22,            // @ds:2b3e71e0
     hazeTopAlpha: 0.16,     // @ds:a43de7ec
     hazeBottomAlpha: 0.26,  // @ds:a43de7ec
-    livingHazeCount: 3,     // @ds:d84e6b39
-    livingParticleCount: 28, // @ds:d84e6b39
-    livingShoalCount: 4,    // @ds:d84e6b39
-    livingShoalFishCount: 5, // @ds:d84e6b39
-    livingAnimalCount: 2,   // @ds:d84e6b39
-    livingDriftSpeed: 9,    // px/s @ds:d84e6b39
 };
 
 export const FISH = {

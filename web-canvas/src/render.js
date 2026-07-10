@@ -27,6 +27,8 @@ const DEFAULT_SHRED_GEOMETRY = {
 
 let shredSvgGeometry = DEFAULT_SHRED_GEOMETRY;
 let shredSvgRenderTree = null;
+let backgroundFocus = null;
+let backgroundFocusKey = null;
 let backgroundPhase = { x: 0, y: 0 };
 
 // @ds:df06827a @ds:b024b514 @ia:2f6e7a91
@@ -389,9 +391,8 @@ export function render(ctx, state){
         bubbles: state.clientBubbles || world.bubbles || state.bubbles || [],
     }, followed, state.debug?.positionTraces || []);
 
-    updateWorldBackgroundCss(world, followed, state.viewportFishCapacity, ctx.canvas, state.frameDt);
+    updateWorldBackgroundCss(world, followed, state.viewportFishCapacity, ctx.canvas);
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-    drawLivingBackgroundDecor(ctx, (state.debug?.now || performance.now()) / 1000);
 
     ctx.save();
     const viewport = worldToViewport(world, followed, ctx.canvas, { viewportFishCapacity: state.viewportFishCapacity });
@@ -417,125 +418,48 @@ export function render(ctx, state){
     }
 }
 
-// @ds:d84e6b39
-export function drawLivingBackgroundDecor(ctx, timeSeconds){
-    const width = ctx.canvas.width;
-    const height = ctx.canvas.height;
-    if( width <= 0 || height <= 0 ) return;
-    drawDecorHaze(ctx, timeSeconds, width, height);
-    drawDecorParticles(ctx, timeSeconds, width, height);
-    drawDecorShoals(ctx, timeSeconds, width, height);
-    drawDecorAnimals(ctx, timeSeconds, width, height);
-}
-
-function drawDecorHaze(ctx, time, width, height){
-    const span = Math.max(width, height);
-    for( let i = 0; i < BACKGROUND.livingHazeCount; i++ ){
-        const x = repeatDecorPosition(width * (0.18 + i * 0.31) + Math.sin(time * 0.035 + i) * span * 0.14, width + span) - span * 0.15;
-        const y = repeatDecorPosition(height * (0.22 + i * 0.27) + Math.cos(time * 0.028 + i * 2) * height * 0.12, height + span) - span * 0.15;
-        const radius = span * (0.32 + i * 0.05);
-        const haze = ctx.createRadialGradient(x, y, 0, x, y, radius);
-        haze.addColorStop(0, 'rgba(44, 190, 232, 0.055)');
-        haze.addColorStop(1, 'rgba(44, 190, 232, 0)');
-        ctx.save();
-        ctx.fillStyle = haze;
-        ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
-        ctx.restore();
-    }
-}
-
-function drawDecorParticles(ctx, time, width, height){
-    for( let i = 0; i < BACKGROUND.livingParticleCount; i++ ){
-        const speed = BACKGROUND.livingDriftSpeed * (0.35 + (i % 5) * 0.13);
-        const x = repeatDecorPosition(i * 89 + time * speed, width + 40) - 20;
-        const y = repeatDecorPosition(i * 137 - time * speed * 0.38 + Math.sin(time * 0.2 + i) * 9, height + 40) - 20;
-        const radius = 0.9 + (i % 4) * 0.55;
-        ctx.save();
-        ctx.globalAlpha = 0.12 + (i % 3) * 0.035;
-        ctx.strokeStyle = i % 6 === 0 ? '#7beeff' : '#bceeff';
-        if( i % 6 === 0 ){
-            ctx.lineWidth = 0.8;
-            ctx.beginPath();
-            ctx.arc(x, y, radius * 2.4, 0, Math.PI * 2);
-            ctx.stroke();
-        }else{
-            ctx.fillStyle = '#bceeff';
-            ctx.beginPath();
-            ctx.arc(x, y, radius, 0, Math.PI * 2);
-            ctx.fill();
-        }
-        ctx.restore();
-    }
-}
-
-function drawDecorShoals(ctx, time, width, height){
-    for( let shoal = 0; shoal < BACKGROUND.livingShoalCount; shoal++ ){
-        const direction = shoal % 2 ? -1 : 1;
-        const x = repeatDecorPosition(direction * time * (BACKGROUND.livingDriftSpeed * 1.5 + shoal * 2) + shoal * 260, width + 220) - 110;
-        const y = height * (0.16 + shoal * 0.2) + Math.sin(time * 0.12 + shoal) * 24;
-        for( let fish = 0; fish < BACKGROUND.livingShoalFishCount; fish++ ){
-            drawDecorFish(ctx, x + direction * fish * 18, y + ((fish * 13) % 29) - 14, direction, 4 + (fish % 3));
-        }
-    }
-}
-
-function drawDecorFish(ctx, x, y, direction, size){
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.scale(direction, 1);
-    ctx.globalAlpha = 0.15;
-    ctx.fillStyle = '#1675ad';
-    ctx.beginPath();
-    ctx.ellipse(0, 0, size * 1.4, size * 0.55, 0, 0, Math.PI * 2);
-    ctx.moveTo(-size * 1.15, 0);
-    ctx.lineTo(-size * 2.1, -size * 0.8);
-    ctx.lineTo(-size * 2.1, size * 0.8);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-}
-
-function drawDecorAnimals(ctx, time, width, height){
-    for( let i = 0; i < BACKGROUND.livingAnimalCount; i++ ){
-        const direction = i % 2 ? -1 : 1;
-        const size = Math.max(54, Math.min(width, height) * (0.1 + i * 0.025));
-        const x = repeatDecorPosition(direction * time * BACKGROUND.livingDriftSpeed * 0.45 + i * 480, width + size * 2) - size;
-        const y = height * (0.32 + i * 0.31) + Math.sin(time * 0.06 + i) * 28;
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.scale(direction, 1);
-        ctx.globalAlpha = 0.075;
-        ctx.fillStyle = '#0a4e79';
-        ctx.beginPath();
-        ctx.ellipse(0, 0, size, size * 0.28, 0, 0, Math.PI * 2);
-        ctx.moveTo(-size * 0.82, 0);
-        ctx.lineTo(-size * 1.24, -size * 0.36);
-        ctx.lineTo(-size * 1.12, 0);
-        ctx.lineTo(-size * 1.24, size * 0.36);
-        ctx.closePath();
-        ctx.fill();
-        ctx.restore();
-    }
-}
-
-function repeatDecorPosition(value, span){
-    return ((value % span) + span) % span;
-}
-
 // @ds:2b3e71e0 @fix:4bbc0692 @ia:3983084a
-export function updateWorldBackgroundCss(world, followed, viewportFishCapacity, canvas, frameDt = 0){
+export function updateWorldBackgroundCss(world, followed, viewportFishCapacity, canvas){
     if( typeof document === 'undefined' || !document.documentElement ) return;
-    if( Number.isFinite(frameDt) && frameDt > 0 ){
-        const velocity = followed?.vel || { x: 0, y: 0 };
-        const scale = viewportScaleForFishCapacity(world, canvas, viewportFishCapacity);
-        backgroundPhase = {
-            x: wrappedTileOffset(backgroundPhase.x - (velocity.x || 0) * frameDt * scale * BACKGROUND.parallaxFactor, BACKGROUND.tileWidthPx),
-            y: wrappedTileOffset(backgroundPhase.y - (velocity.y || 0) * frameDt * scale * BACKGROUND.parallaxFactor, BACKGROUND.tileHeightPx),
-        };
-    }
+    const delta = backgroundCameraDelta(world, followed);
+    const scale = viewportScaleForFishCapacity(world, canvas, viewportFishCapacity);
+    backgroundPhase = {
+        x: wrappedTileOffset(backgroundPhase.x - delta.x * scale * BACKGROUND.parallaxFactor, BACKGROUND.tileWidthPx),
+        y: wrappedTileOffset(backgroundPhase.y - delta.y * scale * BACKGROUND.parallaxFactor, BACKGROUND.tileHeightPx),
+    };
     const style = document.documentElement.style;
     style.setProperty('--world-bg-x', `${backgroundPhase.x.toFixed(2)}px`);
     style.setProperty('--world-bg-y', `${backgroundPhase.y.toFixed(2)}px`);
+}
+
+// @fix:4bbc0692
+export function backgroundCameraDelta(world, followed){
+    const canonical = followed ? followed.pos : { x: world.width / 2, y: world.height / 2 };
+    const width = Number(world.width);
+    const height = Number(world.height);
+    const focusKey = `${followed?.id || 'world'}:${width}x${height}`;
+    if( !Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0 ){
+        backgroundFocus = null;
+        backgroundFocusKey = null;
+        return { x: 0, y: 0 };
+    }
+
+    if( !backgroundFocus || backgroundFocusKey !== focusKey ){
+        backgroundFocus = { x: canonical.x, y: canonical.y };
+        backgroundFocusKey = focusKey;
+        return { x: 0, y: 0 };
+    }
+
+    const nextFocus = {
+        x: nearestToroidalCoordinate(canonical.x, backgroundFocus.x, width),
+        y: nearestToroidalCoordinate(canonical.y, backgroundFocus.y, height),
+    };
+    const delta = {
+        x: nextFocus.x - backgroundFocus.x,
+        y: nextFocus.y - backgroundFocus.y,
+    };
+    backgroundFocus = nextFocus;
+    return delta;
 }
 
 function wrappedTileOffset(value, size){

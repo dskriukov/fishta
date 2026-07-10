@@ -102,9 +102,8 @@ contract_map:
   controls.viewportFishCapacity:            constants.js#VIEWPORT_FISH_CAPACITY main.js#viewportFishCapacity main.js#setViewportFishCapacity render.js#viewportScaleForFishCapacity render.js#worldToViewport index.html#viewport-fish-capacity style.css#viewport-fish-capacity  # @ds:e001d967 @ds:7b9a7984
   controls.inspectClick:                    main.js#handleInspectClick  # @ds:2e1570ed
   controls.camera:                          render.js#worldToViewport  # @ds:7b9a7984 @ds:e001d967
-  world.backgroundTileParallax:             style.css#body::before main.js#frame render.js#updateWorldBackgroundCss render.js#render  # @ds:2b3e71e0 @fix:4bbc0692 @ia:3983084a
+  world.backgroundTileParallax:             style.css#body::before render.js#updateWorldBackgroundCss render.js#backgroundCameraDelta render.js#render  # @ds:2b3e71e0 @fix:4bbc0692 @ia:3983084a
   world.backgroundDepthHaze:                style.css#body::after  # @ds:a43de7ec
-  world.livingBackgroundDecor:              constants.js#BACKGROUND render.js#drawLivingBackgroundDecor render.js#render  # @ds:d84e6b39
   controls.toroidalViewportProjection:      render.js#buildToroidalRenderWorld render.js#nearestToroidalCoordinate  # @ds:7b9a7984 @ds:c83f4c1e @ia:dd909d1a
   client.decorState:                         main.js#applyClientFishDecor main.js#updateClientDecorState  # @ds:975ca168 @ds:bd354b7a @ds:3ddf8f67 @ds:a44b9d2c @fn:a9a3ed12 @ia:9c0d1e2f @ia:3a4b5c6e
   ui.gameMenu:                              main.js#toggleGameMenu main.js#updateGameMenu index.html#game-menu-toggle index.html#game-menu style.css#game-menu-toggle style.css#game-menu  # @ds:ab1e4f02 @ds:8d13f6a2 @ds:59c118f5 @ds:70871bc5 @ds:fb11044e @ds:e001d967
@@ -495,30 +494,19 @@ implementation_instructions:
     and below all gameplay/UI layers. style.css#game must not paint an opaque
     background. render(ctx,state) clears the canvas with clearRect at the start of
     each frame instead of painting the background.
-    main.js#frame passes its clamped frame dt to render(ctx, state). render.js#render
-    passes the followed fish and frame dt to updateWorldBackgroundCss. The latter
-    owns only an accumulated render-only phase in CSS pixels and updates
-    --world-bg-x and --world-bg-y on document.documentElement. For each frame use
-    followed.vel (or {x:0,y:0} when absent): subtract velocity * frameDt * the
-    current viewport scale * BACKGROUND.parallaxFactor from the phase, then wrap
-    it to the configured tile width and height before assigning the CSS variables.
-    Do not read followed.pos, camera deltas, snapshot
-    buffers, or sync-correction state. With no followed fish or invalid/nonpositive
-    dt, leave the phase unchanged. The background variables must not mutate world,
-    fish, viewport, sync buffers, or input state.
+    render.js#updateWorldBackgroundCss(world, followed) updates CSS variables
+    --world-bg-x and --world-bg-y on document.documentElement. It owns a render-only
+    accumulated background phase in CSS pixels. render.js#backgroundCameraDelta
+    computes the nearest toroidal delta from the previous camera focus to the
+    current canonical focus; if the followed fish or world dimensions change,
+    reset only the reference focus and keep the current CSS phase unchanged.
+    Each frame subtracts delta * viewportScale * BACKGROUND.parallaxFactor from
+    the phase and wraps the phase to a bounded pixel range before assigning the
+    CSS variables. This prevents visible jumps on world-edge wrapping, reconnects,
+    first snapshots, and followed-fish switches while keeping all state render-only.
+    The background variables must not mutate world, fish, viewport, sync buffers,
+    or input state.
     # @ds:2b3e71e0 @ds:a43de7ec @fix:4bbc0692 @ia:3983084a
-  world_living_background_decor: |
-    constants.js#BACKGROUND owns fixed visual tunables for the living background:
-    low-opacity haze, particle, shoal, and large-animal counts plus their slow
-    motion rates. render.js#render calls drawLivingBackgroundDecor(ctx, renderTime)
-    immediately after clearRect and before ctx.save/worldToViewport, so it draws in
-    viewport pixels behind all world objects. Use deterministic time-derived paths,
-    not Math.random or persistent gameplay state: draw translucent radial haze
-    gradients, sparse dots/rings, compact fish shoals, and rare broad marine-animal
-    silhouettes. Each helper saves/restores Canvas state; all coordinates wrap or
-    begin outside the viewport so motion is continuous. Restore globalAlpha before
-    returning. Do not read or mutate world, fish, camera, input, or socket state;
-    do not allocate server entities or send protocol rows.  # @ds:d84e6b39
   controlled_objects: |
     world.js owns controlled-object helper functions. controlledObjectCount(world)
     returns (world.fish?.length || 0) + (world.shreds?.length || 0), because these
