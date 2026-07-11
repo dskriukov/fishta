@@ -11,6 +11,8 @@
     <link rel="icon" type="image/svg+xml" href="./assets/fish2.svg">
 </head>
 <body>
+    <div id="world-mist-far" aria-hidden="true"></div>
+    <div id="world-mist-near" aria-hidden="true"></div>
     <canvas id="game"></canvas>
     <div id="join" hidden>
         <!-- @ds:34ba255b @ds:277a51d7 -->
@@ -57,10 +59,16 @@
     <div id="hud">
         <div class="hud-row">
             <button id="game-menu-toggle" type="button" aria-label="Menu" aria-controls="game-menu" aria-expanded="false"><span></span><span></span><span></span></button>
-            <div id="user-fish-metrics" aria-label="user fish metrics">
-                <span id="eaten-metric"><span>eaten:</span> <strong id="eaten">0</strong></span>
+            <!-- @ds:2e91f6d4 @ds:b9136c2e @ds:c5a92431 @ia:32288dfb -->
+            <div id="player-metrics" aria-label="player metrics" hidden>
+                <span id="player-color-indicator" aria-hidden="true"></span>
+                <span id="player-life">
+                    <strong id="player-name">-</strong>
+                    <span id="lifetime" aria-label="life time"><span id="lifetime-bar"></span></span>
+                </span>
+                <span id="player-size"><span id="player-size-label">size</span><strong id="player-size-value">-</strong></span>
+                <span id="eaten-metric"><span>eaten</span><strong id="eaten">0</strong></span>
             </div>
-            <button id="debug-mode-toggle" type="button" aria-pressed="false">Debug</button>
         </div>
     </div>
     <!-- @ds:ab1e4f02 -->
@@ -73,6 +81,7 @@
         <div class="menu-row menu-meta">
             <span id="app-version">version: loading</span>
             <span id="status">alive</span>
+            <button id="debug-mode-toggle" type="button" aria-pressed="false">Debug</button>
             <button id="leave-game" type="button" hidden>Выйти</button>
         </div>
         <!-- @ds:e001d967 -->
@@ -96,21 +105,13 @@
         </section>
         <p id="control-help" hidden></p>
     </aside>
-    <!-- @ds:2e91f6d4 @ds:b9136c2e @ds:c5a92431 -->
-    <div id="player-metrics" aria-label="player metrics" hidden>
-        <span id="player-life">
-            <strong id="player-name">-</strong>
-            <span id="lifetime" aria-label="life time"><span id="lifetime-bar"></span></span>
-        </span>
-        <span id="player-size"><span id="player-size-label">size</span><strong id="player-size-value">-</strong></span>
-    </div>
     <!-- @ds:e42a7c19 -->
     <div id="world-info" aria-label="world snapshot info">
         <span class="world-info-item"><span>fish</span><strong id="world-fish-count">0</strong></span>
-        <span class="world-info-item"><span>area</span><em id="world-fish-area">0</em></span>
         <span class="world-info-item"><span>nutrients</span><strong id="world-nutrient-count">0</strong></span>
-        <span class="world-info-item"><span>area</span><em id="world-nutrient-area">0</em></span>
         <span id="world-speed-info" class="world-info-item"><span>speed</span><strong id="player-speed-real">0.00</strong></span>
+        <span class="world-info-item world-info-area"><span>fish area</span><em id="world-fish-area">0</em></span>
+        <span class="world-info-item world-info-area"><span>food area</span><em id="world-nutrient-area">0</em></span>
     </div>
     <div id="joystick-panel" hidden>
         <div id="joystick-base" aria-label="joystick">

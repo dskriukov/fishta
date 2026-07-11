@@ -14,6 +14,7 @@ import { createClientNet } from './client-net.js';
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const playerMetrics = document.getElementById('player-metrics');
+const playerColorIndicator = document.getElementById('player-color-indicator');
 const playerSizeValue = document.getElementById('player-size-value');
 const playerName = document.getElementById('player-name');
 const playerSpeedMetric = document.getElementById('player-speed-metric');
@@ -364,10 +365,11 @@ function frame(now){
     requestAnimationFrame(frame);
 }
 
-// @ds:c5a92431
+// @ds:c5a92431 @ia:32288dfb
 function updatePlayerNameMetric(fish){
     if( !playerName ) return;
     playerName.textContent = fish?.userName || '-';
+    if( playerColorIndicator ) playerColorIndicator.style.setProperty('--player-color', fish?.userColor || '#75d4e6');
 }
 
 // @ds:b9136c2e

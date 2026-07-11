@@ -4,11 +4,18 @@
 :root {
     --world-bg-x: 0px;
     --world-bg-y: 0px;
-    --world-bg-alpha: 0.22;
-    --world-haze-top-alpha: 0.16;
-    --world-haze-bottom-alpha: 0.26;
+    --world-mist-far-x: 0px;
+    --world-mist-far-y: 0px;
+    --world-mist-near-x: 0px;
+    --world-mist-near-y: 0px;
+    --world-mist-far-scale: 980px 760px;
+    --world-mist-near-scale: 720px 560px;
+    --world-bg-alpha: 0.13;
+    --world-haze-top-alpha: 0.09;
+    --world-haze-bottom-alpha: 0.27;
     --join-radius: 8px;
-    --joystick-size: 212px;
+    --joystick-size: clamp(212px, 35vw, 340px);
+    --joystick-knob-size: 42px;
     --bottom-info-bar-height: 54px;
     --top-info-panel-top: 0px;
     --top-info-panel-height: 68px;
@@ -50,6 +57,45 @@ body::after {
         rgba(210, 240, 255, 0) 42%,
         rgba(1, 12, 24, var(--world-haze-bottom-alpha))
     );
+}
+
+#world-mist-far,
+#world-mist-near {
+    position: fixed;
+    z-index: 1;
+    inset: -20%;
+    pointer-events: none;
+    will-change: background-position;
+}
+
+#world-mist-far {
+    background-image:
+        radial-gradient(ellipse 52% 34% at 14% 22%, rgba(69, 177, 204, 0.18), transparent 72%),
+        radial-gradient(ellipse 44% 30% at 78% 66%, rgba(34, 138, 173, 0.14), transparent 74%),
+        radial-gradient(ellipse 36% 25% at 42% 88%, rgba(101, 204, 221, 0.10), transparent 76%);
+    background-position:
+        var(--world-mist-far-x) var(--world-mist-far-y),
+        var(--world-mist-far-x) var(--world-mist-far-y),
+        var(--world-mist-far-x) var(--world-mist-far-y);
+    background-repeat: repeat;
+    background-size: var(--world-mist-far-scale);
+    filter: blur(16px);
+    opacity: 0.42;
+}
+
+#world-mist-near {
+    background-image:
+        radial-gradient(ellipse 48% 36% at 72% 18%, rgba(84, 193, 217, 0.14), transparent 70%),
+        radial-gradient(ellipse 58% 32% at 18% 72%, rgba(21, 107, 143, 0.16), transparent 73%),
+        radial-gradient(ellipse 32% 24% at 84% 84%, rgba(96, 197, 214, 0.10), transparent 76%);
+    background-position:
+        var(--world-mist-near-x) var(--world-mist-near-y),
+        var(--world-mist-near-x) var(--world-mist-near-y),
+        var(--world-mist-near-x) var(--world-mist-near-y);
+    background-repeat: repeat;
+    background-size: var(--world-mist-near-scale);
+    filter: blur(22px);
+    opacity: 0.34;
 }
 
 #game {
@@ -380,8 +426,8 @@ body::after {
     justify-items: start;
     padding: clamp(28px, 7vw, 120px);
     background:
-        linear-gradient(90deg, rgba(0, 12, 39, 0.76), rgba(0, 18, 52, 0.34) 42%, rgba(0, 11, 37, 0.04) 70%),
-        linear-gradient(180deg, rgba(0, 13, 38, 0.10), rgba(0, 9, 31, 0.46)),
+    linear-gradient(90deg, rgba(2, 36, 53, 0.80), rgba(3, 45, 61, 0.42) 42%, rgba(1, 22, 37, 0.08) 70%),
+    linear-gradient(180deg, rgba(14, 67, 86, 0.12), rgba(1, 18, 32, 0.48)),
         url("./assets/start.png") center / cover no-repeat;
 }
 
@@ -391,8 +437,8 @@ body::after {
     padding: 34px;
     border: 1px solid rgba(203, 237, 255, 0.20);
     border-radius: 20px;
-    background: linear-gradient(145deg, rgba(9, 54, 111, 0.78), rgba(3, 24, 61, 0.86));
-    box-shadow: 0 24px 70px rgba(0, 4, 23, 0.44), inset 0 1px 0 rgba(255, 255, 255, 0.09);
+    background: linear-gradient(145deg, rgba(5, 53, 76, 0.84), rgba(2, 36, 61, 0.90));
+    box-shadow: 0 24px 70px rgba(0, 8, 24, 0.44), inset 0 1px 0 rgba(255, 255, 255, 0.09);
     backdrop-filter: blur(14px);
 }
 
@@ -429,7 +475,7 @@ body::after {
 
 .join-header > div:last-child > span {
     margin-top: 7px;
-    color: #b9d7e8;
+    color: #b5deec;
     font-size: 9px;
     font-weight: 700;
     letter-spacing: 0.16em;
@@ -468,7 +514,7 @@ body::after {
     display: block;
     max-width: 300px;
     margin-top: 12px;
-    color: #b9d7e8;
+    color: #b5deec;
     font-size: 14px;
     font-weight: 400;
     line-height: 1.5;
@@ -490,7 +536,7 @@ body::after {
     padding: 0 14px;
     border: 1px solid rgba(204, 240, 255, 0.39);
     border-radius: 10px;
-    background: rgba(1, 18, 53, 0.45);
+    background: rgba(2, 30, 49, 0.62);
     color: #f5fbff;
     font-size: 16px;
     font-weight: 500;
@@ -498,8 +544,8 @@ body::after {
 }
 
 #join-form input[type="text"]:focus {
-    border-color: #d3f6ff;
-    box-shadow: 0 0 0 3px rgba(186, 242, 255, 0.17);
+    border-color: #a9eaf5;
+    box-shadow: 0 0 0 3px rgba(110, 215, 239, 0.17);
 }
 
 #join-form .join-colour {
@@ -511,7 +557,7 @@ body::after {
     padding: 12px;
     border: 1px solid rgba(203, 237, 255, 0.17);
     border-radius: 12px;
-    background: rgba(3, 37, 84, 0.48);
+    background: rgba(3, 41, 61, 0.52);
     color: #f5fbff;
     text-transform: none;
 }
@@ -548,7 +594,7 @@ body::after {
 }
 
 .join-colour-copy small {
-    color: #b9d7e8;
+    color: #b5deec;
     font-size: 12px;
     font-weight: 400;
 }
@@ -601,7 +647,7 @@ body::after {
     padding: 12px;
     border: 1px solid rgba(203, 237, 255, 0.20);
     border-radius: 11px;
-    background: rgba(1, 20, 57, 0.24);
+    background: rgba(2, 30, 49, 0.42);
     color: #f5fbff;
     cursor: pointer;
     letter-spacing: 0;
@@ -620,9 +666,9 @@ body::after {
 }
 
 .join-tier-card:has(input:checked) {
-    border-color: #8ce8fb;
-    background: rgba(81, 179, 213, 0.14);
-    box-shadow: inset 0 0 0 1px rgba(156, 233, 251, 0.12);
+    border-color: #8edfeb;
+    background: rgba(42, 138, 165, 0.16);
+    box-shadow: inset 0 0 0 1px rgba(142, 223, 235, 0.12);
 }
 
 .join-tier-card:has(input:checked)::after {
@@ -633,8 +679,8 @@ body::after {
     height: 7px;
     content: "";
     border-radius: 50%;
-    background: #9debf9;
-    box-shadow: 0 0 0 3px rgba(157, 235, 249, 0.16);
+    background: #8edfeb;
+    box-shadow: 0 0 0 3px rgba(142, 223, 235, 0.16);
 }
 
 .join-tier-card--free:has(input:checked) {
@@ -676,7 +722,7 @@ body::after {
 }
 
 .join-tier-card small {
-    color: #b9d7e8;
+    color: #b5deec;
     font-size: 11px;
     font-weight: 400;
     line-height: 1.35;
@@ -686,8 +732,8 @@ body::after {
     min-height: 52px;
     border: 0;
     border-radius: 10px;
-    background: #a4e7f6;
-    color: #062653;
+    background: #8edfeb;
+    color: #043047;
     font-size: 15px;
     font-weight: 720;
     box-shadow: 0 8px 20px rgba(0, 11, 45, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.66);
@@ -695,14 +741,14 @@ body::after {
 
 #join-form button:hover {
     border: 0;
-    background: #c1f0fa;
-    color: #062653;
+    background: #b1ebf4;
+    color: #043047;
     box-shadow: 0 8px 20px rgba(0, 11, 45, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.66);
 }
 
 .join-note {
     margin: 13px 0 0;
-    color: #86b6cd;
+    color: #91c5d6;
     font-size: 11px;
     line-height: 1.4;
     text-align: center;
@@ -1120,4 +1166,357 @@ body::after {
     transform: translate(-50%, -50%);
     pointer-events: none;
     z-index: 3;
+}
+
+/* @ds:2e91f6d4 @ds:b9136c2e @ds:c5a92431 @ds:e42a7c19 @ds:ab1e4f02 @ia:32288dfb */
+#hud {
+    top: 0;
+    height: 124px;
+    text-shadow: none;
+}
+
+#hud .hud-row {
+    grid-template-columns: 76px minmax(0, 1fr);
+    gap: 18px;
+    align-items: center;
+    height: auto;
+    padding: 30px 28px 0 32px;
+}
+
+#game-menu-toggle {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 76px;
+    height: 76px;
+    grid-template-rows: repeat(3, 4px);
+    align-content: center;
+    gap: 8px;
+    padding: 0;
+    border: 0;
+    outline: 0;
+    border-radius: 22px;
+    background: rgba(5, 57, 81, 0.72);
+    box-shadow: 0 8px 22px rgba(0, 8, 24, 0.14);
+}
+
+#game-menu-toggle span {
+    width: 34px;
+    height: 4px;
+    border-radius: 4px;
+}
+
+#player-metrics {
+    position: static;
+    transform: none;
+    display: grid;
+    grid-template-columns: 42px minmax(170px, 1fr) auto auto;
+    align-items: center;
+    gap: 18px;
+    min-width: 0;
+    min-height: 94px;
+    padding: 14px 20px;
+    border: 0;
+    border-radius: 26px;
+    background: linear-gradient(100deg, rgba(5, 53, 76, 0.82), rgba(2, 36, 61, 0.78));
+    box-shadow: 0 8px 22px rgba(0, 8, 24, 0.14);
+    backdrop-filter: blur(9px);
+}
+
+#player-color-indicator {
+    width: 38px;
+    height: 38px;
+    border: 4px solid rgba(237, 248, 255, 0.9);
+    border-radius: 50%;
+    background: var(--player-color, #75d4e6);
+    box-shadow: 0 0 16px color-mix(in srgb, var(--player-color, #75d4e6) 55%, transparent);
+}
+
+#player-life {
+    gap: 0;
+}
+
+#player-name {
+    max-width: none;
+    font-size: 30px;
+    font-weight: 760;
+    letter-spacing: -0.03em;
+}
+
+#lifetime {
+    width: 100%;
+    height: 9px;
+    margin-top: 11px;
+    border: 0;
+    border-radius: 9px;
+    background: rgba(217, 245, 255, 0.17);
+}
+
+#player-size,
+#eaten-metric {
+    display: grid;
+    grid-template-columns: auto;
+    gap: 2px;
+    min-width: 74px;
+    padding-left: 20px;
+    border-left: 2px solid rgba(217, 245, 255, 0.2);
+    white-space: nowrap;
+}
+
+#player-size-label,
+#eaten-metric > span {
+    color: rgba(181, 222, 236, 0.58);
+    font-size: 17px;
+    font-weight: 760;
+    line-height: 1;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+}
+
+#player-size-value,
+#eaten {
+    color: #edf8ff;
+    font-size: 34px;
+    font-weight: 760;
+    line-height: 1;
+    letter-spacing: -0.04em;
+    font-variant-numeric: tabular-nums;
+}
+
+#world-info {
+    left: 0;
+    right: auto;
+    bottom: calc(24px + env(safe-area-inset-bottom));
+    box-sizing: border-box;
+    width: min(340px, calc(100vw - 16px));
+    min-width: min(290px, calc(100vw - 16px));
+    height: auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    align-items: stretch;
+    justify-content: stretch;
+    justify-items: stretch;
+    padding: 17px 22px;
+    border: 0;
+    border-radius: 20px;
+    background: rgba(3, 35, 58, 0.25);
+    box-shadow: none;
+    backdrop-filter: blur(3px);
+    text-shadow: none;
+}
+
+#world-info .world-info-item {
+    display: flex;
+    grid-template-columns: none;
+    align-items: baseline;
+    justify-content: space-between;
+    justify-items: initial;
+    gap: 12px;
+    min-width: 0;
+    min-height: 55px;
+    padding: 11px 0;
+    border-bottom: 2px solid rgba(217, 245, 255, 0.13);
+}
+
+#world-info .world-info-item > span {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+#world-info .world-info-item > strong,
+#world-info .world-info-item > em {
+    margin-left: auto;
+    white-space: nowrap;
+}
+
+#world-info .world-info-item:last-child {
+    border-bottom: 0;
+}
+
+#world-info .world-info-item span {
+    color: rgba(181, 222, 236, 0.58);
+    font-size: 18px;
+    font-weight: 740;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+#world-info strong,
+#world-info em {
+    color: #edf8ff;
+    font-size: 30px;
+    font-weight: 740;
+    letter-spacing: -0.04em;
+    text-align: right;
+}
+
+#game-menu {
+    top: 136px;
+}
+
+/* @ds:cd1c5776 @ds:0eef2d19 @ds:e41821af */
+#joystick-panel {
+    left: auto;
+    right: max(24px, env(safe-area-inset-right));
+    bottom: max(24px, env(safe-area-inset-bottom));
+    width: calc(var(--joystick-size) + var(--joystick-knob-size));
+    height: calc(var(--joystick-size) + var(--joystick-knob-size));
+}
+
+#joystick-base {
+    right: calc(var(--joystick-knob-size) / 2);
+    bottom: calc(var(--joystick-knob-size) / 2);
+    width: var(--joystick-size);
+    height: var(--joystick-size);
+    background: radial-gradient(circle, rgba(4, 38, 59, 0.34), rgba(4, 38, 59, 0.54));
+}
+
+#joystick-base::before {
+    background: rgba(3, 35, 60, 0.9);
+}
+
+.joystick-burst-ring {
+    opacity: 1;
+}
+
+#joystick-current-burst-ring {
+    border-width: 2px;
+    box-shadow: 0 0 12px color-mix(in srgb, var(--current-burst-color) 24%, transparent);
+}
+
+#joystick-knob {
+    width: var(--joystick-knob-size);
+    height: var(--joystick-knob-size);
+    border: 2px solid rgba(237, 248, 255, 0.72);
+    background: rgba(110, 215, 239, 0.31);
+    box-shadow: 0 5px 16px rgba(0, 8, 24, 0.32);
+}
+
+#player-speed-metric {
+    z-index: 4;
+    color: #d7f6ff;
+    text-shadow: none;
+}
+
+#player-speed-percent {
+    font-size: clamp(30px, 5.35vw, 52px);
+    letter-spacing: -0.06em;
+}
+
+@media (max-width: 720px) {
+    :root {
+        --joystick-size: 190px;
+        --joystick-knob-size: 48px;
+    }
+
+    #hud {
+        height: 73px;
+    }
+
+    #hud .hud-row {
+        grid-template-columns: 46px minmax(0, 1fr);
+        gap: 10px;
+        padding: 15px 15px 0 16px;
+    }
+
+    #game-menu-toggle {
+        width: 46px;
+        height: 46px;
+        grid-template-rows: repeat(3, 3px);
+        gap: 5px;
+        border-radius: 14px;
+    }
+
+    #game-menu-toggle span {
+        width: 21px;
+        height: 3px;
+    }
+
+    #player-metrics {
+        grid-template-columns: 20px minmax(66px, 1fr) auto auto;
+        gap: 8px;
+        min-height: 58px;
+        padding: 8px 10px;
+        border-radius: 17px;
+    }
+
+    #player-color-indicator {
+        width: 20px;
+        height: 20px;
+        border-width: 2px;
+    }
+
+    #player-name {
+        font-size: 15px;
+    }
+
+    #lifetime {
+        height: 5px;
+        margin-top: 6px;
+    }
+
+    #player-size,
+    #eaten-metric {
+        min-width: 44px;
+        padding-left: 8px;
+        border-left-width: 1px;
+    }
+
+    #player-size-label,
+    #eaten-metric > span {
+        font-size: 9px;
+    }
+
+    #player-size-value,
+    #eaten {
+        font-size: 18px;
+    }
+
+    #world-info {
+        left: 10px;
+        bottom: calc(15px + env(safe-area-inset-bottom));
+        width: min(145px, calc(100vw - 12px));
+        min-width: min(130px, calc(100vw - 12px));
+        padding: 7px 11px;
+        border-radius: 12px;
+    }
+
+    #world-info .world-info-item {
+        min-height: 24px;
+        padding: 5px 0;
+        border-bottom-width: 1px;
+    }
+
+    #world-info .world-info-item span {
+        font-size: 9px;
+    }
+
+    #world-info strong,
+    #world-info em {
+        font-size: 15px;
+    }
+
+    #world-info .world-info-area {
+        display: none;
+    }
+
+    #game-menu {
+        top: 83px;
+    }
+
+    #joystick-panel {
+        right: max(15px, env(safe-area-inset-right));
+        bottom: max(15px, env(safe-area-inset-bottom));
+    }
+}
+
+@media (max-width: 380px) {
+    :root {
+        --joystick-size: 150px;
+        --joystick-knob-size: 42px;
+    }
+
+    #world-info {
+        width: min(130px, calc(100vw - 12px));
+    }
 }

@@ -30,6 +30,13 @@ let shredSvgRenderTree = null;
 let backgroundFocus = null;
 let backgroundFocusKey = null;
 let backgroundPhase = { x: 0, y: 0 };
+let backgroundMistFarPhase = { x: 0, y: 0 };
+let backgroundMistNearPhase = { x: 0, y: 0 };
+
+const BACKGROUND_MIST = {
+    far: { factor: 0.4, width: 980, height: 760 },
+    near: { factor: 0.7, width: 720, height: 560 },
+};
 
 // @ds:df06827a @ds:b024b514 @ia:2f6e7a91
 export async function loadFishGeometry(urls = ['./assets/fish2.svg', './src/_fish_save.svg']){
@@ -423,13 +430,33 @@ export function updateWorldBackgroundCss(world, followed, viewportFishCapacity, 
     if( typeof document === 'undefined' || !document.documentElement ) return;
     const delta = backgroundCameraDelta(world, followed);
     const scale = viewportScaleForFishCapacity(world, canvas, viewportFishCapacity);
+    const cameraDelta = {
+        x: -delta.x * scale,
+        y: -delta.y * scale,
+    };
+    const backgroundDelta = {
+        x: cameraDelta.x * BACKGROUND.parallaxFactor,
+        y: cameraDelta.y * BACKGROUND.parallaxFactor,
+    };
     backgroundPhase = {
-        x: wrappedTileOffset(backgroundPhase.x - delta.x * scale * BACKGROUND.parallaxFactor, BACKGROUND.tileWidthPx),
-        y: wrappedTileOffset(backgroundPhase.y - delta.y * scale * BACKGROUND.parallaxFactor, BACKGROUND.tileHeightPx),
+        x: wrappedTileOffset(backgroundPhase.x + backgroundDelta.x, BACKGROUND.tileWidthPx),
+        y: wrappedTileOffset(backgroundPhase.y + backgroundDelta.y, BACKGROUND.tileHeightPx),
+    };
+    backgroundMistFarPhase = {
+        x: wrappedTileOffset(backgroundMistFarPhase.x + cameraDelta.x * BACKGROUND_MIST.far.factor, BACKGROUND_MIST.far.width),
+        y: wrappedTileOffset(backgroundMistFarPhase.y + cameraDelta.y * BACKGROUND_MIST.far.factor, BACKGROUND_MIST.far.height),
+    };
+    backgroundMistNearPhase = {
+        x: wrappedTileOffset(backgroundMistNearPhase.x + cameraDelta.x * BACKGROUND_MIST.near.factor, BACKGROUND_MIST.near.width),
+        y: wrappedTileOffset(backgroundMistNearPhase.y + cameraDelta.y * BACKGROUND_MIST.near.factor, BACKGROUND_MIST.near.height),
     };
     const style = document.documentElement.style;
     style.setProperty('--world-bg-x', `${backgroundPhase.x.toFixed(2)}px`);
     style.setProperty('--world-bg-y', `${backgroundPhase.y.toFixed(2)}px`);
+    style.setProperty('--world-mist-far-x', `${backgroundMistFarPhase.x.toFixed(2)}px`);
+    style.setProperty('--world-mist-far-y', `${backgroundMistFarPhase.y.toFixed(2)}px`);
+    style.setProperty('--world-mist-near-x', `${backgroundMistNearPhase.x.toFixed(2)}px`);
+    style.setProperty('--world-mist-near-y', `${backgroundMistNearPhase.y.toFixed(2)}px`);
 }
 
 // @fix:4bbc0692

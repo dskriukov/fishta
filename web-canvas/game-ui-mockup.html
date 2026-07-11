@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Selfish bait — игровой HUD</title>
+  <style>
+    :root {
+      --world-bg-x: 0px; --world-bg-y: 0px;
+      --ink: #edf8ff; --muted: rgba(217, 245, 255, .66); --quiet: rgba(217, 245, 255, .43);
+      --line: rgba(185, 232, 247, .31); --panel: rgba(4, 38, 59, .54);
+      --player: #75d4e6; --life: #7bd88f; --burst: #ff7d78;
+    }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+    body { background: #03243a; color: var(--ink); font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    body::before, body::after { position: fixed; z-index: 0; inset: 0; content: ""; pointer-events: none; }
+    body::before { background: url("./assets/back.png") var(--world-bg-x) var(--world-bg-y) / auto auto repeat; opacity: .13; }
+    body::after { background: linear-gradient(180deg, rgba(190, 237, 255, .09), transparent 30%, rgba(1, 12, 24, .27)); }
+    #game { position: fixed; z-index: 1; inset: 0; display: block; width: 100vw; height: 100vh; }
+    .hud { position: fixed; z-index: 2; pointer-events: none; user-select: none; }
+    .glass { border: 0; background: linear-gradient(135deg, rgba(14, 67, 86, .48), var(--panel)); box-shadow: 0 8px 22px rgba(0, 8, 24, .14); backdrop-filter: blur(9px); }
+
+    .menu { top: 39px; left: 32px; display: grid; width: 76px; height: 76px; place-items: center; border-radius: 22px; background: rgba(5, 57, 81, .72); }
+    .menu i, .menu i::before, .menu i::after { display: block; width: 34px; height: 4px; border-radius: 4px; background: var(--ink); content: ""; }
+    .menu i { position: relative; }.menu i::before { position: absolute; top: -12px; }.menu i::after { position: absolute; top: 12px; }
+
+    .player-card { top: 30px; left: 126px; right: 28px; display: grid; grid-template-columns: 42px minmax(170px, 1fr) auto auto; align-items: center; gap: 18px; min-height: 94px; padding: 14px 20px; border-radius: 26px; transform: none; background: linear-gradient(100deg, rgba(5, 53, 76, .82), rgba(2, 36, 61, .78)); }
+    .player-colour { width: 38px; height: 38px; border: 4px solid rgba(237, 248, 255, .9); border-radius: 50%; background: var(--player); box-shadow: 0 0 16px rgba(117, 212, 230, .54); }
+    .player-id { min-width: 0; }.player-id strong { display: block; overflow: hidden; font-size: 30px; font-weight: 760; letter-spacing: -.03em; text-overflow: ellipsis; white-space: nowrap; }
+    .lifetime { display: block; height: 9px; overflow: hidden; margin-top: 11px; border-radius: 9px; background: rgba(217, 245, 255, .17); }.lifetime i { display: block; width: 72%; height: 100%; border-radius: inherit; background: var(--life); box-shadow: none; }
+    .size, .eaten { min-width: 74px; padding-left: 20px; border-left: 2px solid rgba(217, 245, 255, .20); color: rgba(181, 222, 236, .58); font-size: 17px; font-weight: 760; letter-spacing: .13em; text-transform: uppercase; }.size b, .eaten b { display: block; margin-top: 2px; color: var(--ink); font-size: 34px; font-weight: 760; letter-spacing: -.04em; line-height: 1; text-transform: none; }
+
+    .world-info { bottom: 24px; left: 34px; display: grid; gap: 0; width: 290px; padding: 17px 22px; border-radius: 20px; background: rgba(3, 35, 58, .25); box-shadow: none; backdrop-filter: blur(3px); }
+    .world-metric { display: flex; align-items: baseline; justify-content: space-between; min-height: 55px; padding: 11px 0; border-bottom: 2px solid rgba(217, 245, 255, .13); }.world-metric:last-child { border-bottom: 0; }.world-metric span { color: rgba(181, 222, 236, .58); font-size: 18px; font-weight: 740; letter-spacing: .12em; text-transform: uppercase; }.world-metric b { color: var(--ink); font-size: 30px; font-weight: 740; letter-spacing: -.04em; }
+    .world-metric--speed b { color: #d7f6ff; font-variant-numeric: tabular-nums; }
+
+    .joystick-panel { right: max(28px, env(safe-area-inset-right)); bottom: max(26px, env(safe-area-inset-bottom)); width: 340px; height: 340px; }
+    .joystick-base { position: absolute; right: 0; bottom: 0; width: 340px; height: 340px; border-radius: 50%; background: radial-gradient(circle, rgba(4, 38, 59, .34), rgba(4, 38, 59, .54)); }
+    .joystick-base::before { position: absolute; top: 50%; left: 50%; width: 45.45%; aspect-ratio: 1; border-radius: 50%; background: rgba(3, 35, 60, .96); content: ""; transform: translate(-50%, -50%); z-index: 1; }
+    .burst-ring, .current-ring { position: absolute; top: 50%; left: 50%; border-radius: 50%; transform: translate(-50%, -50%); }
+    .burst-ring { border: 1px solid rgba(150, 158, 164, .10); opacity: 1; }.burst-ring.is-available { border-color: rgba(255, 228, 92, .26); }.burst-ring.is-limit { border-width: 2px; border-color: rgba(255, 228, 92, .48); box-shadow: 0 0 12px rgba(255, 228, 92, .12); }.burst-ring.is-cruise-boundary { border-color: rgba(110, 215, 239, .28); }
+    .current-ring { border: 4px solid #df7f9d; box-shadow: 0 0 18px rgba(223, 127, 157, .25); z-index: 2; }
+    .joystick-knob { position: absolute; width: 84px; height: 84px; border: 2px solid rgba(237, 248, 255, .72); border-radius: 50%; background: rgba(110, 215, 239, .31); box-shadow: 0 5px 16px rgba(0, 8, 24, .32); transform: translate(-50%, -50%); z-index: 3; }
+    .speed-percent { position: absolute; z-index: 2; top: 50%; left: 50%; color: #d7f6ff; font-size: 52px; font-weight: 800; letter-spacing: -.06em; line-height: .9; transform: translate(-50%, -50%); }.speed-percent small { display: block; margin-top: 10px; color: var(--muted); font-size: 16px; font-weight: 750; letter-spacing: .14em; text-align: center; text-transform: uppercase; }
+
+    @media (max-width: 640px) {
+      .menu { top: 21px; left: 16px; width: 46px; height: 46px; border-radius: 14px; }.menu i, .menu i::before, .menu i::after { width: 21px; height: 3px; }.menu i::before { top: -8px; }.menu i::after { top: 8px; }.player-card { top: 15px; grid-template-columns: 20px minmax(66px, 1fr) auto auto; left: 72px; right: 15px; min-height: 58px; width: auto; gap: 8px; padding: 8px 10px; border-radius: 17px; transform: none; }.player-colour { width: 20px; height: 20px; border-width: 2px; }.player-id strong { font-size: 15px; }.lifetime { height: 5px; margin-top: 6px; }.size, .eaten { min-width: 44px; padding-left: 8px; border-left-width: 1px; font-size: 9px; }.size b, .eaten b { font-size: 18px; }.world-info { bottom: 15px; left: 15px; width: 145px; padding: 7px 11px; border-radius: 12px; }.world-metric { min-height: 24px; padding: 5px 0; border-bottom-width: 1px; }.world-metric span { font-size: 9px; }.world-metric b { font-size: 15px; }.world-metric:nth-child(n + 4) { display: none; }.joystick-panel { right: max(15px, env(safe-area-inset-right)); bottom: max(15px, env(safe-area-inset-bottom)); width: 190px; height: 190px; }.joystick-base { width: 190px; height: 190px; }.joystick-knob { top: 31px; left: 138px; width: 48px; height: 48px; }.speed-percent { font-size: 30px; }.speed-percent small { margin-top: 5px; font-size: 9px; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <button class="hud menu glass" type="button" aria-label="Меню"><i></i></button>
+  <section class="hud player-card glass" aria-label="Состояние игрока">
+    <i class="player-colour"></i>
+    <div class="player-id"><strong>fish-664</strong><span class="lifetime"><i></i></span></div>
+    <span class="size">size<b>1.0</b></span><span class="eaten">eaten<b>7</b></span>
+  </section>
+
+  <aside class="hud world-info glass" aria-label="Состояние мира">
+    <div class="world-metric"><span>fish</span><b>71</b></div>
+    <div class="world-metric"><span>nutrients</span><b>18</b></div>
+    <div class="world-metric world-metric--speed"><span>speed</span><b>147.20</b></div>
+    <div class="world-metric"><span>fish area</span><b>32.2k</b></div>
+    <div class="world-metric"><span>food area</span><b>0.8k</b></div>
+  </aside>
+
+  <section class="hud joystick-panel" aria-label="Джойстик и скорость">
+    <div class="joystick-base"><span class="availability-rings"></span><i class="current-ring"></i><i class="joystick-knob"></i><strong class="speed-percent">65<small>speed</small></strong></div>
+  </section>
+
+  <script type="module">
+    import { loadFishGeometry, loadShredGeometry, render } from './src/render.js';
+    import { speedLevelToControlMagnitude } from './src/controls.js';
+    import { availableSpeedLevelForSize } from './src/fish.js';
+
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const joystickBase = document.querySelector('.joystick-base');
+    const availabilityRings = document.querySelector('.availability-rings');
+    const currentRing = document.querySelector('.current-ring');
+    const joystickKnob = document.querySelector('.joystick-knob');
+    const displayedFishSize = 1;
+    const desiredSpeedLevel = 65;
+    const appliedSpeedLevel = availableSpeedLevelForSize(displayedFishSize, desiredSpeedLevel);
+    const availabilityLevels = [30, 43, 56, 69, 82, 99];
+    const ringLevels = availabilityLevels.includes(appliedSpeedLevel)
+      ? availabilityLevels
+      : [...availabilityLevels, appliedSpeedLevel].sort((a, b) => a - b);
+    for( const level of ringLevels ){
+      const ring = document.createElement('i');
+      const diameter = speedLevelToControlMagnitude(level) * 100;
+      ring.className = `burst-ring${level <= appliedSpeedLevel ? ' is-available' : ''}${level === appliedSpeedLevel ? ' is-limit' : ''}${level === 30 ? ' is-cruise-boundary' : ''}`;
+      ring.style.width = `${diameter}%`;
+      ring.style.height = `${diameter}%`;
+      ring.title = level === 30 ? 'cruise boundary v30' : `burst v${level}`;
+      availabilityRings.append(ring);
+    }
+    const appliedMagnitude = speedLevelToControlMagnitude(appliedSpeedLevel);
+    currentRing.style.width = `${appliedMagnitude * 100}%`;
+    currentRing.style.height = `${appliedMagnitude * 100}%`;
+    const direction = { x: .72, y: -.69 };
+    const directionLength = Math.hypot(direction.x, direction.y);
+    joystickKnob.style.left = `${50 + direction.x / directionLength * appliedMagnitude * 50}%`;
+    joystickKnob.style.top = `${50 + direction.y / directionLength * appliedMagnitude * 50}%`;
+    const layers = ['part_30_percents', 'part_30_percents_main_color', 'part_20_percents', 'part_10_percents_1', 'part_10_percents_2'];
+    const world = {
+      width: 900,
+      height: 1500,
+      fish: [
+        { id: 'me', ownerKind: 'user', userName: 'fish-664', userColor: '#75d4e6', pos: { x: 450, y: 760 }, vel: { x: 147, y: -35 }, radius: 30, facing: 1, size: 3.5, mode: 'cruise', swimPhase: 0, visualScale: 1, eyeFear: 0 },
+        { id: 'rival', ownerKind: 'user', userName: 'fish-691', userColor: '#d6b84f', pos: { x: 540, y: 696 }, vel: { x: -86, y: 9 }, radius: 23, facing: -1, size: 2.1, mode: 'burst', swimPhase: 1.7, visualScale: 1, eyeFear: .12 },
+        { id: 'prey-1', ownerKind: 'npc', hue: 186, pos: { x: 334, y: 648 }, vel: { x: 42, y: 10 }, radius: 14, facing: 1, size: .8, mode: 'cruise', swimPhase: 2.6, visualScale: 1, eyeFear: 0 },
+        { id: 'prey-2', ownerKind: 'npc', hue: 296, pos: { x: 668, y: 818 }, vel: { x: -33, y: 20 }, radius: 12, facing: -1, size: .6, mode: 'cruise', swimPhase: .8, visualScale: 1, eyeFear: .45 },
+      ],
+      shreds: [
+        { id: 'shred-1', pos: { x: 540, y: 794 }, vel: { x: 0, y: 0 }, size: 34, sourceColor: '#d6b84f', remainingLayers: layers, visualSeed: .31 },
+        { id: 'shred-2', pos: { x: 370, y: 851 }, vel: { x: 0, y: 0 }, size: 27, sourceColor: '#bd7ee4', remainingLayers: layers.slice(0, 4), visualSeed: .67 },
+        { id: 'shred-3', pos: { x: 648, y: 632 }, vel: { x: 0, y: 0 }, size: 24, sourceColor: '#79d9c1', remainingLayers: layers.slice(0, 3), visualSeed: .92 },
+      ],
+      bubbles: [
+        { pos: { x: 400, y: 724 }, radius: 3.2, alpha: .78, phase: .1, age: .25 },
+        { pos: { x: 389, y: 706 }, radius: 2.4, alpha: .67, phase: .4, age: .42 },
+        { pos: { x: 379, y: 690 }, radius: 1.7, alpha: .55, phase: .7, age: .63 },
+        { pos: { x: 572, y: 727 }, radius: 2.1, alpha: .65, phase: .2, age: .35, color: 'red' },
+      ],
+    };
+
+    function resize(){ canvas.width = innerWidth; canvas.height = innerHeight; }
+    function frame(now){
+      const t = now / 1000;
+      world.fish.forEach((fish, index) => { fish.swimPhase = t * (4.5 + index * .25) + index; });
+      render(ctx, { world, currentUserFishId: 'me', viewportFishCapacity: '10', clientBubbles: world.bubbles, debug: { now } });
+      requestAnimationFrame(frame);
+    }
+
+    resize();
+    addEventListener('resize', resize);
+    await loadFishGeometry();
+    await loadShredGeometry();
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>
