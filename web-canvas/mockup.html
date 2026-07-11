@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Selfish bait — visual direction</title>
+<style>
+    :root {
+        color-scheme: dark;
+        --ink: #eaf8ff;
+        --muted: rgba(215, 241, 255, .58);
+        --line: rgba(155, 219, 245, .18);
+        --glass: rgba(5, 31, 53, .57);
+        --accent: #72e2ff;
+        --good: #83e7b1;
+    }
+    * { box-sizing: border-box; }
+    body {
+        margin: 0;
+        min-height: 100vh;
+        overflow: hidden;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: var(--ink);
+        background: #031b30;
+    }
+    .screen {
+        position: relative;
+        min-height: 100vh;
+        overflow: hidden;
+        isolation: isolate;
+        background:
+            radial-gradient(ellipse at 52% 44%, rgba(20, 143, 200, .20), transparent 34%),
+            linear-gradient(180deg, rgba(2, 22, 43, .15), rgba(1, 14, 28, .58)),
+            url("./assets/back.png") center / cover;
+    }
+    .water-glow, .water-glow::before, .water-glow::after {
+        position: absolute;
+        inset: 0;
+        content: "";
+        pointer-events: none;
+    }
+    .water-glow {
+        z-index: -1;
+        background: radial-gradient(ellipse 44% 32% at 73% 21%, rgba(105, 228, 255, .12), transparent 72%);
+    }
+    .water-glow::before { background: linear-gradient(104deg, transparent 38%, rgba(161, 236, 255, .055) 48%, transparent 59%); transform: translateX(-18%); }
+    .water-glow::after { background: linear-gradient(180deg, transparent 54%, rgba(0, 10, 24, .62)); }
+    .brand {
+        position: absolute;
+        top: 34px;
+        left: 38px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        color: rgba(234, 248, 255, .9);
+        letter-spacing: .02em;
+        font-size: 14px;
+        font-weight: 650;
+    }
+    .brand-mark { width: 11px; height: 11px; border: 1px solid var(--accent); border-radius: 50%; box-shadow: 0 0 18px rgba(114, 226, 255, .72); }
+    .brand small { display: block; margin-top: 2px; color: var(--muted); font-size: 10px; font-weight: 550; letter-spacing: .14em; text-transform: uppercase; }
+    .status {
+        position: absolute;
+        top: 34px;
+        right: 38px;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        color: var(--muted);
+        font-size: 12px;
+    }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); box-shadow: 0 0 12px rgba(131, 231, 177, .8); }
+    .hud {
+        position: absolute;
+        left: 38px;
+        bottom: 36px;
+        width: min(385px, calc(100vw - 76px));
+        padding: 18px 19px;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: linear-gradient(135deg, rgba(16, 62, 88, .56), rgba(3, 23, 43, .68));
+        box-shadow: 0 16px 44px rgba(0, 5, 16, .30), inset 0 1px 0 rgba(255, 255, 255, .07);
+        backdrop-filter: blur(14px);
+    }
+    .hud-heading { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 16px; }
+    .hud-heading strong { font-size: 15px; letter-spacing: .01em; }
+    .hud-heading span { color: var(--good); font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+    .metrics { display: grid; grid-template-columns: 1.15fr 1fr .85fr; gap: 14px; }
+    .metric { min-width: 0; }
+    .metric label { display: block; margin-bottom: 6px; color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .11em; text-transform: uppercase; }
+    .metric strong { font-size: 23px; font-weight: 620; letter-spacing: -.04em; }
+    .metric strong b { color: var(--accent); font-size: 13px; font-weight: 600; letter-spacing: 0; }
+    .bar { height: 5px; overflow: hidden; margin-top: 10px; border-radius: 10px; background: rgba(177, 231, 255, .12); }
+    .bar > i { display: block; width: 72%; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #62d5f4, #8fe8b7); box-shadow: 0 0 13px rgba(114, 226, 255, .55); }
+    .mini-map {
+        position: absolute;
+        right: 38px;
+        bottom: 36px;
+        width: 152px;
+        aspect-ratio: 1;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: rgba(4, 31, 53, .54);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06), 0 16px 44px rgba(0, 5, 16, .25);
+        backdrop-filter: blur(12px);
+    }
+    .mini-map::before { position: absolute; inset: 18px; content: ""; border: 1px solid rgba(119, 220, 247, .12); border-radius: 12px; }
+    .mini-map i { position: absolute; width: 4px; height: 4px; border-radius: 50%; background: rgba(129, 225, 250, .56); }
+    .mini-map i:nth-of-type(1) { top: 42px; left: 53px; }
+    .mini-map i:nth-of-type(2) { top: 72px; right: 41px; }
+    .mini-map i:nth-of-type(3) { right: 63px; bottom: 43px; }
+    .mini-map i:nth-of-type(4) { width: 8px; height: 8px; top: 62px; left: 70px; background: #87e9b3; box-shadow: 0 0 12px rgba(135, 233, 179, .8); }
+    .mini-map span { position: absolute; top: 14px; left: 15px; color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; }
+    .fish { position: absolute; top: 50%; left: 53%; width: clamp(140px, 16vw, 245px); filter: drop-shadow(0 24px 20px rgba(0, 4, 15, .48)) drop-shadow(0 0 26px rgba(75, 205, 249, .12)); transform: translate(-50%, -50%) rotate(-4deg); }
+    .target { position: absolute; top: 47%; left: 71%; width: 54px; height: 54px; border: 1px solid rgba(119, 225, 250, .34); border-radius: 50%; box-shadow: 0 0 30px rgba(69, 201, 247, .18); }
+    .target::before, .target::after { position: absolute; content: ""; background: rgba(126, 230, 250, .45); }
+    .target::before { width: 1px; height: 16px; left: 50%; top: -8px; }
+    .target::after { width: 16px; height: 1px; left: -8px; top: 50%; }
+    .hint { position: absolute; left: 50%; bottom: 43px; transform: translateX(-50%); color: rgba(218, 243, 255, .45); font-size: 11px; letter-spacing: .08em; }
+    .hint kbd { margin: 0 4px; padding: 3px 6px; border: 1px solid rgba(197, 239, 255, .18); border-radius: 5px; color: rgba(234, 249, 255, .78); font: inherit; }
+    .annotation { position: absolute; top: 106px; left: 38px; padding-left: 12px; border-left: 2px solid rgba(114, 226, 255, .52); color: rgba(219, 245, 255, .58); font-size: 11px; line-height: 1.55; }
+    .annotation b { display: block; color: rgba(235, 250, 255, .86); font-size: 12px; }
+    @media (max-width: 700px) { .brand, .annotation { left: 20px; } .status { right: 20px; } .hud { left: 20px; bottom: 20px; width: calc(100vw - 40px); } .mini-map { display: none; } .hint { display: none; } .fish { left: 58%; top: 43%; width: 190px; } }
+</style>
+</head>
+<body>
+<main class="screen">
+    <div class="water-glow"></div>
+    <header class="brand"><i class="brand-mark"></i><div>Selfish bait<small>Fish Death Race</small></div></header>
+    <div class="status"><i class="status-dot"></i>В океане</div>
+    <aside class="annotation"><b>Глубоководный интерфейс</b>Спокойная иерархия. Никакого декоративного шума<br>поверх решения игрока.</aside>
+    <img class="fish" src="./assets/fish2.svg" alt="">
+    <i class="target"></i>
+    <section class="hud" aria-label="Состояние рыбы">
+        <div class="hud-heading"><strong>fish-334</strong><span>Стабильно</span></div>
+        <div class="metrics">
+            <div class="metric"><label>Размер</label><strong>1.0 <b>масса</b></strong></div>
+            <div class="metric"><label>Скорость</label><strong>68 <b>%</b></strong></div>
+            <div class="metric"><label>Добыча</label><strong>12</strong></div>
+        </div>
+        <div class="bar"><i></i></div>
+    </section>
+    <aside class="mini-map" aria-label="Мини-карта"><span>Эхо-карта</span><i></i><i></i><i></i><i></i></aside>
+    <footer class="hint"><kbd>WASD</kbd> движение <span>·</span> <kbd>Space</kbd> рывок</footer>
+</main>
+</body>
+</html>

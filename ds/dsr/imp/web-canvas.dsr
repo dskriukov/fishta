@@ -62,6 +62,7 @@ file_plan:
   web-canvas/src/main.js:           "client init, join flow, render loop, input send"
   web-canvas/assets/back.png:       "published runtime copy of ds/assets/back.png"
   web-canvas/assets/start.png:      "published runtime copy of ds/assets/start.png"
+  web-canvas/assets/join-corner-decoration.svg: "entry-card decorative SVG asset"
 
 contract_map:
   main.serverModel:                         server.js#startServerWorld  # @ds:27fa3caa @ds:ec8cb052
@@ -81,6 +82,7 @@ contract_map:
   wsProtocol.removedFishRows:                 protocol.js#encodeRemovedFishRow protocol.js#applyWorldSync  # @ds:f51a5030 @ds:a16328a6
   wsProtocol.events:                         protocol.js#encodeEvent protocol.js#parseEvent  # @ds:a16328a6
   controls.joinWorldForm:                   controls.js#createJoinFormState  # @ds:34ba255b @ds:58050922
+  controls.joinPresentation:                index.html#join-form style.css##join style.css##join-form main.js#syncJoinFishPreview  # @ds:277a51d7
   controls.startBackground:                 style.css##join  # @ds:58200142 @ia:3983084a
   controls.noVulnerabilityControl:          controls.js#createJoinFormState controls.js#createInput  # @ds:5377d065
   controls.deviceType:                      controls.js#detectControlDevice  # @ds:cf6ad7d6
@@ -307,6 +309,44 @@ implementation_instructions:
     layered under the existing dark water overlay so the form remains readable.
     This entry background is tied to the visible join panel and is independent of
     the in-game canvas background.  # @ds:58200142 @ia:3983084a
+  join_presentation: |
+    index.html#join-form keeps the existing #join-name text input, #join-color
+    native color input, #join-tier paid identity input, and submit event. Build
+    the English card with the project logo, the fixed entry copy, a compact fish
+    color row, and two same-name radio labels: free radio checked by default and
+    paid radio retaining id #join-tier. The color row uses an object element loading
+    ./assets/fish2.svg, retaining the full gameplay fish geometry. Make the row its
+    only rounded outline: use a 64px transparent preview area on the row's palette-
+    consistent deep-blue background, a three-column grid (preview, copy, picker),
+    and one .join-colour-swatch div. Position #join-color as a full-size, invisible
+    native input over that div so it remains the system color-dialog trigger; CSS
+    draws only the div background and its 2px ring. main.js#syncJoinFishPreview
+    derives a luminance-aware --join-swatch-ring and writes --join-swatch-color from
+    #join-color.value at initialization and on color input: use a light ring for
+    dark colors and a dark ring for light colors. The same function writes the
+    color into the loaded fish SVG root after the object load event. In that load handler inject a
+    1.396s infinite, ease-in-out CSS cycle for fin_back, fin_bottom,
+    fin_bottom_small, and fin_bottom_top. fin_back rotates around its 0% horizontal
+    bounding-box edge (the body join), while the other fins retain their calm cruise
+    scale/skew equivalents; do not modify simulation state. Their labels provide
+    the fixed Free/Paid eligibility text. CSS
+    On .join-corner-decoration object load, inject independent 5.2s and 6.4s
+    ease-in-out alternate rotations for the SVG's two path layers around the shared
+    viewBox center, with amplitudes <= 2deg and no pointer interaction. Render the
+    header logo with an object loading ./src/selfish-bait.svg instead of an img. On
+    its load, define one main.js#JOIN_LOGO_LIVELINESS constant holding the rotation
+    amplitude and timing scale. Use it to inject independent 2.7s, 3.1s, 3.55s,
+    2.9s, and 3.35s ease-in-out alternate rotations for its five path layers around
+    the 39x39 viewBox center, with a 3.4deg base amplitude and no pointer interaction.
+    CSS gives
+    Free a teal-green selected border/fill/marker and Paid a violet-pink
+    selected border/fill/marker; native radio inputs remain accessible while
+    visually hidden.
+    Add ./assets/join-corner-decoration.svg as a clipped, pointer-inert,
+    semi-transparent top-right layer inside #join-form. CSS keeps #join as the
+    full-screen start.png scene with a left-side readability overlay, makes one
+    translucent 420px maximum-width entry card, and scopes all join styling to
+    #join / #join-form so the in-game HUD is unaffected.  # @ds:277a51d7
   reconnect_and_timeout: |
     On unexpected socket break, keep the user fish as ownerKind='user' for 3 seconds.
     During the grace window, continue the last input action.

@@ -13,30 +13,45 @@
 <body>
     <canvas id="game"></canvas>
     <div id="join" hidden>
-        <!-- @ds:34ba255b -->
-        <form id="join-form">
-            <div class="join-header" aria-hidden="true">
+        <!-- @ds:34ba255b @ds:277a51d7 -->
+        <form id="join-form" lang="en">
+            <object class="join-corner-decoration" data="./assets/join-corner-decoration.svg" type="image/svg+xml" tabindex="-1" aria-hidden="true"></object>
+            <header class="join-header">
                 <div class="join-bait">
-                    <img src="./src/selfish-bait.svg" alt="">
+                    <object data="./src/selfish-bait.svg" type="image/svg+xml" tabindex="-1" aria-label="Selfish bait"></object>
                 </div>
                 <div>
                     <strong>Selfish bait</strong>
                     <span>Fish Death Race</span>
                 </div>
+            </header>
+            <div class="join-intro">
+                <p>Enter the food chain</p>
+                <h1>Eat. Grow. Survive.</h1>
+                <span>Choose your fish and join a race where every bite counts.</span>
             </div>
-            <label>
-                <span>Name</span>
+            <label class="join-field">
+                <span>Fish name</span>
                 <input id="join-name" type="text" maxlength="24" autocomplete="off">
             </label>
-            <label>
-                <span>Color</span>
-                <input id="join-color" type="color">
+            <label class="join-colour">
+                <span class="join-fish-preview" aria-hidden="true"><object data="./assets/fish2.svg" type="image/svg+xml" tabindex="-1"></object></span>
+                <span class="join-colour-copy"><strong>Fish colour</strong><small>Choose any colour</small></span>
+                <span class="join-colour-swatch"><span aria-hidden="true"></span><input id="join-color" type="color" aria-label="Choose fish colour"></span>
             </label>
-            <label class="toggle">
-                <input id="join-tier" type="checkbox">
-                <span>paid fish</span>
-            </label>
-            <button type="submit">Dive away!</button>
+            <fieldset class="join-tiers">
+                <legend>Entry mode</legend>
+                <label class="join-tier-card join-tier-card--free">
+                    <input type="radio" name="join-tier" checked>
+                    <span><strong>Free</strong><small>Any fish larger than you can eat you.</small></span>
+                </label>
+                <label class="join-tier-card join-tier-card--paid">
+                    <input id="join-tier" type="radio" name="join-tier">
+                    <span><strong>Paid</strong><small>Only larger fish controlled by other players can eat you.</small></span>
+                </label>
+            </fieldset>
+            <button type="submit">Dive in</button>
+            <p class="join-note">You can change these settings before your next race.</p>
         </form>
     </div>
     <div id="hud">

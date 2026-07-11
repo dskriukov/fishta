@@ -7,6 +7,15 @@ rationale_notes:
   - "There is no separate vulnerability control; paid/free user tier is chosen at join time and predation consumes that tier."
   - "Camera follows the current client's user fish; the full multiplayer world need not fit on screen."
   - "Paid/free user type is a temporary join-form choice, not an external account integration."
+  - "The entry presentation communicates paid/free eligibility as selectable mode cards; it does not introduce a separate vulnerability state."
+  - "The entry color control keeps the native unrestricted picker and pairs it with a live fish-geometry preview so the chosen color is visible before joining."
+  - "The preview uses the in-game ocean-water base color and reuses the real fish asset with a calm cruise-style fin cycle; it is presentational and does not alter simulation state."
+  - "The color row avoids competing nested frames: its single row contour groups the fish, text, and a circular native color swatch. The rear-fin transform origin remains at the body join so only the tail end moves."
+  - "The color swatch remains a single circular control; its ring is derived from color luminance so both light and dark choices are visible against the entry-card palette."
+  - "The native color input is retained only as the accessible system color-dialog trigger; a controlled div renders the visible swatch. The corner decoration borrows the non-interactive, independent low-amplitude layer motion of shred rendering."
+  - "The real Selfish bait logo uses the same non-interactive low-amplitude, independently phased layer motion as the corner decoration; it is not substituted by a decorative approximation."
+  - "Logo layer motion is deliberately more visible and faster than the corner decoration; one implementation constant centralizes its rotation and timing multipliers."
+  - "Free and Paid use separate teal-green and violet-pink accents only for visual selection; the colors do not imply different gameplay behavior beyond the existing tier rules."
   - "Touch movement and touch hunt are separate touch roles: the first touch steers, the second touch enables burst."
 
 input_bindings:

@@ -19,6 +19,27 @@ join_world:
       - userTier
     rule: "client shows a prefilled join form; user may keep or override generated name/color and choose paid/free type before connecting"
 
+join_presentation:
+  from: ds:controls.join-presentation
+  contract:
+    name: renderJoinPresentation
+    inputs: [generatedName, generatedColor, selectedUserTier]
+    output: joinFormUi
+    rule: "the English entry screen renders one translucent card over start.png; the card preserves the existing name, unrestricted native color input, and paid/free identity fields; its color row has one outer contour, an aligned fish preview over a palette-consistent deep-water background, text adjacent to the preview, and one round controlled div swatch with a luminance-contrasting ring while the native input is invisible and clickable above it; the real fish continuously animates its cruise fins with the rear fin anchored to its body connection; both the decorative corner SVG and the real Selfish bait logo animate their own layers with independently phased shred-like rotations, and one implementation constant controls the logo motion intensity; Free and Paid remain selectable cards whose copy describes their respective predation eligibility"
+    mode_accents:
+      free: teal-green
+      paid: violet-pink
+    texts:
+      eyebrow: "Enter the food chain"
+      heading: "Eat. Grow. Survive."
+      description: "Choose your fish and join a race where every bite counts."
+      name: "Fish name"
+      color: "Fish colour"
+      mode: "Entry mode"
+      free: "Any fish larger than you can eat you."
+      paid: "Only larger fish controlled by other players can eat you."
+      submit: "Dive in"
+
 start_background:
   from: ds:controls.start-background
   asset: ds/assets/start.png

@@ -5,5 +5,19 @@
     "*.fix": "markdown",
     "*.air": "yaml",
     "*.dsc": "yaml"
+  },
+  "chat.tools.terminal.autoApprove": {
+    "/^sha1sum ds/sense/world/world\\.ds$/": {
+      "approve": true,
+      "matchCommandLine": true
+    },
+    "/^sha1sum ds/sense/world/world\\.ds ds/fix/background\\.fix$/": {
+      "approve": true,
+      "matchCommandLine": true
+    },
+    "/^sha1sum ds/sense/controls/controls\\.ds$/": {
+      "approve": true,
+      "matchCommandLine": true
+    }
   }
 }

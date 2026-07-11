@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Selfish bait — entry</title>
+  <style>
+    :root {
+      --surface: rgba(3, 24, 61, .82);
+      --ink: #f5fbff;
+      --muted: #b9d7e8;
+      --quiet: #86b6cd;
+      --stroke: rgba(203, 237, 255, .09);
+      --accent: #a4e7f6;
+      --focus: #d3f6ff;
+    }
+    * { box-sizing: border-box; }
+    html, body { min-width: 320px; min-height: 100%; margin: 0; }
+    body { background: #03163d; color: var(--ink); font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .screen { position: relative; min-height: 100vh; overflow: hidden; isolation: isolate; background: url("./assets/start.png") center / cover no-repeat; }
+    .screen::before { position: absolute; z-index: -1; inset: 0; content: ""; background: linear-gradient(90deg, rgba(0, 12, 39, .72) 0%, rgba(0, 18, 52, .34) 38%, rgba(0, 11, 37, .04) 66%), linear-gradient(180deg, rgba(0, 13, 38, .12), rgba(0, 9, 31, .42)); }
+    .screen::after { position: absolute; z-index: -1; inset: 0; content: ""; background: radial-gradient(ellipse at 50% 12%, rgba(146, 232, 255, .12), transparent 34%); }
+    .entry { width: min(1240px, calc(100vw - 72px)); min-height: 100vh; margin: 0 auto; display: flex; align-items: center; }
+    .sheet { position: relative; width: min(420px, 100%); padding: 34px; overflow: hidden; border: 1px solid var(--stroke); border-radius: 20px; background: linear-gradient(145deg, rgba(9, 54, 111, .78), var(--surface)); box-shadow: 0 24px 70px rgba(0, 4, 23, .44), inset 0 1px 0 rgba(255, 255, 255, .09); backdrop-filter: blur(14px); }
+    .corner-decoration { position: absolute; top: -48px; right: -74px; width: 222px; height: 315px; opacity: .72; pointer-events: none; }
+    .sheet > :not(.corner-decoration) { position: relative; z-index: 1; }
+    .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 43px; }
+    .brand img { width: 48px; height: 48px; object-fit: contain; filter: drop-shadow(0 5px 9px rgba(0, 6, 29, .45)); }
+    .brand strong { display: block; font-size: 22px; font-weight: 760; letter-spacing: -.045em; line-height: .84; }
+    .brand span { display: block; margin-top: 7px; color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+    .intro { margin-bottom: 29px; }
+    .intro p { margin: 0 0 9px; color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; }
+    h1 { max-width: 310px; margin: 0; font-size: 32px; font-weight: 680; letter-spacing: -.045em; line-height: 1.1; }
+    .intro small { display: block; max-width: 300px; margin-top: 12px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+    .field-label { display: block; margin-bottom: 8px; color: var(--ink); font-size: 13px; font-weight: 620; }
+    .name { width: 100%; height: 50px; margin-bottom: 23px; padding: 0 14px; border: 1px solid rgba(204, 240, 255, .39); border-radius: 10px; outline: none; background: rgba(1, 18, 53, .45); color: var(--ink); font: 500 16px/1 inherit; }
+    .name:focus { border-color: var(--focus); box-shadow: 0 0 0 3px rgba(186, 242, 255, .17); }
+    .fish { display: flex; align-items: center; gap: 13px; margin: 0 0 23px; padding: 12px; border: 1px solid rgba(203, 237, 255, .17); border-radius: 12px; background: rgba(2, 21, 57, .28); }
+    .fish-preview { display: grid; width: 54px; height: 54px; place-items: center; border-radius: 9px; background: linear-gradient(145deg, #61cbeb, #2662bb); }
+    .fish-preview img { width: 47px; color: white; filter: brightness(0) invert(1) drop-shadow(0 4px 4px rgba(0, 13, 44, .35)); transform: scaleX(-1); }
+    .fish-copy { flex: 1; min-width: 0; }.fish-copy b { display: block; margin-bottom: 4px; font-size: 13px; font-weight: 650; }.fish-copy span { color: var(--muted); font-size: 12px; }
+    .colour-picker { width: 48px; height: 34px; padding: 3px; border: 1px solid rgba(213, 247, 255, .55); border-radius: 8px; background: rgba(1, 18, 53, .35); cursor: pointer; }.colour-picker::-webkit-color-swatch-wrapper { padding: 0; }.colour-picker::-webkit-color-swatch { border: 0; border-radius: 4px; }.colour-picker::-moz-color-swatch { border: 0; border-radius: 4px; }
+    .tier-label { display: block; margin-bottom: 8px; color: var(--ink); font-size: 13px; font-weight: 620; }
+    .tiers { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 25px; }
+    .tier { min-height: 76px; padding: 12px; border: 1px solid rgba(203, 237, 255, .2); border-radius: 11px; background: rgba(1, 20, 57, .24); }
+    .tier.selected { border-color: #8ce8fb; background: rgba(81, 179, 213, .14); box-shadow: inset 0 0 0 1px rgba(156, 233, 251, .12); }
+    .tier strong { display: block; margin-bottom: 5px; font-size: 13px; font-weight: 660; }.tier small { display: block; color: var(--muted); font-size: 11px; line-height: 1.35; }
+    button { width: 100%; min-height: 52px; border: 0; border-radius: 10px; background: var(--accent); color: #062653; cursor: pointer; font: 720 15px/1 inherit; box-shadow: 0 8px 20px rgba(0, 11, 45, .28), inset 0 1px 0 rgba(255, 255, 255, .66); }
+    button:focus-visible { outline: 3px solid white; outline-offset: 3px; }.note { margin: 13px 0 0; color: var(--quiet); font-size: 11px; line-height: 1.4; text-align: center; }
+    .caption { position: absolute; right: 7%; bottom: 8%; color: rgba(232, 249, 255, .72); font-size: 13px; line-height: 1.55; text-align: right; }.caption b { display: block; margin-bottom: 4px; color: #cff6ff; font-size: 10px; letter-spacing: .16em; text-transform: uppercase; }
+    @media (max-width: 720px) { .entry { width: min(460px, calc(100vw - 32px)); align-items: flex-start; padding: 28px 0; }.sheet { padding: 27px 23px; }.caption { display: none; } }
+  </style>
+</head>
+<body>
+  <main class="screen">
+    <div class="entry">
+      <section class="sheet" aria-label="Вход в океан"><img class="corner-decoration" src="./assets/join-corner-decoration.svg" alt="">
+        <header class="brand"><img src="./src/selfish-bait.svg" alt=""><div><strong>Selfish<br>bait</strong><span>Fish death race</span></div></header>
+        <div class="intro"><p>Enter the food chain</p><h1>Eat. Grow. Survive.</h1><small>Choose your fish and join a race where every bite counts.</small></div>
+        <label class="field-label" for="name">Fish name</label><input class="name" id="name" value="fish-277">
+        <section class="fish" aria-label="Selected fish colour"><div class="fish-preview"><img src="./assets/fish2.svg" alt=""></div><div class="fish-copy"><b>Fish colour</b><span>Choose any colour</span></div><input class="colour-picker" type="color" value="#72d9ef" aria-label="Choose fish colour"></section>
+        <span class="tier-label">Entry mode</span><div class="tiers"><article class="tier selected"><strong>Free</strong><small>Any fish larger than you can eat you.</small></article><article class="tier"><strong>Paid</strong><small>Only larger fish controlled by other players can eat you.</small></article></div>
+        <button type="button">Dive in</button><p class="note">You can change these settings before your next race.</p>
+      </section>
+      <aside class="caption"><b>Fish death race</b>Свет сверху. Глубина — впереди.</aside>
+    </div>
+  </main>
+</body>
+</html>

@@ -30,6 +30,13 @@ const joinPanel = document.getElementById('join');
 const joinForm = document.getElementById('join-form');
 const joinName = document.getElementById('join-name');
 const joinColor = document.getElementById('join-color');
+const joinFishPreview = document.querySelector('.join-fish-preview object');
+const joinCornerDecoration = document.querySelector('.join-corner-decoration');
+const joinLogo = document.querySelector('.join-bait object');
+const JOIN_LOGO_LIVELINESS = {
+    rotationDeg: 3.4,
+    timingScale: 0.5,
+};
 const joinTier = document.getElementById('join-tier');
 const leaveButton = document.getElementById('leave-game');
 const gameMenuToggle = document.getElementById('game-menu-toggle');
@@ -159,6 +166,11 @@ window.addEventListener('resize', resize);
 
 if( joinName ) joinName.value = `fish-${Math.floor(Math.random() * 900 + 100)}`;
 if( joinColor ) joinColor.value = `#${Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0')}`;
+syncJoinFishPreview(); // @ds:277a51d7
+if( joinColor ) joinColor.addEventListener('input', syncJoinFishPreview);
+if( joinFishPreview ) joinFishPreview.addEventListener('load', syncJoinFishPreview);
+if( joinCornerDecoration ) joinCornerDecoration.addEventListener('load', animateJoinCornerDecoration);
+if( joinLogo ) joinLogo.addEventListener('load', animateJoinLogo);
 setJoinedUiState(false);
 if( joinForm ){
     joinForm.addEventListener('submit', e =>{
@@ -170,6 +182,73 @@ if( joinForm ){
         });
         setJoinedUiState(false, { sessionReady: true });
     });
+}
+
+function syncJoinFishPreview(){
+    if( !joinColor || !joinFishPreview ) return;
+    joinColor.style.setProperty('--join-swatch-ring', swatchRingFor(joinColor.value));
+    joinColor.closest('.join-colour-swatch')?.style.setProperty('--join-swatch-color', joinColor.value);
+    const fishSvg = joinFishPreview.contentDocument?.documentElement;
+    if( !fishSvg ) return;
+    fishSvg.style.color = joinColor.value;
+    if( fishSvg.querySelector('#join-preview-cruise-motion') ) return;
+    const motionStyle = fishSvg.ownerDocument.createElementNS('http://www.w3.org/2000/svg', 'style');
+    motionStyle.id = 'join-preview-cruise-motion';
+    motionStyle.textContent = `
+        @keyframes joinPreviewTail { 0%, 100% { transform: rotate(-3.5deg); } 50% { transform: rotate(3.5deg); } }
+        @keyframes joinPreviewBottomFin { 0%, 100% { transform: skewX(-4deg) scaleY(.98); } 50% { transform: skewX(4deg) scaleY(1.04); } }
+        @keyframes joinPreviewSmallFin { 0%, 100% { transform: skewX(-2deg) scaleY(.98); } 50% { transform: skewX(2deg) scaleY(1.05); } }
+        @keyframes joinPreviewTopFin { 0%, 100% { transform: skewX(3deg) scaleY(1.01); } 50% { transform: skewX(-3deg) scaleY(.99); } }
+        #fin_back { transform-box: fill-box; transform-origin: 0% 50%; animation: joinPreviewTail 1.396s ease-in-out infinite; }
+        #fin_bottom { transform-box: fill-box; transform-origin: 50% 0%; animation: joinPreviewBottomFin 1.396s ease-in-out infinite; }
+        #fin_bottom_small { transform-box: fill-box; transform-origin: 50% 0%; animation: joinPreviewSmallFin 1.396s ease-in-out infinite; }
+        #fin_bottom_top { transform-box: fill-box; transform-origin: 50% 100%; animation: joinPreviewTopFin 1.396s ease-in-out infinite; }
+    `;
+    fishSvg.append(motionStyle);
+}
+
+function animateJoinCornerDecoration(){
+    const decorationSvg = joinCornerDecoration?.contentDocument?.documentElement;
+    if( !decorationSvg || decorationSvg.querySelector('#join-decoration-motion') ) return;
+    const motionStyle = decorationSvg.ownerDocument.createElementNS('http://www.w3.org/2000/svg', 'style');
+    motionStyle.id = 'join-decoration-motion';
+    motionStyle.textContent = `
+        @keyframes joinDecorationLayerOne { from { transform: rotate(-1.8deg); } to { transform: rotate(1.8deg); } }
+        @keyframes joinDecorationLayerTwo { from { transform: rotate(1.25deg); } to { transform: rotate(-1.25deg); } }
+        path:nth-of-type(1) { transform-box: view-box; transform-origin: 50% 50%; animation: joinDecorationLayerOne 5.2s ease-in-out infinite alternate; }
+        path:nth-of-type(2) { transform-box: view-box; transform-origin: 50% 50%; animation: joinDecorationLayerTwo 6.4s ease-in-out infinite alternate; }
+    `;
+    decorationSvg.append(motionStyle);
+}
+
+function animateJoinLogo(){
+    const logoSvg = joinLogo?.contentDocument?.documentElement;
+    if( !logoSvg || logoSvg.querySelector('#join-logo-motion') ) return;
+    const motionStyle = logoSvg.ownerDocument.createElementNS('http://www.w3.org/2000/svg', 'style');
+    motionStyle.id = 'join-logo-motion';
+    const { rotationDeg, timingScale } = JOIN_LOGO_LIVELINESS;
+    const duration = seconds => `${(seconds * timingScale).toFixed(2)}s`;
+    const turn = factor => `${(rotationDeg * factor).toFixed(2)}deg`;
+    motionStyle.textContent = `
+        @keyframes joinLogoLayerOne { from { transform: rotate(-${turn(1)}); } to { transform: rotate(${turn(1)}); } }
+        @keyframes joinLogoLayerTwo { from { transform: rotate(${turn(.74)}); } to { transform: rotate(-${turn(.74)}); } }
+        @keyframes joinLogoLayerThree { from { transform: rotate(-${turn(.85)}); } to { transform: rotate(${turn(.85)}); } }
+        @keyframes joinLogoLayerFour { from { transform: rotate(${turn(.65)}); } to { transform: rotate(-${turn(.65)}); } }
+        @keyframes joinLogoLayerFive { from { transform: rotate(-${turn(.76)}); } to { transform: rotate(${turn(.76)}); } }
+        path { transform-box: view-box; transform-origin: 39px 39px; animation-timing-function: ease-in-out; animation-iteration-count: infinite; animation-direction: alternate; }
+        path:nth-of-type(1) { animation-name: joinLogoLayerOne; animation-duration: ${duration(5.4)}; }
+        path:nth-of-type(2) { animation-name: joinLogoLayerTwo; animation-duration: ${duration(6.2)}; }
+        path:nth-of-type(3) { animation-name: joinLogoLayerThree; animation-duration: ${duration(7.1)}; }
+        path:nth-of-type(4) { animation-name: joinLogoLayerFour; animation-duration: ${duration(5.8)}; }
+        path:nth-of-type(5) { animation-name: joinLogoLayerFive; animation-duration: ${duration(6.7)}; }
+    `;
+    logoSvg.append(motionStyle);
+}
+
+function swatchRingFor(color){
+    const channel = offset => parseInt(color.slice(offset, offset + 2), 16) / 255;
+    const luminance = 0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5);
+    return luminance < 0.42 ? 'rgba(229, 244, 255, 0.92)' : 'rgba(2, 22, 53, 0.82)';
 }
 if( leaveButton ){
     leaveButton.addEventListener('click', handleLeaveGameButton);

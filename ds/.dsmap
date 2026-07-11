@@ -1,4 +1,4 @@
-ds/sense/controls/controls.ds#56571d82 - 323e0d97
+ds/sense/controls/controls.ds#2b0c2c4d - 323e0d97
 ds/sense/controls/controls.ia#ea72de17 - 3ab6da12
 ds/fix/background.fix#0778747e - 8bccf725
 ds/sense/fish/fish.ds#785684de - 0e1af7e8
@@ -27,6 +27,7 @@ ds:controls.inspect-click - 2e1570ed 323e0d97
 ds:controls.initial-mode - c2aeb63a 323e0d97
 ds:controls.joystick-current-burst-indicator - e41821af 323e0d97
 ds:controls.join-after-leave - 9772e9ac 323e0d97
+ds:controls.join-presentation - 277a51d7 323e0d97
 ds:controls.join-world - 34ba255b 323e0d97
 ds:controls.keys - 10baf178 323e0d97
 ds:controls.leave-game - fb11044e 323e0d97
