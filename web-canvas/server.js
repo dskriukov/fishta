@@ -236,6 +236,7 @@ function tick(){
     stepAuthoritativeWorld({ world }, inputsByClient, 1 / SERVER.tickRate, Math.random);
 }
 
+// @ds:e559831a @ds:2afd71a0
 function broadcastWorldSync(){
     const absolute = syncMessageCount % 20 === 0;
     const encoded = encodeWorldSync(world, lastWorldSyncState, absolute);

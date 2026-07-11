@@ -5,3 +5,5 @@ rationale_notes:
   - "The server broadcasts one shared world state stream to all clients; per-client messages are limited to identity and short events."
   - "Idle clients send periodic ping rather than repeating zero control messages."
   - "The idle ping period is one second; adding a faster unchanged-input heartbeat violates the protocol even if changed control messages remain immediate."
+  - "Shred rows remain present for every live shred so row omission keeps its existing immediate deletion meaning; only static shred fields are omitted from delta rows after the client has received a full row."
+  - "The current global stream is serialized once and fanned out unchanged. Future viewport delivery should cache shared spatial fragments rather than simulate or serialize separate worlds for clients."

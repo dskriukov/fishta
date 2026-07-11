@@ -77,7 +77,9 @@ contract_map:
   wsProtocol.clientDeltaInput:               client-net.js#sendInput  # @ds:671e9773
   wsProtocol.handshakeState:                 client-net.js#connect server.js#handleMessage  # @ds:4fad33f8
   wsProtocol.serverSync:                     protocol.js#encodeWorldSync protocol.js#applyWorldSync  # @ds:682570c7
+  wsProtocol.sharedWorldSnapshot:            server.js#broadcastWorldSync protocol.js#encodeWorldSync  # @ds:2afd71a0
   wsProtocol.fishRow:                        protocol.js#encodeFishRow protocol.js#parseFishRow  # @ds:ea18a088 @ds:2e91f6d4
+  wsProtocol.shredRow:                       protocol.js#encodeShredRow protocol.js#encodeShredDeltaRow protocol.js#parseShredRow protocol.js#applyWorldSync  # @ds:9f50b1be
   wsProtocol.stateMods:                      protocol.js#stateMods  # @ds:f51a5030
   wsProtocol.removedFishRows:                 protocol.js#encodeRemovedFishRow protocol.js#applyWorldSync  # @ds:f51a5030 @ds:a16328a6
   wsProtocol.events:                         protocol.js#encodeEvent protocol.js#parseEvent  # @ds:a16328a6
@@ -137,7 +139,7 @@ contract_map:
   shred.drift:                               shred.js#advanceShreds  # @ds:8b62d9ce @ds:ed2b4f19 @ds:d3187816 @ds:31a8f5c2
   shred.decayRefresh:                        shred.js#refreshShredDecay predation.js#collectFeedingCandidates predation.js#refreshCandidate predation.js#processFeedingBatch  # @ds:fb0f32c4
   shred.eating:                              shred.js#canEatShred shred.js#shredCandidateNutrition shred.js#consumeShredLayer  # @ds:c14f7a08 @ds:9e4c1b7a @ds:b6f08d21 @ds:4d7c2e93 @ds:f0a6c5d8 @ds:d867989f @ds:98224ab9 @ds:fb0f32c4
-  shred.protocol:                            protocol.js#encodeShredRow protocol.js#parseShredRow protocol.js#encodeWorldSync protocol.js#applyWorldSync  # @ds:ed2b4f19 @ds:682570c7 @ds:d3187816
+  shred.protocol:                            protocol.js#encodeShredRow protocol.js#encodeShredDeltaRow protocol.js#parseShredRow protocol.js#encodeWorldSync protocol.js#applyWorldSync  # @ds:ed2b4f19 @ds:682570c7 @ds:d3187816 @ds:9f50b1be
   shred.render:                              render.js#loadShredGeometry render.js#drawShred  # @ds:6f3a9c20 @ds:73b91e4c @ds:0b8e71d4 @ds:3ad65f20
   shred.mouthCue:                            main.js#updateClientDecorState protocol.js#parseFishRow  # @ds:a2d5936f @ia:0bdc556b
   world.emitBubbles:                        world.js#emitBubble  # @ds:d6cebf86
@@ -704,13 +706,16 @@ implementation_instructions:
     is later rejected during refresh. This keeps any successful or unsuccessful
     feeding interaction from losing already-decayed state while postponing the next
     automatic decay interval.
-    Protocol sync must include shreds in world snapshots via shred rows. Shred
+    Protocol sync must include every live shred in each world snapshot. Shred
     rows are independent from fish rows, so fish tombstone rows keep their current
-    meaning. Add decayAge to the shred row after visualSeed; parse rows without
-    that field as decayAge=0 for compatibility. Client render draws only remaining
-    SVG layers from the published web-canvas/assets/shred.svg runtime copy of
-    the canonical ds/assets/shred.svg asset and treats layer drift as render-only.
-    # @ds:e13d7a52 @ds:7c2f91ad @ds:918d4b63 @ds:d5e7a01c @ds:8b62d9ce @ds:c14f7a08 @ds:9e4c1b7a @ds:b6f08d21 @ds:4d7c2e93 @ds:f0a6c5d8 @ds:a2d5936f @ds:ed2b4f19 @ds:d3187816 @ds:31a8f5c2 @ds:fb0f32c4 @ds:eccfca7e
+    meaning. A full `s` row includes static fields plus decayAge; a dynamic `d`
+    row includes the known shred id, position, motion, decayAge, and `=` or a new
+    layers mask. `applyWorldSync` rebuilds the shred array from all parsed rows of
+    the message, so an omitted id is removed even from a delta message. Client
+    render draws only remaining SVG layers from the published web-canvas/assets/
+    shred.svg runtime copy of the canonical ds/assets/shred.svg asset and treats
+    layer drift as render-only.
+    # @ds:e13d7a52 @ds:7c2f91ad @ds:918d4b63 @ds:d5e7a01c @ds:8b62d9ce @ds:c14f7a08 @ds:9e4c1b7a @ds:b6f08d21 @ds:4d7c2e93 @ds:f0a6c5d8 @ds:a2d5936f @ds:ed2b4f19 @ds:d3187816 @ds:31a8f5c2 @ds:fb0f32c4 @ds:eccfca7e @ds:9f50b1be
   feeding_batch: |
     fish.js#makeFish initializes feedingSuccessFactor=1 and feedingCooldown=0.
     fish.js#advanceFeedingState(fish, dt) runs once per authoritative tick before
@@ -994,17 +999,20 @@ implementation_instructions:
     Implement server message codecs:
       - encodeIdentity(id,token) => i:${id}:${token}
       - encodeEvent(type,data) => e:${type}:${data}
-      - encodeWorldSync(world, previousById, absolute) returns { message, state }.
+      encodeWorldSync(world, previousState, absolute) returns { message, state }.
     encodeWorldSync algorithm:
-      - create nextById from current world.fish snapshots;
-      - emit one encodeFishRow(fish, previousById.get(fish.id), absolute) for each current fish;
-      - when absolute=false, for every id in previousById that is not in nextById, append encodeRemovedFishRow(id);
+        - create next fish and shred snapshot maps from current world state;
+        - emit one encodeFishRow(fish, previousState.fish.get(fish.id), absolute) for each current fish;
+        - when absolute=false, for every id in previousState.fish that is not in the next fish map, append encodeRemovedFishRow(id);
+        - emit a full `s` row for every shred in an absolute message and for a new shred in a delta message; otherwise emit its `d` row;
       - return message prefix 'a|' for absolute and '|' for delta;
-      - return state=nextById for the caller to store as lastWorldSyncState.
+        - return state={ fish, shreds } for the caller to store as lastWorldSyncState.
     Fish row shape:
       ID:TYPE EATEN_OPT:SIZE_ABS:COLOR1_OPT:COLOR2_OPT:NAME_OPT POS_X_OPT:POS_Y_OPT MOVING_ANG:MOVING_SPEED STATE_MODS
-    Shred row shape:
-      sID SIZE:GEOM_AREA:INITIAL_GEOM_AREA:COLOR_HEX:LAYERS_HEX:SEED POS_X:POS_Y MOVING_ANG:MOVING_SPEED
+    Full shred row shape:
+      sID SIZE:GEOM_AREA:INITIAL_GEOM_AREA:COLOR_HEX:LAYERS_HEX:SEED:DECAY_AGE POS_X:POS_Y MOVING_ANG:MOVING_SPEED
+    Dynamic shred row shape:
+      dID POS_X:POS_Y MOVING_ANG:MOVING_SPEED DECAY_AGE:LAYERS_HEX_OR_EQUALS
     encodeFishRow includes shredEatCueCounter as a numeric state mod `sN` only
     when the counter is greater than zero, and parseFishRow preserves the previous
     value when the mod is absent. The value is domain-visible event state for
@@ -1016,9 +1024,14 @@ implementation_instructions:
     encodeFishRow encodes burst fish state as `bN` where N is clamped to 1..99.
     parseFishRow decodes `vN` into fish.speedLevel=N and derives mode from that value; rows with no v mod decode as fish.mode='cruise' and speedLevel=0.
     encodeWorldSync includes one shred row for each current world.shreds item
-    after fish rows. Delta sync may send shreds as absolute shred rows each tick;
-    applyWorldSync replaces world.shreds with the parsed shred rows from the
-    latest message so eaten/exhausted shreds disappear without fish tombstones.
+    after fish rows. For each shred retain a server sync snapshot of static fields,
+    remaining-layers mask, and position-independent id. Full rows are required on
+    absolute messages and when the id was absent from the preceding snapshot;
+    dynamic rows carry the current transform and decayAge, with `=` when the layer
+    mask matches the preceding snapshot. applyWorldSync resolves dynamic rows from
+    its existing shred map, replaces world.shreds with all resolved rows from the
+    latest message, and ignores a dynamic row whose id has no local full baseline
+    until the next absolute snapshot. This keeps omission as immediate deletion.
     parseShredRow must also accept legacy `kID AREA:INITIAL_AREA ...` chunk rows
     during transition and convert them into one-layer neutral shreds.
     encodeRemovedFishRow(id):
@@ -1040,8 +1053,13 @@ implementation_instructions:
       - use the elapsed time since the previous sync and the previous client velocity to predict the client-side current position at receive time;
       - print a compact console table with id, role, previous client position, predicted client position, absolute server position, elapsed ms, error dx/dy, and error distance;
       - skip rows with no previous client position.
-    State mods include a, bN, f, e, sN, gN, and lN. Names use base64url; colors use hex without #; type is u/p/n.
-    State mods are domain/network facts only. Do not add protocol fields or mods for visual-only mouth, teeth, fin, swim phase, burst kick, or mouth hold state.  # @ds:839f8cd0 @ds:5a4d3d6d @ds:671e9773 @ds:4fad33f8 @ds:682570c7 @ds:ea18a088 @ds:f51a5030 @ds:a16328a6
+    `server.js#broadcastWorldSync` calls encodeWorldSync once per sync interval,
+    stores the returned state, and sends the exact resulting message to every open
+    socket. It must not build client-specific object sets or re-encode the world
+    during this global-stream phase. State mods include a, bN, f, e, sN, gN, and
+    lN. Names use base64url; colors use hex without #; type is u/p/n. State mods
+    are domain/network facts only. Do not add protocol fields or mods for visual-
+    only mouth, teeth, fin, swim phase, burst kick, or mouth hold state.  # @ds:839f8cd0 @ds:5a4d3d6d @ds:671e9773 @ds:4fad33f8 @ds:682570c7 @ds:ea18a088 @ds:f51a5030 @ds:a16328a6 @ds:2afd71a0 @ds:9f50b1be
   input_latency: |
     Do not throttle changed input in client-net.js.
     client-net exposes:

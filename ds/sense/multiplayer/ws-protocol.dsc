@@ -92,6 +92,17 @@ server_sync:
     rule: "one shared world string includes all fish for all clients; client finds own fish by ID from identity_message"
     delta_fields: "only changed OPT fields are transmitted; unchanged OPT fields are ="
 
+shared_world_snapshot:
+  from: ds:ws-protocol.shared-world-snapshot
+  authoritative_world_step_hz_min: 10
+  current_delivery:
+    scope: all_live_fish_and_shreds
+    serialization: one_shared_message_per_sync
+    fanout: "send the already serialized message to every connected client"
+    per_client_object_serialization: false
+  future_spatial_delivery:
+    rule: "cached world fragments may replace global fanout by viewport subscription without duplicating authoritative world calculation"
+
 fish_row:
   from: ds:ws-protocol.fish-row
   format: "ID:TYPE EATEN_OPT:SIZE_ABS:COLOR1_OPT:COLOR2_OPT:NAME_OPT POS_X_OPT:POS_Y_OPT MOVING_ANG:MOVING_SPEED STATE_MODS"
@@ -118,6 +129,23 @@ fish_row:
     format: "hex RGB without #"
   name:
     format: base64url
+
+shred_row:
+  from: ds:ws-protocol.shred-row
+  lifecycle:
+    every_sync_contains: every_live_shred
+    omission: "removes shred from client cache"
+  full:
+    marker: s
+    trigger: [absolute_world_message, first_shred_appearance]
+    fields: [id, size, geometric_area, initial_geometric_area, source_color, remaining_layers, visual_seed, decay_age, position, motion]
+  dynamic:
+    marker: d
+    trigger: "known shred in a delta world message"
+    fields: [id, position, motion, decay_age, remaining_layers_when_changed]
+    preserved_client_fields: [size, geometric_area, initial_geometric_area, source_color, visual_seed]
+  recovery:
+    rule: "absolute world messages rebuild the complete client shred cache without prior delta state"
 
 state_mods:
   from: ds:ws-protocol.state-mods

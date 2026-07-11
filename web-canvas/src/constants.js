@@ -14,7 +14,7 @@ export const WORLD = {
     initialViewportScale: 1.5, // @ds:19c14fea
     resizeHysteresisUsers: 1,  // @ds:19c14fea
     npcDensity: 0.00002,    // @ds:53db39eb 0.000006
-    maxControlledObjects: 900, // @ds:eccfca7e
+    maxControlledObjects: 200, // @ds:eccfca7e
     oldAgeSuspendFillRatio: 0.9, // @ds:d140effd
     densitySamples: 18,      // @ds:53db39eb
 };

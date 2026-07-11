@@ -80,7 +80,7 @@ body::after {
     background-repeat: repeat;
     background-size: var(--world-mist-far-scale);
     filter: blur(16px);
-    opacity: 0.42;
+    opacity: 0.2;
 }
 
 #world-mist-near {
@@ -94,8 +94,8 @@ body::after {
         var(--world-mist-near-x) var(--world-mist-near-y);
     background-repeat: repeat;
     background-size: var(--world-mist-near-scale);
-    filter: blur(22px);
-    opacity: 0.34;
+    /* filter: blur(22px); */
+    opacity: 0.2;
 }
 
 #game {

@@ -1,6 +1,6 @@
 // imp/web-canvas/src/protocol.js
 // Compact WebSocket string protocol.
-// @ds:839f8cd0 @ds:5a4d3d6d @ds:671e9773 @ds:e6be3c03 @ds:4fad33f8 @ds:682570c7 @ds:ea18a088 @ds:f51a5030 @ds:a16328a6 @ds:ed2b4f19 @ds:a2d5936f @ds:2e91f6d4
+// @ds:839f8cd0 @ds:5a4d3d6d @ds:671e9773 @ds:e6be3c03 @ds:4fad33f8 @ds:682570c7 @ds:ea18a088 @ds:f51a5030 @ds:a16328a6 @ds:ed2b4f19 @ds:a2d5936f @ds:2e91f6d4 @ds:2afd71a0 @ds:9f50b1be
 
 import { FISH, REGIME, SHRED } from './constants.js';
 
@@ -93,34 +93,49 @@ export function encodeWorldSize(world){
     return encodeEvent('w', `${round(world.width, 0)}:${round(world.height, 0)}`);
 }
 
-export function encodeWorldSync(world, previousById = new Map(), absolute = false){
-    const nextById = new Map();
+// @ds:682570c7 @ds:2afd71a0 @ds:9f50b1be
+export function encodeWorldSync(world, previousState = new Map(), absolute = false){
+    const previousFishById = previousState?.fish || (previousState instanceof Map ? previousState : new Map());
+    const previousShredsById = previousState?.shreds || new Map();
+    const nextFishById = new Map();
+    const nextShredsById = new Map();
     const rows = [];
     for( const fish of world.fish || [] ){
-        const previous = absolute ? null : previousById.get(fish.id);
+        const previous = absolute ? null : previousFishById.get(fish.id);
         rows.push(encodeFishRow(fish, previous, absolute));
-        nextById.set(fish.id, fishSnapshot(fish));
+        nextFishById.set(fish.id, fishSnapshot(fish));
     }
     for( const shred of world.shreds || [] ){
-        rows.push(encodeShredRow(shred));
+        const previous = absolute ? null : previousShredsById.get(shred.id);
+        rows.push(previous ? encodeShredDeltaRow(shred, previous) : encodeShredRow(shred));
+        nextShredsById.set(shred.id, shredSnapshot(shred));
     }
     if( !absolute ){
-        for( const id of previousById.keys() ){
-            if( !nextById.has(id) ) rows.push(encodeRemovedFishRow(id));
+        for( const id of previousFishById.keys() ){
+            if( !nextFishById.has(id) ) rows.push(encodeRemovedFishRow(id));
         }
     }
     return {
         message: `${absolute ? 'a|' : '|'}${rows.join('|')}`,
-        state: nextById,
+        state: { fish: nextFishById, shreds: nextShredsById },
     };
 }
 
-// @ds:ed2b4f19 @ds:d3187816
+// @ds:ed2b4f19 @ds:d3187816 @ds:9f50b1be
 export function encodeShredRow(shred){
     const angle = movingAngle(shred);
     const speed = Math.hypot(shred.vel?.x || 0, shred.vel?.y || 0);
     const layersHex = encodeLayers(shred.remainingLayers);
     return `s${shred.id} ${fixed(shred.size, 3)}:${fixed(shred.geometricArea, 3)}:${fixed(shred.initialGeometricArea ?? shred.geometricArea, 3)}:${normalizeHex(shred.sourceColor || 'd6b84f')}:${layersHex}:${fixed(shred.visualSeed || 0, 3)}:${fixed(shred.decayAge || 0, 3)} ${fixed(shred.pos.x, 5)}:${fixed(shred.pos.y, 5)} ${fixed(angle, 5)}:${fixed(speed, 2)}`;
+}
+
+// @ds:ed2b4f19 @ds:d3187816 @ds:9f50b1be
+export function encodeShredDeltaRow(shred, previous){
+    const angle = movingAngle(shred);
+    const speed = Math.hypot(shred.vel?.x || 0, shred.vel?.y || 0);
+    const layersHex = encodeLayers(shred.remainingLayers);
+    const layers = layersHex === previous.layersHex ? '=' : layersHex;
+    return `d${shred.id} ${fixed(shred.pos.x, 5)}:${fixed(shred.pos.y, 5)} ${fixed(angle, 5)}:${fixed(speed, 2)} ${fixed(shred.decayAge || 0, 3)}:${layers}`;
 }
 
 // @ds:f51a5030 @ds:a16328a6
@@ -144,6 +159,7 @@ export function encodeFishRow(fish, previous = null, absolute = false){
     return `${fish.id}:${type} ${eaten}:${size}:${color1}:${color2}:${name} ${posX}:${posY} ${fixed(angle, 5)}:${fixed(speed, 2)} ${state}`;
 }
 
+// @ds:682570c7 @ds:9f50b1be
 export function applyWorldSync(world, message){
     const text = String(message || '');
     const absolute = text.startsWith('a|');
@@ -151,12 +167,13 @@ export function applyWorldSync(world, message){
     const byId = new Map((world.fish || []).map(fish => [fish.id, fish]));
     const seen = new Set();
     const nextFish = absolute ? [] : [...(world.fish || [])];
+    const shredById = new Map((world.shreds || []).map(shred => [shred.id, shred]));
     const nextShreds = [];
     const syncDiagnostics = { absolute, fish: [] };
 
     for( const row of rows ){
-        if( row[0] === 's' || row[0] === 'k' ){
-            const shred = parseShredRow(row);
+        if( row[0] === 's' || row[0] === 'd' || row[0] === 'k' ){
+            const shred = parseShredRow(row, shredById);
             if( shred ) nextShreds.push(shred);
             continue;
         }
@@ -195,8 +212,9 @@ export function applyWorldSync(world, message){
     return syncDiagnostics;
 }
 
-// @ds:ed2b4f19 @ds:d3187816
-export function parseShredRow(row){
+// @ds:ed2b4f19 @ds:d3187816 @ds:9f50b1be
+export function parseShredRow(row, byId = new Map()){
+    if( String(row).startsWith('d') ) return parseShredDeltaRow(row, byId);
     const [idText, sizeText, pos, motion] = String(row).split(' ');
     if( !idText || !sizeText || !pos || !motion ) return null;
     const [xText, yText] = pos.split(':');
@@ -224,6 +242,29 @@ export function parseShredRow(row){
         remainingLayers: decodeLayers(layersText),
         visualSeed: Number(seedText) || 0,
         decayAge: Number(decayAgeText) || 0,
+    };
+}
+
+// @ds:ed2b4f19 @ds:d3187816 @ds:9f50b1be
+function parseShredDeltaRow(row, byId){
+    const [idText, pos, motion, state] = String(row).split(' ');
+    const id = Number(idText.slice(1));
+    const previous = byId.get(id);
+    if( !Number.isFinite(id) || !previous || !pos || !motion || !state ) return null;
+    const [xText, yText] = pos.split(':');
+    const [angleText, speedText] = motion.split(':');
+    const [decayAgeText, layersText] = state.split(':');
+    const angle = Number(angleText) || 0;
+    const speed = Number(speedText) || 0;
+    return {
+        ...previous,
+        pos: { x: Number(xText) || 0, y: Number(yText) || 0 },
+        vel: {
+            x: Math.cos(angle * Math.PI / 180) * speed,
+            y: Math.sin(angle * Math.PI / 180) * speed,
+        },
+        decayAge: Number(decayAgeText) || 0,
+        remainingLayers: layersText === '=' ? previous.remainingLayers : decodeLayers(layersText),
     };
 }
 
@@ -317,6 +358,13 @@ function fishSnapshot(fish){
         color1: colorOf(fish),
         color2: color2Of(fish),
         name: fish.ownerKind === 'user' ? encodeName(fish.userName || '') : '',
+    };
+}
+
+function shredSnapshot(shred){
+    return {
+        id: shred.id,
+        layersHex: encodeLayers(shred.remainingLayers),
     };
 }
 
