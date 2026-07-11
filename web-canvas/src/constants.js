@@ -9,8 +9,8 @@ export const WORLD = {
     // size set at runtime to canvas size — world.air#ia:5a6b7c8d, ds:b28b7af6 ds:c83f4c1e
     drag: 1.6,              // linear damping per second — world.air#ia:1c2d3e4f, ds:ca07d970
     sizeDrag: 0.18,         // @ds:ca07d970 @ds:8869f043
-    initialWidth: 2800,      // @ds:19c14fea
-    initialHeight: 2800,     // @ds:19c14fea
+    initialWidth: 1000,      // @ds:19c14fea
+    initialHeight: 1000,     // @ds:19c14fea
     initialViewportScale: 1.5, // @ds:19c14fea
     resizeHysteresisUsers: 1,  // @ds:19c14fea
     npcDensity: 0.00002,    // @ds:53db39eb 0.000006
