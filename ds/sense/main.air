@@ -32,6 +32,12 @@ accepted_interpretations:
   - decision: "Debug mode is a client-owned render overlay, not a simulation or protocol mode."
     confidence: high
     rationale: "The requested world bounds and coordinate traces are visual diagnostics for server/client drift and must not affect authoritative gameplay."
+  - decision: "The world map is a separate client-owned overlay and must not be coupled to Debug activation."
+    confidence: high
+    rationale: "The map is a player-facing spatial overview, while Debug is reserved for coordinate traces and diagnostics."
+  - decision: "Map fish marks use fixed player markers and size-relative NPC markers with a 2px minimum."
+    confidence: high
+    rationale: "Player identity remains readable at fixed 3px/5px point diameters, while NPC scale communicates relative fish size within the current map without making small fish hard to see."
 
 architectural_assumptions:
   - "Server owns authoritative world step; client render/prediction remains separate." # ia:web-canvas.ecs-arch

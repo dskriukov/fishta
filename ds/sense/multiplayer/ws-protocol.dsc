@@ -66,11 +66,11 @@ handshake:
   client_ready:
     requires:
       - "i:${ID}:${token}"
-      - "first absolute a|... world state"
+      - "first absolute fragment containing the current user's fish"
     mark: "server setup data received"
   delta_exchange:
     allowed_after: [server_ready, client_ready]
-    rule: "before setup is complete, endpoint must not treat the connection as fully synchronized for delta exchange"
+    rule: "before setup is complete, endpoint must not treat the connection as fully synchronized for relative fragments"
 
 server_sync:
   from: ds:ws-protocol.server-sync
@@ -81,27 +81,71 @@ server_sync:
       token: "temporary reconnect token for future r:${token}"
   world_messages:
     absolute:
-      prefix: "a|"
-      trigger:
-        - "after setup"
-        - "every 20 server state messages"
-    delta:
-      prefix: "|"
-      trigger: "ordinary server state message between absolute baselines"
-    audience: all_clients
-    rule: "one shared world string includes all fish for all clients; client finds own fish by ID from identity_message"
-    delta_fields: "only changed OPT fields are transmitted; unchanged OPT fields are ="
+      format: "a:N:CELL_X:CELL_Y|ROWS"
+      position: "cell-local world coordinates"
+    relative:
+      format: "|N:CELL_X:CELL_Y|ROWS"
+      position: "deltas from immediately preceding server cycle"
+    cycle:
+      field: N
+      rule: "strictly increases and never repeats or decreases within one socket connection"
+      global_absolute_period: 20
+      global_absolute_rule: "every twentieth cycle sends every delivered non-empty cell from the absolute row set regardless of distance"
+    fragment:
+      fields: [N, CELL_X, CELL_Y, ROWS]
+      row_separator: "|"
+      rule: "every fragment has a cycle and cell header; the protocol intentionally has no legacy global snapshot compatibility"
+
+spatial_fragments:
+  from: ds:ws-protocol.spatial-fragments
+  cell_size_wu: { width: 100, height: 100 }
+  membership: "cell containing the object position center"
+  object_kinds: [fish, shred]
+  source_sets:
+    absolute: "one shared serialized row set per completed server cycle"
+    relative: "one shared serialized row set per completed server cycle"
+  indexing:
+    rule: "record start and end row indices in both shared sets for every non-empty cell"
+    empty_cells: "not indexed and never queued or sent"
+  delivery:
+    anchor: "current user's fish cell"
+    order: "increasing toroidal distance from the current user's fish"
+    ordinary_cycle_absolute_cells: "four nearest non-empty cells; the user fish cell is first"
+    ordinary_cycle_relative_cells: "all other non-empty cells in the same order"
+    twentieth_cycle_absolute_cells: "all non-empty cells"
+  queue_reset:
+    trigger: "next completed server cycle exists before the client's current queue is fully sent"
+    action: "drop the remaining queue and start the newer N from its nearest cells"
+    reset_message: none
+    detection: "client sees a greater N"
+
+cell_local_position:
+  from: ds:ws-protocol.cell-local-position
+  absolute_decode:
+    x: "CELL_X * 100 + localX"
+    y: "CELL_Y * 100 + localY"
+  relative_decode:
+    rule: "add the row delta to the same object's state from the immediately preceding server cycle"
+
+new_object_row:
+  from: ds:ws-protocol.new-object-row
+  marker: n
+  placement: "immediately before the object's existing identifier token"
+  duration_cycles: 10
+  payload: "full absolute object state with cell-local position"
+  fragment_override: "row remains absolute even inside a relative fragment"
+  client_rule: "create object or restore an absolute baseline without predecessor state"
+  separate_creation_message: false
 
 shared_world_snapshot:
   from: ds:ws-protocol.shared-world-snapshot
   authoritative_world_step_hz_min: 10
-  current_delivery:
+  prepared_cycle:
     scope: all_live_fish_and_shreds
-    serialization: one_shared_message_per_sync
-    fanout: "send the already serialized message to every connected client"
+    serialization: "one shared absolute row set and one shared relative row set"
+    grouping: "non-empty cells with row index ranges"
     per_client_object_serialization: false
-  future_spatial_delivery:
-    rule: "cached world fragments may replace global fanout by viewport subscription without duplicating authoritative world calculation"
+    per_client_delivery: "only chooses and sends ranges from the shared prepared sets"
 
 fish_row:
   from: ds:ws-protocol.fish-row
@@ -120,8 +164,8 @@ fish_row:
     delta_rule: "absolute value when changed; = when unchanged"
   position:
     precision: 5
-    absolute_message: "absolute coordinates"
-    delta_message: "coordinate deltas"
+    absolute_message: "coordinates local to the fragment cell"
+    relative_message: "coordinate deltas from preceding server cycle"
   motion:
     angle_precision: 5
     speed_precision: 2
@@ -133,19 +177,16 @@ fish_row:
 shred_row:
   from: ds:ws-protocol.shred-row
   lifecycle:
-    every_sync_contains: every_live_shred
-    omission: "removes shred from client cache"
+    omission: "does not imply removal"
   full:
     marker: s
-    trigger: [absolute_world_message, first_shred_appearance]
-    fields: [id, size, geometric_area, initial_geometric_area, source_color, remaining_layers, visual_seed, decay_age, position, motion]
+    trigger: [absolute_fragment, first_shred_appearance]
+    fields: [id, size, geometric_area, initial_geometric_area, source_color, remaining_layers, visual_seed, decay_age, cell_local_position, motion]
   dynamic:
     marker: d
-    trigger: "known shred in a delta world message"
-    fields: [id, position, motion, decay_age, remaining_layers_when_changed]
+    trigger: "synchronized shred in a relative fragment"
+    fields: [id, position_delta, motion, decay_age, remaining_layers_when_changed]
     preserved_client_fields: [size, geometric_area, initial_geometric_area, source_color, visual_seed]
-  recovery:
-    rule: "absolute world messages rebuild the complete client shred cache without prior delta state"
 
 state_mods:
   from: ds:ws-protocol.state-mods
@@ -153,11 +194,51 @@ state_mods:
     a: "fish is under threat / can be attacked"
     v1..v99: "current relative speed level"
     f: "fear mode"
-    e: "fish is eaten"
   combinations:
     threat_with_speed_level: "fish moves while also under threat"
-  eaten_lifecycle:
-    rule: "after sending e, server removes the fish from the world and does not send that ID in following sync messages"
+
+object_removal:
+  from: ds:ws-protocol.object-removal
+  format: "x:${TRANSPORT_ID}"
+  transport_id:
+    fish: "${ID}"
+    shred: "s${ID}"
+  audience: all_clients
+  trigger: "immediately when fish or shred is removed from authoritative world"
+  priority: "independent of fragment queue, cycle, and cell; wins over late fragment rows"
+  creation: "no separate creation message; a full absolute row creates the object"
+  reused_id: "an absolute row after x:${TRANSPORT_ID} creates a new object without generation tracking"
+
+client_fragment_validity:
+  from: ds:ws-protocol.client-fragment-validity
+  identity_key: object_ID
+  relative_apply:
+    prerequisite: "applicable object state from N - 1"
+    on_missing_predecessor: "ignore relative row and keep object unrendered until an absolute row"
+  completed_cycle_check:
+    trigger: "first received fragment of N + 1"
+    unsynchronized_when:
+      - "object was received in N - 1"
+      - "object was not received in N"
+      - "x:${TRANSPORT_ID} was not received"
+    rule: "absence during the current unfinished cycle is not unsynchronized"
+
+client_timing_and_visibility:
+  from: ds:ws-protocol.client-timing-and-visibility
+  cycle_clock: "local receive time of first fragment for each N"
+  render_position: "wrap(server_base_position + last_velocity * elapsed_since_cycle_clock)"
+  temporary_unsynchronized:
+    motion: "continues extrapolation"
+    fade_out_seconds: 0.2
+    after_fade: "remain cached but not rendered until absolute row or x:${TRANSPORT_ID}"
+  absolute_recovery:
+    active_fade: "cancel fade, replace server state, and fade current alpha to 1 over 0.2 seconds"
+    new_or_hidden: "create or reveal with alpha 0 to 1 over 0.2 seconds"
+  removal_animation:
+    trigger: "x:${TRANSPORT_ID}"
+    motion: "stop at currently displayed position"
+    opacity: "ease-out to 0 over 0.1 seconds"
+    completion: "remove local cache object"
 
 events:
   from: ds:ws-protocol.events

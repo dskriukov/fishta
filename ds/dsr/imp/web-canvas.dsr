@@ -72,16 +72,22 @@ contract_map:
   multiplayer.convertDisconnectedUserFishToNpc: server.js#convertUserFishToNpc  # @ds:eba75588 @ds:a6c9e8b4
   multiplayer.leaveGame:                    server.js#handleLeaveGame  # @ds:704ab317
   multiplayer.syncWorld:                    server.js#broadcastWorldSync  # @ds:e559831a @ds:e4d375ed
+  multiplayer.serverPerformanceStatistics:  server.js#performanceStatistics server.js#tick server.js#broadcastWorldSync server.js#queueWorldFragments server.js#flushFragmentQueue  # @ds:61245206
   wsProtocol.encoding:                       protocol.js#encodeName protocol.js#decodeName  # @ds:839f8cd0
   wsProtocol.clientMessages:                 protocol.js#encodeClientJoin protocol.js#parseClientMessage  # @ds:5a4d3d6d
   wsProtocol.clientDeltaInput:               client-net.js#sendInput  # @ds:671e9773
   wsProtocol.handshakeState:                 client-net.js#connect server.js#handleMessage  # @ds:4fad33f8
-  wsProtocol.serverSync:                     protocol.js#encodeWorldSync protocol.js#applyWorldSync  # @ds:682570c7
-  wsProtocol.sharedWorldSnapshot:            server.js#broadcastWorldSync protocol.js#encodeWorldSync  # @ds:2afd71a0
+  wsProtocol.serverSync:                     protocol.js#encodeWorldCycle protocol.js#applyWorldFragment  # @ds:682570c7
+  wsProtocol.spatialFragments:                server.js#broadcastWorldSync server.js#queueWorldFragments protocol.js#encodeWorldCycle  # @ds:c39827ed
+  wsProtocol.cellLocalPosition:               protocol.js#encodeFishRow protocol.js#encodeShredRow protocol.js#applyWorldFragment  # @ds:e047bbdf
+  wsProtocol.newObjectRow:                    protocol.js#encodeWorldCycle protocol.js#applyWorldFragment  # @ds:6c8c56e7
+  wsProtocol.sharedWorldSnapshot:            server.js#broadcastWorldSync protocol.js#encodeWorldCycle  # @ds:2afd71a0
   wsProtocol.fishRow:                        protocol.js#encodeFishRow protocol.js#parseFishRow  # @ds:ea18a088 @ds:2e91f6d4
-  wsProtocol.shredRow:                       protocol.js#encodeShredRow protocol.js#encodeShredDeltaRow protocol.js#parseShredRow protocol.js#applyWorldSync  # @ds:9f50b1be
+  wsProtocol.shredRow:                       protocol.js#encodeShredRow protocol.js#encodeShredDeltaRow protocol.js#parseShredRow protocol.js#applyWorldFragment  # @ds:9f50b1be
   wsProtocol.stateMods:                      protocol.js#stateMods  # @ds:f51a5030
-  wsProtocol.removedFishRows:                 protocol.js#encodeRemovedFishRow protocol.js#applyWorldSync  # @ds:f51a5030 @ds:a16328a6
+  wsProtocol.objectRemoval:                   server.js#broadcastRemovedObjects protocol.js#encodeObjectRemoval protocol.js#applyObjectRemoval client-net.js#connect  # @ds:0aaccaf8
+  wsProtocol.clientFragmentValidity:          protocol.js#applyWorldFragment  # @ds:28d9098a
+  wsProtocol.clientTimingVisibility:          protocol.js#applyWorldFragment protocol.js#applyObjectRemoval main.js#extrapolateWorld render.js#drawFish render.js#drawShred  # @ds:8c663384
   wsProtocol.events:                         protocol.js#encodeEvent protocol.js#parseEvent  # @ds:a16328a6
   controls.joinWorldForm:                   controls.js#createJoinFormState  # @ds:34ba255b @ds:58050922
   controls.joinPresentation:                index.html#join-form style.css##join style.css##join-form main.js#syncJoinFishPreview  # @ds:277a51d7
@@ -100,6 +106,8 @@ contract_map:
   controls.joystickSteer:                   controls.js#joystickSteer  # @ds:b43d2f95
   controls.speedControl:                    controls.js#huntMode controls.js#speedLevel  # @ds:22fd3ab4 @ds:27129cfa @ds:cd1c5776 @ds:e6be3c03 @ia:6b7c8d9e
   controls.joystickRadialHunt:              controls.js#joystickSteer main.js#setupJoystickControls style.css##joystick-panel  # @ds:cd1c5776
+  controls.joystickViewportFootprint:       style.css#:root style.css##joystick-panel style.css##joystick-base  # @ds:6896cdc6
+  controls.responsiveJoinAndStatusLayout:   style.css##join style.css##join-form style.css##world-info style.css##joystick-panel  # @fix:3196de1d
   controls.burstEnduranceJoystickUi:        main.js#updateJoystickBurstAvailability main.js#renderJoystickBurstRings main.js#updateJoystickCurrentBurstRing style.css##joystick-base  # @ds:0eef2d19 @ds:e41821af
   controls.primaryKeyboardAndJoystick:      controls.js#createControlModeState main.js#buildInputPayload main.js#updateJoystickPanelVisibility main.js#setControlMode  # @ds:93b8abba @ds:10baf178 @ds:b43d2f95
   controls.burstEnduranceMenuTable:         main.js#updateBurstEnduranceTable index.html#burst-endurance-table style.css#burst-endurance-table  # @ds:cff27cd5
@@ -111,11 +119,11 @@ contract_map:
   controls.toroidalViewportProjection:      render.js#buildToroidalRenderWorld render.js#nearestToroidalCoordinate  # @ds:7b9a7984 @ds:c83f4c1e @ia:dd909d1a
   client.decorState:                         main.js#applyClientFishDecor main.js#updateClientDecorState  # @ds:975ca168 @ds:bd354b7a @ds:3ddf8f67 @ds:a44b9d2c @fn:a9a3ed12 @ia:9c0d1e2f @ia:3a4b5c6e
   ui.gameMenu:                              main.js#toggleGameMenu main.js#updateGameMenu index.html#game-menu-toggle index.html#game-menu style.css#game-menu-toggle style.css#game-menu  # @ds:ab1e4f02 @ds:8d13f6a2 @ds:59c118f5 @ds:70871bc5 @ds:fb11044e @ds:e001d967
+  ui.worldMap:                              main.js#toggleWorldMap main.js#updateWorldMapUi main.js#worldMapVisible index.html#world-map-toggle index.html#world-map style.css#world-map-toggle style.css#world-map render.js#drawWorldMap  # @ds:3a980720 @ds:8f2c91ad
   debug.toggleMode:                         main.js#toggleDebugMode index.html#debug-mode-toggle  # @ds:59c118f5
   debug.drawWorldRepeatBounds:              render.js#drawDebugWorldRepeatBounds  # @ds:7435b6ce
   debug.recordPositionTraces:               main.js#recordDebugPositionTraces protocol.js#applyWorldSync  # @ds:727e9afe
   debug.drawPositionTraces:                 render.js#drawDebugPositionTraces  # @ds:727e9afe
-  debug.drawFishMinimap:                    render.js#drawDebugFishMinimap  # @ds:8f2c91ad
   debug.drawFishCollisionRadius:            render.js#drawDebugFishCollisionRadius  # @ds:6b4e90d2 @ds:a3e394a8
   ui.showAppVersion:                         server.js#appVersion main.js#showAppVersion index.html#app-version  # @ds:8d13f6a2
   ui.worldSnapshotInfo:                      main.js#updateWorldSnapshotInfo index.html#world-info style.css#world-info  # @ds:e42a7c19
@@ -202,7 +210,7 @@ data_model:
       gameMenuOpen: "boolean controlling the top-left game menu panel"
       debugMode: "boolean toggled by game menu UI/keyboard; never sent to server"
       debugPositionTraces: "array of { kind:'relative'|'absolute', pos:{x,y}, createdAt, fadeStartAt, alpha?, fishId? }"
-      debugFishMinimap: "render-only 200x200 px overlay computed from current world.fish positions; never stored in world state"
+      worldMapVisible: "boolean toggled by the top-right map button; never sent to server"
       worldSnapshotInfo: "bottom-left render-only DOM panel derived from the latest WebSocket-synchronized world.fish and world.shreds arrays"
       latestAbsoluteServerPositions: "Map fishId -> absolute server pos captured from absolute sync diagnostics"
       lastDebugTraceAt: "timestamp of last debug trace sample, used to cap trace density"
@@ -263,6 +271,16 @@ data_model:
     client_owns:
       - current input
       - join form draft values
+  server_performance_statistics:
+    fields:
+      windowStartedAt: "monotonic timestamp at the beginning of the current five-second reporting window"
+      worldIterationCount: "authoritative step samples in the current window"
+      worldIterationTotalMs: "sum of stepAuthoritativeWorld elapsed durations"
+      controlledObjectTotal: "sum of world.fish.length + world.shreds.length after each authoritative step"
+      preparedSyncCycleCount: "broadcastWorldSync invocations in the current window"
+      droppedFragmentCount: "unsubmitted queue messages discarded by a newer client queue"
+      completedClientSessionCount: "client queues whose final fragment was submitted in the current window"
+      completedClientSessionTotalMs: "sum from broadcast preparation start through final socket.send"
       - render interpolation and prediction cache
       - decorative bubble emission, advancement, and rendering
       - size delta label accumulation, lifetime, current user size metric, and rendering for the current user fish only
@@ -281,6 +299,9 @@ implementation_instructions:
     The server runs the authoritative world step at a fixed tick rate.
     Connected clients send compact input messages for their own user fish only.
     Server broadcasts compact state strings shared by all clients; per-client messages are limited to identity and events.  # @ds:e559831a
+  server_performance_statistics: |
+    server.js owns one module-level performanceStatistics accumulator and resets it only after reporting. Use performance.now() for all durations. In tick(), time only stepAuthoritativeWorld({ world }, inputsByClient, dt, Math.random), then add its elapsed milliseconds, increment the iteration count, and add world.fish.length + world.shreds.length after the step. In broadcastWorldSync(), capture preparationStartedAt before encodeWorldCycle(), increment preparedSyncCycleCount once for that shared cycle, and pass preparationStartedAt into every queueWorldFragments call.
+    queueWorldFragments stores preparationStartedAt with each per-socket queue. Before replacing an existing queue, add its current unsent messages.length to droppedFragmentCount. flushFragmentQueue records a completed-client-session duration only after socket.send() submits the final message of its unchanged queue; replaced queues contribute no duration. A five-second server timer calls reportPerformanceStatistics(), which prints one stable console line containing the current-window averages: authoritative iteration milliseconds, completed client-session milliseconds (or n/a when there are no completed sessions), controlled object count, and dropped fragments divided by prepared sync cycles (or 0 when none). Then reset all window totals and set windowStartedAt to the report timestamp.  # @ds:61245206
   join_identity: |
     Join form starts with generated name and generated user color.
     It includes a paid/free toggle. The toggle is only a local domain attribute,
@@ -477,6 +498,9 @@ implementation_instructions:
       - joystick: visible lower-right radial joystick controls direction and speed v=0..99 while keyboard stays active.
     #debug-mode-toggle toggles only debugMode and does not own menu visibility.
     #leave-game remains the explicit leave/enter command inside the menu and keeps the same joined-state behavior.  # @ds:ab1e4f02 @ds:8d13f6a2 @ds:59c118f5 @ds:70871bc5 @ds:fb11044e @ds:22fd3ab4
+  world_map_ui: |
+    index.html contains #world-map-toggle in the top-right of #hud and #world-map as a screen-space 200x200 px overlay. The map button is visible only while an active joined session exists, has the same toolbar button footprint as #game-menu-toggle, and independently toggles worldMapVisible without changing debugMode, world state, input, or socket messages. #world-map is hidden unless worldMapVisible is true. In every responsive breakpoint, #hud .hud-row keeps explicit left-button, shrinkable metrics, and right-button grid tracks; #world-map-toggle uses the same breakpoint-specific width, height, border radius, and visual container as #game-menu-toggle, so neither button can wrap below the toolbar.  # @ds:3a980720
+    constants.js exports WORLD_MAP with the fixed 200px square size, 12px left inset, and 12px overlay gap; do not reuse DEBUG minimap coordinates for player-facing map UI. main.js#getWorldMapTop reads #hud and visible #player-metrics bounding rectangles every animation frame, takes the greater bottom edge, and adds WORLD_MAP.overlayGapPx. Pass this screen-space top coordinate in the render state. render.js#drawWorldMap(ctx, world, currentUserFishId, top) runs after restoring the viewport transform, uses WORLD_MAP.sizePx and WORLD_MAP.leftPx with the supplied top coordinate, validates positive world dimensions, draws the fixed square frame, and maps each canonical fish position into the square using clamped float coordinates without mutating fish.pos. NPC point diameter is derived from linear size sqrt(max(0, fish.size)): nominal PLAYER.startSize maps to 2px, every smaller value also maps to 2px, and the largest current fish maps to 5px; clamp the final diameter to [2, 5] and handle the no-range case without division by zero. Other user fish use a 3px inner point plus a 1px-gap, 1px-stroke outer circle; the current user uses a 5px inner point plus a 1px-gap, 2px-stroke outer circle. Keep the fish color resolution used by the existing minimap.  # @ds:3a980720 @ds:8f2c91ad
   world_snapshot_info_ui: |
     index.html contains #world-info in the bottom-left overlay layer. It has four
     value spans: #world-fish-count, #world-fish-area, #world-nutrient-count, and
@@ -837,13 +861,18 @@ implementation_instructions:
     plus "unknown" digest rather than hiding the field.  # @ds:8d13f6a2
   mobile_joystick_layout: |
     style.css owns the on-screen joystick layout.
-    #joystick-panel is a fixed lower interface area shown after join whenever activeControlMode is not pointer or touch, and hidden while pointer or touch experimental mode is active.
-    #joystick-base is the visible circular joystick control anchored to the lower-right of #joystick-panel and keeps its unchanged 112px diameter.
+    Define --joystick-footprint-size as min(340px, 40vmin), where vmin makes the cap follow the smaller viewport side in both portrait and landscape. Keep --joystick-knob-size as the existing responsive knob diameter and derive --joystick-size as calc(var(--joystick-footprint-size) - var(--joystick-knob-size)). Mobile media rules may change only --joystick-knob-size; they must not replace the footprint-derived --joystick-size with a fixed base diameter.
+    #joystick-panel is a fixed square whose width and height are exactly --joystick-footprint-size. Anchor it to the lower-right with the existing safe-area-aware right and bottom offsets. It is shown after join whenever activeControlMode is not pointer or touch and hidden while pointer or touch experimental mode is active. Do not stretch the panel toward the left viewport edge.
+    #joystick-base is the visible circular joystick control anchored one half knob diameter inward from the panel's lower-right edges. Its width and height are --joystick-size, so the knob remains within the panel when its center reaches the base edge. Rings remain inside the base and the complete visual footprint remains within min(340px, 40% of min(viewport width, viewport height)).
     Joystick speed comes from pointer displacement from the visible joystick base center in the same radial control that owns steering.
     setupJoystickControls stores input.joystick.rawVector as the normalized actual displacement with magnitude 0..1, and stores input.joystick.vector as the same direction clamped to the current available speed radius for internal consistency. controls.js#joystickSteer uses rawVector so steering strength follows the held pointer position; controls.js#speedLevel maps rawVector magnitude to desired speedLevel 0..99 with the expanded cruise radius before buildInputPayload clamps it through availableSpeedLevelForSize. main.js#updateJoystickBurstAvailability computes the current available speedLevel for the user fish and redraws rings for v=30 cruise boundary plus selected burst availability levels. If the current user fish has applied speedLevel 1..99, main.js#updateJoystickCurrentBurstRing shows #joystick-current-burst-ring at speedLevelToControlMagnitude(fish.speedLevel), uses a 2px border, and colors it through main.js#joystickCurrentSpeedColor: levels 1..30 return the blue cruise color, and levels 31..99 return the existing pink burstSpeedColor scale. speedLevel 0 hides that ring.  # @ds:cd1c5776 @ds:0eef2d19 @ds:e41821af
     index.html#game-menu contains #burst-endurance-table with rows for speedLevel v=1..99. main.js#updateBurstEnduranceTable reads BURST_ENDURANCE_SIZE_THRESHOLDS and currentUserFish.size, writes mode, minimum size threshold, current availability, energy factor, expected size loss, and the time window for each speed. updateGameMenu refreshes the table while the menu is open and whenever current fish state changes.  # @ds:cff27cd5
     index.html#game-menu contains #viewport-fish-capacity with option values 10, 20, 30, and max. constants.js exports VIEWPORT_FISH_CAPACITY with options ['10','20','30','max'] and defaultValue '20'. main.js owns viewportFishCapacity as client display state, initializes the select to the default, updates that state from change events through setViewportFishCapacity(value), and passes viewportFishCapacity into render(), viewportToWorld(), and worldToViewport() calls that convert current pointer/touch positions.  # @ds:e001d967
-    The visible joystick layout remains independent from the current user fish screen position.  # @ds:b43d2f95 @ds:cd1c5776
+    The visible joystick layout remains independent from the current user fish screen position.  # @ds:b43d2f95 @ds:cd1c5776 @ds:6896cdc6
+  responsive_join_and_status_layout: |
+    style.css owns the responsive repair. #join must use overflow-y:auto, align-items:center, and viewport-relative block padding so #join-form is vertically centered whenever it fits, and otherwise is never clipped when its content height exceeds a short viewport; at landscape/short-height breakpoints reduce only spacing and typography while retaining every required form control and exact text. The form itself may scroll within the entry layer and must remain keyboard/touch operable.
+    #world-info is the bottom status strip. In landscape/short-height layouts, give it an explicit compact height, full-width horizontal grid, opaque/semi-opaque background, and its own top border so its occupied rectangle is visually identifiable and does not become a large left overlay. Keep status values readable and preserve the existing world-info items.
+    #joystick-panel must use bottom: calc(var(--bottom-info-bar-height) + safe-area-aware gap) in every responsive layout, so its complete footprint is above the status strip. Do not use a bottom offset that ignores --bottom-info-bar-height.  # @fix:3196de1d
   predation_eligibility: |
     canEat(predator, victim) requires burst, size eligibility, and canBeVictimOf.
     canBeVictimOf rules:
@@ -940,7 +969,7 @@ implementation_instructions:
     advanceBubbles owns bubble motion and birth/fade animation: increment `age`, decrement `life`, move by velocity, compute `birth = clamp(age / BUBBLE.birthDuration, 0..1)`, compute `fade = clamp(life / BUBBLE.life, 0..1)`, set `radius = targetRadius * easeOut(birth)` and `alpha = min(birth, fade)`. Bounds removal must use the larger of current radius and targetRadius so a just-born zero-radius bubble is not removed incorrectly.
     render(ctx,state) reads bubbles from state.clientBubbles first, then state.world.bubbles only for legacy single-process mode. render.js#drawBubble uses the ordinary white/blue style when bubble.color is absent and a red fill/stroke style when bubble.color is `red`.
     Camera viewport follows current client user fish via worldToViewport(world, followed, canvas, options).
-    Rendering projects game-world units to canvas pixels. render.js#viewportScaleForFishCapacity(world, canvas, value) computes nominalStartDiameter = FISH.baseRadius * sqrt(PLAYER.startSize) * 2, numericScale = min(canvas.width, canvas.height) / (Number(value) * nominalStartDiameter) for 10/20/30, maxScale = max(canvas.width, canvas.height) / min(world.width, world.height), then returns max(numericScale, maxScale). For value max it returns maxScale. worldToViewport uses that scale and keeps the followed fish centered. The scale is display-only and must not write to world, fish, protocol rows, or server state.  # @ds:e559831a @ds:7b9a7984 @ds:e001d967 @ds:d6cebf86 @ia:3c4d5e6f @ia:5a6b7c8d
+    Rendering projects game-world units to canvas pixels. render.js#viewportScaleForFishCapacity(world, canvas, value) computes nominalStartDiameter = FISH.baseRadius * sqrt(PLAYER.startSize) * 2, numericScale = min(canvas.width, canvas.height) / (Number(value) * nominalStartDiameter) for 10/20/30, and maxScale = max(canvas.width / world.width, canvas.height / world.height). This maxScale uses the cover scale: at least one complete world axis fits the corresponding screen axis, while the other axis may extend beyond the viewport. The function then returns max(numericScale, maxScale). For value max it returns maxScale. worldToViewport uses that scale and keeps the followed fish centered. The scale is display-only and must not write to world, fish, protocol rows, or server state.  # @ds:e559831a @ds:7b9a7984 @ds:e001d967 @ds:d6cebf86 @ia:3c4d5e6f @ia:5a6b7c8d
   toroidal_viewport_projection: |
     render.js owns viewport projection only; it must not mutate state.world, fish.pos, protocol rows, or snapshotBuffer.
     worldToViewport(world, followed, canvas, options) keeps the followed fish's canonical position as the viewport focus.
@@ -978,16 +1007,8 @@ implementation_instructions:
     drawDebugWorldRepeatBounds(ctx, world) draws a rectangular stroke from (0,0) to (world.width,world.height).
     drawDebugFishCollisionRadius(ctx, renderWorld.fish) runs while the viewport transform is active, after fish are drawn and before position traces; it iterates every displayed fish in the projected render world and draws a translucent circular halo centered on fish.pos with radius fish.radius. Use the unscaled collision/contact radius, not fish.radius * visualScale, because predation contact uses fish.radius. The overlay is read-only and must not mutate fish, world, protocol, or server state.
     drawDebugPositionTraces(ctx, traces, now) draws relative traces as yellow dots and absolute traces as green dots using each trace alpha.
-    drawDebugFishMinimap(ctx, world, currentUserFishId) runs after restoring the viewport transform so its geometry is screen-space UI, not world-space geometry.
-    It draws a 200x200 px square overlay anchored to the top-left debug area using DEBUG.minimapSizePx.
-    It maps each canonical fish position to minimap coordinates:
-      pointSize = fish.id === currentUserFishId ? DEBUG.minimapCurrentUserPointPx : fish.ownerKind === 'user' ? DEBUG.minimapUserPointPx : DEBUG.minimapNpcPointPx
-      minimapX = left + clamp(fish.pos.x / world.width, 0, 1) * (DEBUG.minimapSizePx - pointSize)
-      minimapY = top + clamp(fish.pos.y / world.height, 0, 1) * (DEBUG.minimapSizePx - pointSize)
-    The mapping may read float fish coordinates and must not round or write them back to fish.pos.
-    NPC fish are rendered as 1 px points, other user fish as 3 px points, and the current user's fish as a 5 px point.
-    Point color is derived from the fish's rendered body color: userColor for user fish, formerUserColor for abandoned former user fish, otherwise the NPC hue color.
-    These overlays are render-only diagnostics and must not mutate world, fish, protocol rows, or server state.  # @ds:59c118f5 @ds:7435b6ce @ds:727e9afe @ds:8f2c91ad
+    Debug does not draw a map. The map is drawn by world_map_ui only when worldMapVisible is true.
+    These overlays are render-only diagnostics and must not mutate world, fish, protocol rows, or server state.  # @ds:59c1185f @ds:7435b6ce @ds:727e9afe
   compact_protocol: |
     Protocol payloads are ASCII strings over WebSocket with first-character dispatch.
     Implement client message codecs:
@@ -999,14 +1020,21 @@ implementation_instructions:
     Implement server message codecs:
       - encodeIdentity(id,token) => i:${id}:${token}
       - encodeEvent(type,data) => e:${type}:${data}
-      encodeWorldSync(world, previousState, absolute) returns { message, state }.
-    encodeWorldSync algorithm:
-        - create next fish and shred snapshot maps from current world state;
-        - emit one encodeFishRow(fish, previousState.fish.get(fish.id), absolute) for each current fish;
-        - when absolute=false, for every id in previousState.fish that is not in the next fish map, append encodeRemovedFishRow(id);
-        - emit a full `s` row for every shred in an absolute message and for a new shred in a delta message; otherwise emit its `d` row;
-      - return message prefix 'a|' for absolute and '|' for delta;
-        - return state={ fish, shreds } for the caller to store as lastWorldSyncState.
+      encodeObjectRemoval(kind,id) returns x:${kind==='shred' ? 's' : ''}${id}.
+      encodeWorldCycle(world, previousState, cycle) returns { absoluteText, relativeText, cells, state }.
+    encodeWorldCycle algorithm:
+      - use SYNC.cellSize=100 and assign every fish/shred to floor(pos.x/100),floor(pos.y/100) by its center;
+      - maintain server birthCycle maps by transport identifier; a row is new while cycle-birthCycle < 10;
+      - generate an absolute row and relative row for every object exactly once; a new object's relative-set row is its full absolute row prefixed with n;
+      - absolute row positions are localX=pos.x-cellX*100/localY=pos.y-cellY*100; ordinary relative positions are deltas from the immediately preceding server cycle;
+      - group both row sets in the same deterministic cell order, join each into one shared string, and store per non-empty cell {key,cellX,cellY,absoluteStart,absoluteEnd,relativeStart,relativeEnd}; ranges exclude message headers and delimit complete joined rows;
+      - return next snapshot maps for the next cycle baseline; do not emit deletion rows.
+    server.js#queueWorldFragments:
+      - sort non-empty cells by shortest toroidal squared distance from cell center to the client's current fish, forcing its containing cell first;
+      - build `a:N:X:Y|ROWS` from absolute ranges for the first four cells, and `|N:X:Y|ROWS` from relative ranges for the rest;
+      - when N%20===0, use absolute ranges and a-prefix for every cell;
+      - replace any unsent per-socket queue when a newer cycle is prepared; send one queued fragment per setImmediate turn while checking the queue generation so an old callback cannot continue an replaced queue;
+      - empty cells have no ranges and never enter a queue.
     Fish row shape:
       ID:TYPE EATEN_OPT:SIZE_ABS:COLOR1_OPT:COLOR2_OPT:NAME_OPT POS_X_OPT:POS_Y_OPT MOVING_ANG:MOVING_SPEED STATE_MODS
     Full shred row shape:
@@ -1023,43 +1051,26 @@ implementation_instructions:
     the lifetime bar are bound to synchronized server state and PLAYER.maxLifetimeSeconds.
     encodeFishRow encodes burst fish state as `bN` where N is clamped to 1..99.
     parseFishRow decodes `vN` into fish.speedLevel=N and derives mode from that value; rows with no v mod decode as fish.mode='cruise' and speedLevel=0.
-    encodeWorldSync includes one shred row for each current world.shreds item
-    after fish rows. For each shred retain a server sync snapshot of static fields,
-    remaining-layers mask, and position-independent id. Full rows are required on
-    absolute messages and when the id was absent from the preceding snapshot;
-    dynamic rows carry the current transform and decayAge, with `=` when the layer
-    mask matches the preceding snapshot. applyWorldSync resolves dynamic rows from
-    its existing shred map, replaces world.shreds with all resolved rows from the
-    latest message, and ignores a dynamic row whose id has no local full baseline
-    until the next absolute snapshot. This keeps omission as immediate deletion.
-    parseShredRow must also accept legacy `kID AREA:INITIAL_AREA ...` chunk rows
-    during transition and convert them into one-layer neutral shreds.
-    encodeRemovedFishRow(id):
-      - output a syntactically valid fish row with id, type n, unchanged/default metadata and state mod e;
-      - parseFishRow must set parsed.eaten=true when mods contains e.
-    applyWorldSync(world,message):
-      - parse absolute flag from prefix;
-      - collect sync diagnostics for absolute messages before mutating existing fish: for each parsed non-eaten row, record fish id, owner kind, previous client position/velocity when present, and parsed absolute server position;
-      - for absolute, start nextFish=[];
-      - for delta, start nextFish as existing world.fish copy;
-      - when parsed.eaten, remove existing fish with that id from nextFish immediately and continue;
-      - when parsed.eaten appears in an absolute message, do not add that row to nextFish;
-      - when parsed id exists, Object.assign parsed fields into the existing object and preserve object identity;
-      - when parsed id is new, push parsed;
-      - assign world.fish to nextFish;
-      - do not clear, create, or mutate client-owned bubble arrays.
+    applyWorldFragment(world,message,transportState,receivedAt):
+      - parse absolute/header N/cellX/cellY; ignore N lower than transportState.currentCycle;
+      - on first fragment of a greater N, evaluate the completed previous cycle: objects whose last received cycle equals N-2 start temporary fade-out only now; store receivedAt as the new cycle clock;
+      - parse an optional leading n before each existing object identifier; n makes that row full/absolute even under a relative fragment;
+      - reconstruct absolute positions from cell origin; apply an ordinary relative row only when object.lastSyncCycle===N-1; otherwise ignore the row and leave the object hidden until a full row;
+      - full rows create unknown objects and set fade-in 0->1 for 0.2s; full rows for fading/hidden objects reverse from their current alpha to 1 over 0.2s; all accepted rows set lastSyncCycle=N;
+      - never remove an object because a cell or row is absent; preserve fish/shred arrays across fragments.
+    applyObjectRemoval(world,message,transportState,receivedAt):
+      - resolve fish numeric identifiers and shred s-prefixed identifiers;
+      - tombstone the transport identifier with its current cycle so queued rows from that cycle cannot revive it; a full absolute row from a later cycle creates the deliberately reused ID as a new object;
+      - freeze the object at its current extrapolated display position, zero velocity, and start ease-out opacity from current alpha to zero over 0.1s; remove it from local cache after completion.
     client-net.js logs absolute-position drift diagnostics after absolute syncs:
       - select the current user fish plus the first two NPC fish from the diagnostic rows;
       - use the elapsed time since the previous sync and the previous client velocity to predict the client-side current position at receive time;
       - print a compact console table with id, role, previous client position, predicted client position, absolute server position, elapsed ms, error dx/dy, and error distance;
       - skip rows with no previous client position.
-    `server.js#broadcastWorldSync` calls encodeWorldSync once per sync interval,
-    stores the returned state, and sends the exact resulting message to every open
-    socket. It must not build client-specific object sets or re-encode the world
-    during this global-stream phase. State mods include a, bN, f, e, sN, gN, and
+    server.js#tick compares transport identifiers before and after the authoritative step and immediately broadcasts x:${TRANSPORT_ID} for every removed fish or shred. `broadcastWorldSync` calls encodeWorldCycle exactly once per sync interval, stores its shared strings/ranges and state, then only slices ranges into per-client ordered queues. State mods include a, bN, f, sN, gN, and
     lN. Names use base64url; colors use hex without #; type is u/p/n. State mods
     are domain/network facts only. Do not add protocol fields or mods for visual-
-    only mouth, teeth, fin, swim phase, burst kick, or mouth hold state.  # @ds:839f8cd0 @ds:5a4d3d6d @ds:671e9773 @ds:4fad33f8 @ds:682570c7 @ds:ea18a088 @ds:f51a5030 @ds:a16328a6 @ds:2afd71a0 @ds:9f50b1be
+    only mouth, teeth, fin, swim phase, burst kick, or mouth hold state. main.js computes each object's sync opacity and cycle-clock extrapolation per frame; render.js applies syncOpacity around the complete fish or shred draw.  # @ds:839f8cd0 @ds:5a4d3d6d @ds:671e9773 @ds:4fad33f8 @ds:682570c7 @ds:c39827ed @ds:e047bbdf @ds:6c8c56e7 @ds:ea18a088 @ds:f51a5030 @ds:a16328a6 @ds:2afd71a0 @ds:9f50b1be @ds:0aaccaf8 @ds:28d9098a @ds:8c663384
   input_latency: |
     Do not throttle changed input in client-net.js.
     client-net exposes:

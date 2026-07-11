@@ -30,7 +30,7 @@ modules:                     # from ds:domain.modules
   - ws-protocol
   - client-debug
 
-debug:                       # from ds:debug.mode, ds:debug.world-repeat-bounds, ds:debug.position-traces, ds:debug.fish-minimap, ds:debug.fish-collision-radius
+debug:                       # from ds:debug.mode, ds:debug.world-repeat-bounds, ds:debug.position-traces, ds:debug.fish-collision-radius
   authority: client-only
   mutates_domain_state: false
   mutates_server_state: false
@@ -52,18 +52,6 @@ debug:                       # from ds:debug.mode, ds:debug.world-repeat-bounds,
         source: "absolute fish position received from server sync"
       visibleSeconds: 3
       fadeAfterVisible: true
-    fishMinimap:
-      sizePx: { width: 200, height: 200 }
-      source: "current client-visible world fish positions"
-      coordinateModel: "scale float world coordinates from [0,width) x [0,height) into minimap pixels without changing fish model coordinates"
-      mark:
-        shape: point
-        sizePxByFishKind:
-          npc: 1
-          otherUser: 3
-          currentUser: 5
-        color: "same as rendered fish color"
-      meaning: "overview of all fish positions across the full wrapped world rectangle"
     fishCollisionRadius:
       shape: circle
       source: "current rendered fish position and fish.radius used by predation contact checks"
@@ -88,6 +76,26 @@ constraints:                 # from ds:intent.game
   single_user_mode: "single-player experience over the same server-authoritative world"
 
 ui:
+  worldMap:
+    from: ds:ui.world-map-toggle, ds:debug.fish-minimap
+    authority: client-only
+    defaultVisible: false
+    trigger: "top-right toolbar map button visually matching the menu button"
+    source: "current client-visible world fish positions"
+    coordinateModel: "scale float world coordinates from [0,width) x [0,height) into a 200x200 map without changing fish model coordinates"
+    fishMarks:
+      npc:
+        shape: point
+        diameterPx: "interpolate by linear fish size; clamp to at least 2; nominal PLAYER.startSize is 2 and current map maximum is 5"
+      otherUser:
+        shape: double-circle
+        pointDiameterPx: 3
+        outline: { gapPx: 1, widthPx: 1 }
+      currentUser:
+        shape: double-circle
+        pointDiameterPx: 5
+        outline: { gapPx: 1, widthPx: 2 }
+    meaning: "overview of all fish positions across the full wrapped world rectangle, independent from Debug"
   game_menu:
     from: [ds:ui.game-menu, ds:ui.version-visible, ds:debug.mode, ds:controls.mode-select, ds:controls.leave-game, ds:controls.viewport-fish-capacity]
     authority: client-display

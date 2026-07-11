@@ -2,8 +2,15 @@
 
 rationale_notes:
   - "Protocol structure is ASCII so the first-character dispatch and separators remain cheap and unambiguous; user-facing names are base64url encoded when they may contain non-ASCII text."
-  - "The server broadcasts one shared world state stream to all clients; per-client messages are limited to identity and short events."
+  - "The server calculates one authoritative world and serializes two shared row sets per cycle. Per-client delivery chooses only the order and stopping point of cached cell ranges, never a different world or a different serialization."
+  - "A cell is a delivery index rather than a client-side lifetime boundary. Empty cells are omitted, and only the mandatory x:${TRANSPORT_ID} message proves that an object was removed; shred transport IDs use an s prefix to avoid collisions with fish IDs."
+  - "The four nearest non-empty cells use absolute rows so the controlled fish and immediate vicinity always recover without a delta chain; distant rows may be relative only when the client has the preceding state."
+  - "Every twentieth cycle makes all delivered cells absolute, providing periodic recovery independent of distance."
+  - "For its first ten cycles an object's n-prefixed row overrides a relative fragment and carries full absolute data, so creation never depends on a prior delta baseline and usually becomes visible before the periodic global absolute cycle."
+  - "A newer cycle number implicitly invalidates the unsent tail of the old queue, so a separate queue-reset message is redundant on ordered WebSocket delivery."
+  - "The cycle clock is client-local and starts with the first received fragment so later fragments from one server calculation can be visually extrapolated to the same presentation time."
+  - "Temporary absence is a transport gap rather than a deletion: preserve the object cache through the 0.2-second fade so a later absolute row can reverse opacity without a jump."
+  - "Authoritative deletion freezes an object's current rendered point and uses the shorter 0.1-second ease-out fade; an ID received later after deletion is intentionally a new object."
   - "Idle clients send periodic ping rather than repeating zero control messages."
   - "The idle ping period is one second; adding a faster unchanged-input heartbeat violates the protocol even if changed control messages remain immediate."
-  - "Shred rows remain present for every live shred so row omission keeps its existing immediate deletion meaning; only static shred fields are omitted from delta rows after the client has received a full row."
-  - "The current global stream is serialized once and fanned out unchanged. Future viewport delivery should cache shared spatial fragments rather than simulate or serialize separate worlds for clients."
+  - "Fish and shred rows use the same delivery lifecycle even though their payload schemas differ; a full row is required before either kind can be safely rendered after a gap."

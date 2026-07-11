@@ -14,8 +14,9 @@
     --world-haze-top-alpha: 0.09;
     --world-haze-bottom-alpha: 0.27;
     --join-radius: 8px;
-    --joystick-size: clamp(212px, 35vw, 340px);
+    --joystick-footprint-size: min(340px, 60vmin); /* @ds:6896cdc6 */
     --joystick-knob-size: 42px;
+    --joystick-size: calc(var(--joystick-footprint-size) - var(--joystick-knob-size)); /* @ds:6896cdc6 */
     --bottom-info-bar-height: 54px;
     --top-info-panel-top: 0px;
     --top-info-panel-height: 68px;
@@ -214,6 +215,7 @@ body::after {
 
 #leave-game[hidden],
 #game-menu-toggle[hidden],
+#world-map-toggle[hidden],
 #control-modes[hidden],
 #control-help[hidden],
 #player-metrics[hidden] {
@@ -379,6 +381,7 @@ body::after {
 
 #join-form button,
 #game-menu-toggle,
+#world-map-toggle,
 #debug-mode-toggle,
 #leave-game,
 #control-modes button {
@@ -425,6 +428,8 @@ body::after {
     align-items: center;
     justify-items: start;
     padding: clamp(28px, 7vw, 120px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
     background:
     linear-gradient(90deg, rgba(2, 36, 53, 0.80), rgba(3, 45, 61, 0.42) 42%, rgba(1, 22, 37, 0.08) 70%),
     linear-gradient(180deg, rgba(14, 67, 86, 0.12), rgba(1, 18, 32, 0.48)),
@@ -437,9 +442,10 @@ body::after {
     padding: 34px;
     border: 1px solid rgba(203, 237, 255, 0.20);
     border-radius: 20px;
-    background: linear-gradient(145deg, rgba(5, 53, 76, 0.84), rgba(2, 36, 61, 0.90));
+    background: linear-gradient(145deg, rgba(5, 53, 76, 0.05), rgba(2, 36, 61, 0.05));
+    /* background: linear-gradient(145deg, rgba(5, 53, 76, 0.84), rgba(2, 36, 61, 0.90)); */
     box-shadow: 0 24px 70px rgba(0, 8, 24, 0.44), inset 0 1px 0 rgba(255, 255, 255, 0.09);
-    backdrop-filter: blur(14px);
+    backdrop-filter: blur(4px);
 }
 
 #join-form::before,
@@ -789,6 +795,48 @@ body::after {
     background: currentColor;
 }
 
+#world-map-toggle {
+    pointer-events: auto;
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    padding: 9px;
+    justify-self: end;
+    touch-action: manipulation;
+}
+
+#world-map-toggle span {
+    position: relative;
+    display: block;
+    width: 26px;
+    height: 22px;
+    border: 2px solid currentColor;
+    border-radius: 5px;
+    transform: skewY(-8deg);
+    opacity: 0.92;
+}
+
+#world-map-toggle span::before,
+#world-map-toggle span::after {
+    content: "";
+    position: absolute;
+    top: -2px;
+    display: block;
+    width: 2px;
+    height: 22px;
+    background: currentColor;
+    transform: skewY(8deg);
+}
+
+#world-map-toggle span::before { left: 7px; }
+#world-map-toggle span::after { left: 15px; }
+
+#world-map-toggle[aria-pressed="true"] {
+    background: rgba(110, 215, 239, 0.34);
+    border-color: rgba(205, 238, 255, 0.72);
+}
+
 #control-modes {
     pointer-events: auto;
     gap: 6px;
@@ -984,6 +1032,10 @@ body::after {
     display: none;
 }
 
+#world-map[hidden] {
+    display: none;
+}
+
 #game-menu .menu-row {
     display: flex;
     flex-wrap: wrap;
@@ -1176,21 +1228,20 @@ body::after {
 }
 
 #hud .hud-row {
-    grid-template-columns: 76px minmax(0, 1fr);
+    grid-template-columns: 76px minmax(0, 1fr) 76px;
     gap: 18px;
     align-items: center;
     height: auto;
     padding: 30px 28px 0 32px;
 }
 
-#game-menu-toggle {
+#game-menu-toggle,
+#world-map-toggle {
     appearance: none;
     -webkit-appearance: none;
     width: 76px;
     height: 76px;
-    grid-template-rows: repeat(3, 4px);
     align-content: center;
-    gap: 8px;
     padding: 0;
     border: 0;
     outline: 0;
@@ -1205,6 +1256,27 @@ body::after {
     border-radius: 4px;
 }
 
+#world-map-toggle {
+    justify-self: end;
+}
+
+#world-map-toggle svg {
+    width: 34px;
+    height: 34px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-miterlimit: 10;
+    stroke-width: 32px;
+}
+
+#world-map-toggle span,
+#world-map-toggle span::before,
+#world-map-toggle span::after {
+    display: none;
+}
+
 #player-metrics {
     position: static;
     transform: none;
@@ -1217,9 +1289,9 @@ body::after {
     padding: 14px 20px;
     border: 0;
     border-radius: 26px;
-    background: linear-gradient(100deg, rgba(5, 53, 76, 0.82), rgba(2, 36, 61, 0.78));
+    background: linear-gradient(100deg, rgba(5, 53, 76, 0.52), rgba(2, 36, 61, 0.58));
     box-shadow: 0 8px 22px rgba(0, 8, 24, 0.14);
-    backdrop-filter: blur(9px);
+    backdrop-filter: blur(5px);
 }
 
 #player-color-indicator {
@@ -1354,13 +1426,13 @@ body::after {
     top: 136px;
 }
 
-/* @ds:cd1c5776 @ds:0eef2d19 @ds:e41821af */
+/* @ds:cd1c5776 @ds:0eef2d19 @ds:e41821af @ds:6896cdc6 */
 #joystick-panel {
     left: auto;
     right: max(24px, env(safe-area-inset-right));
-    bottom: max(24px, env(safe-area-inset-bottom));
-    width: calc(var(--joystick-size) + var(--joystick-knob-size));
-    height: calc(var(--joystick-size) + var(--joystick-knob-size));
+    bottom: calc(var(--bottom-info-bar-height) + max(4px, env(safe-area-inset-bottom)));
+    width: var(--joystick-footprint-size);
+    height: var(--joystick-footprint-size);
 }
 
 #joystick-base {
@@ -1405,7 +1477,6 @@ body::after {
 
 @media (max-width: 720px) {
     :root {
-        --joystick-size: 190px;
         --joystick-knob-size: 48px;
     }
 
@@ -1414,17 +1485,26 @@ body::after {
     }
 
     #hud .hud-row {
-        grid-template-columns: 46px minmax(0, 1fr);
+        grid-template-columns: 46px minmax(0, 1fr) 46px;
         gap: 10px;
         padding: 15px 15px 0 16px;
     }
 
-    #game-menu-toggle {
+    #game-menu-toggle,
+    #world-map-toggle {
         width: 46px;
         height: 46px;
+        border-radius: 14px;
+    }
+
+    #game-menu-toggle {
         grid-template-rows: repeat(3, 3px);
         gap: 5px;
-        border-radius: 14px;
+    }
+
+    #world-map-toggle svg {
+        width: 21px;
+        height: 21px;
     }
 
     #game-menu-toggle span {
@@ -1506,17 +1586,194 @@ body::after {
 
     #joystick-panel {
         right: max(15px, env(safe-area-inset-right));
-        bottom: max(15px, env(safe-area-inset-bottom));
+        bottom: calc(var(--bottom-info-bar-height) + max(15px, env(safe-area-inset-bottom)));
     }
 }
 
 @media (max-width: 380px) {
     :root {
-        --joystick-size: 150px;
         --joystick-knob-size: 42px;
     }
 
     #world-info {
         width: min(130px, calc(100vw - 12px));
+    }
+}
+
+@media (orientation: landscape) and (max-height: 900px) {
+    :root {
+        --top-info-panel-height: clamp(58px, 12vh, 96px);
+        --top-info-panel-gap: clamp(5px, 1vh, 10px);
+    }
+
+    #hud {
+        height: var(--top-info-panel-height);
+    }
+
+    #hud .hud-row {
+        grid-template-columns: clamp(46px, 9vh, 68px) minmax(0, 1fr) clamp(46px, 9vh, 68px);
+        gap: clamp(8px, 1.8vw, 18px);
+        padding: clamp(8px, 3vh, 24px) clamp(14px, 2vw, 28px) 0;
+    }
+
+    #game-menu-toggle,
+    #world-map-toggle {
+        width: clamp(46px, 9vh, 68px);
+        height: clamp(46px, 9vh, 68px);
+        border-radius: clamp(14px, 2.8vh, 22px);
+    }
+
+    #game-menu-toggle {
+        grid-template-rows: repeat(3, clamp(3px, 0.5vh, 4px));
+        gap: clamp(5px, 1vh, 8px);
+    }
+
+    #world-map-toggle svg {
+        width: clamp(21px, 4.5vh, 34px);
+        height: clamp(21px, 4.5vh, 34px);
+    }
+
+    #game-menu-toggle span {
+        width: clamp(21px, 4.5vh, 34px);
+        height: clamp(3px, 0.5vh, 4px);
+    }
+
+    #player-metrics {
+        grid-template-columns: clamp(20px, 5vh, 38px) minmax(100px, 1fr) auto auto;
+        gap: clamp(8px, 1.8vh, 18px);
+        min-height: clamp(54px, 11vh, 94px);
+        padding: clamp(8px, 1.8vh, 14px) clamp(10px, 2vw, 20px);
+        border-radius: clamp(16px, 3.2vh, 26px);
+    }
+
+    #player-color-indicator {
+        width: clamp(20px, 5vh, 38px);
+        height: clamp(20px, 5vh, 38px);
+        border-width: clamp(2px, 0.5vh, 4px);
+    }
+
+    #player-name {
+        font-size: clamp(15px, 3.9vh, 30px);
+    }
+
+    #lifetime {
+        height: clamp(5px, 1.2vh, 9px);
+        margin-top: clamp(6px, 1.4vh, 11px);
+    }
+
+    #player-size,
+    #eaten-metric {
+        min-width: clamp(44px, 9vh, 74px);
+        padding-left: clamp(8px, 2vh, 20px);
+        border-left-width: clamp(1px, 0.25vh, 2px);
+    }
+
+    #player-size-label,
+    #eaten-metric > span {
+        font-size: clamp(9px, 2.2vh, 17px);
+    }
+
+    #player-size-value,
+    #eaten {
+        font-size: clamp(18px, 4.4vh, 34px);
+    }
+
+    #game-menu {
+        top: calc(var(--top-info-panel-height) + 8px);
+        max-height: calc(100dvh - var(--top-info-panel-height) - var(--bottom-info-bar-height) - 16px);
+        overflow-y: auto;
+    }
+
+    /* @fix:3196de1d */
+    #join {
+        align-items: center;
+        padding: max(12px, env(safe-area-inset-top)) max(16px, 5vw) max(16px, env(safe-area-inset-bottom));
+    }
+
+    #join-form {
+        width: min(420px, calc(100vw - 32px));
+        max-height: calc(100dvh - max(12px, env(safe-area-inset-top)) - max(16px, env(safe-area-inset-bottom)));
+        overflow-y: auto;
+        padding: clamp(18px, 3.2vh, 28px) clamp(18px, 2.4vw, 28px);
+        gap: 0;
+    }
+
+    .join-header {
+        margin-bottom: clamp(18px, 3vh, 28px);
+    }
+
+    .join-intro {
+        margin-bottom: clamp(16px, 2.4vh, 22px);
+    }
+
+    .join-intro h1 {
+        font-size: clamp(25px, 4.2vh, 32px);
+    }
+
+    #join-form .join-field,
+    #join-form .join-colour {
+        margin-bottom: clamp(14px, 2vh, 20px);
+    }
+
+    .join-tiers {
+        margin-bottom: clamp(16px, 2.2vh, 22px);
+    }
+
+    #join-form .join-tier-card {
+        min-height: 72px;
+        padding: 10px;
+    }
+
+    #join-form button {
+        min-height: 46px;
+    }
+
+    #world-info {
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        min-width: 0;
+        height: auto;
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: clamp(6px, 1.8vw, 22px);
+        align-items: stretch;
+        padding: 5px 14px max(5px, env(safe-area-inset-bottom));
+        border-top: 1px solid rgba(205, 238, 255, 0.24);
+        border-radius: 0;
+        background: rgba(4, 38, 59, 0.82);
+        backdrop-filter: blur(8px);
+    }
+
+    #world-info .world-info-item {
+        display: grid;
+        grid-template-columns: auto;
+        justify-items: center;
+        align-content: center;
+        gap: 2px;
+        min-height: 0;
+        padding: 3px 6px;
+        border-bottom: 0;
+        border-right: 1px solid rgba(217, 245, 255, 0.13);
+    }
+
+    #world-info .world-info-item:last-child {
+        border-right: 0;
+    }
+
+    #world-info .world-info-item > strong,
+    #world-info .world-info-item > em {
+        margin-left: 0;
+    }
+
+    #world-info .world-info-item span {
+        font-size: clamp(8px, 1.1vw, 12px);
+        letter-spacing: 0.08em;
+    }
+
+    #world-info strong,
+    #world-info em {
+        font-size: clamp(15px, 2.3vw, 24px);
     }
 }

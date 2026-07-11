@@ -1,6 +1,8 @@
 # controls.air — Agent Interpretation Reference
 
 rationale_notes:
+  - "The entry card is vertically centered whenever it fits, and may scroll inside the viewport when a fixed-height landscape viewport cannot fit all required content; hiding overflow would clip the required submit action."
+  - "The world status panel is a bottom status strip in compact landscape layouts. Its occupied height is part of the joystick placement calculation, rather than a translucent layer behind the joystick."
   - "Hunt input changes movement regime, not steering source."
   - "Explicit control-mode selection replaces implicit last-input switching and priority rules."
   - "Movement keys support layout equivalents where possible, and simultaneous keys compose direction."
@@ -17,6 +19,7 @@ rationale_notes:
   - "Logo layer motion is deliberately more visible and faster than the corner decoration; one implementation constant centralizes its rotation and timing multipliers."
   - "Free and Paid use separate teal-green and violet-pink accents only for visual selection; the colors do not imply different gameplay behavior beyond the existing tier rules."
   - "Touch movement and touch hunt are separate touch roles: the first touch steers, the second touch enables burst."
+  - "The joystick viewport limit applies to its complete visible footprint, including a knob displaced to the base edge. The base diameter is therefore smaller than the capped panel footprint by one knob diameter; sizing from the minimum viewport side prevents landscape width from inflating the control."
 
 input_bindings:
   control_modes:

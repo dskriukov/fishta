@@ -9,8 +9,8 @@ export const WORLD = {
     // size set at runtime to canvas size — world.air#ia:5a6b7c8d, ds:b28b7af6 ds:c83f4c1e
     drag: 1.6,              // linear damping per second — world.air#ia:1c2d3e4f, ds:ca07d970
     sizeDrag: 0.18,         // @ds:ca07d970 @ds:8869f043
-    initialWidth: 1800,      // @ds:19c14fea
-    initialHeight: 1200,     // @ds:19c14fea
+    initialWidth: 2800,      // @ds:19c14fea
+    initialHeight: 2800,     // @ds:19c14fea
     initialViewportScale: 1.5, // @ds:19c14fea
     resizeHysteresisUsers: 1,  // @ds:19c14fea
     npcDensity: 0.00002,    // @ds:53db39eb 0.000006
@@ -53,11 +53,18 @@ export const VIEWPORT_FISH_CAPACITY = {
 export const SERVER = {
     tickRate: 30,           // @ds:e4d375ed
     port: 8787,             // local server default — @ds:f359ebf2
+    performanceStatisticsIntervalMs: 5000, // @ds:61245206
 };
 
 export const SYNC = {
     snapshotHz: 10,         // @ds:e559831a
     maxExtrapolationMs: 180, // @ds:e559831a @ds:7b9a7984
+    cellSize: 100,          // @ds:c39827ed
+    nearestAbsoluteCells: 4, // @ds:c39827ed
+    globalAbsoluteEvery: 20, // @ds:682570c7
+    newObjectAbsoluteCycles: 10, // @ds:6c8c56e7
+    temporaryFadeSeconds: 0.2, // @ds:8c663384
+    removalFadeSeconds: 0.1, // @ds:8c663384
 };
 
 export const DEBUG = {
@@ -66,12 +73,12 @@ export const DEBUG = {
     traceSampleMs: 150,     // @ds:727e9afe
     relativeTraceColor: '#ffe45c', // @ds:727e9afe
     absoluteTraceColor: '#5cff9d', // @ds:727e9afe
-    minimapSizePx: 200,     // @ds:8f2c91ad
-    minimapNpcPointPx: 1,   // @ds:8f2c91ad
-    minimapUserPointPx: 3,  // @ds:8f2c91ad
-    minimapCurrentUserPointPx: 5, // @ds:8f2c91ad
-    minimapLeftPx: 12,      // @ds:8f2c91ad
-    minimapTopPx: 56,       // @ds:8f2c91ad
+};
+
+export const WORLD_MAP = {
+    sizePx: 200,            // @ds:3a980720 @ds:8f2c91ad
+    leftPx: 12,             // @ds:3a980720
+    overlayGapPx: 12,       // @ds:3a980720
 };
 
 export const SIZE_DELTA_LABEL = {

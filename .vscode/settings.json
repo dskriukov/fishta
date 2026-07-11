@@ -18,6 +18,10 @@
     "/^sha1sum ds/sense/controls/controls\\.ds$/": {
       "approve": true,
       "matchCommandLine": true
+    },
+    "/^sha1sum ds/sense/main\\.ds \\| cut -c1-8$/": {
+      "approve": true,
+      "matchCommandLine": true
     }
   }
 }

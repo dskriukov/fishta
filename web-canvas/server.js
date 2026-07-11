@@ -18,8 +18,9 @@ import { isLeaveBlockedByUserAttack } from './src/predation.js';
 import {
     encodeEvent,
     encodeIdentity,
+    encodeObjectRemoval,
     encodeWorldSize,
-    encodeWorldSync,
+    encodeWorldCycle,
     parseClientMessage,
 } from './src/protocol.js';
 
@@ -32,8 +33,11 @@ const inputsByClient = new Map();
 const sockets = new Map();
 const disconnects = new Map();
 let nextClientId = 1;
-let syncMessageCount = 0;
+let syncCycle = 0;
 let lastWorldSyncState = new Map();
+const objectBirthCycles = new Map();
+const fragmentQueues = new Map();
+const performanceStatistics = makePerformanceStatistics();
 
 maintainPopulation({ world }, Math.random);
 
@@ -83,6 +87,7 @@ wss.on('connection', socket =>{
     socket.on('close', () =>{
         const meta = sockets.get(socket);
         sockets.delete(socket);
+        fragmentQueues.delete(socket);
         if( meta?.fishId ) markDisconnected(meta);
     });
 });
@@ -231,20 +236,142 @@ function tick(){
     if( nextSize.width !== world.width || nextSize.height !== world.height ){
         scaleWorldEntities(world, nextSize);
         broadcastEvent(encodeWorldSize(world));
-        lastWorldSyncState = new Map();
     }
+    const beforeFish = new Set(world.fish.map(fish => fish.id));
+    const beforeShreds = new Set(world.shreds.map(shred => shred.id));
+    const iterationStartedAt = performance.now();
     stepAuthoritativeWorld({ world }, inputsByClient, 1 / SERVER.tickRate, Math.random);
+    performanceStatistics.worldIterationTotalMs += performance.now() - iterationStartedAt;
+    performanceStatistics.worldIterationCount++;
+    performanceStatistics.controlledObjectTotal += world.fish.length + world.shreds.length;
+    broadcastRemovedObjects(beforeFish, beforeShreds);
 }
 
-// @ds:e559831a @ds:2afd71a0
-function broadcastWorldSync(){
-    const absolute = syncMessageCount % 20 === 0;
-    const encoded = encodeWorldSync(world, lastWorldSyncState, absolute);
+// @ds:e559831a @ds:c39827ed @ds:2afd71a0 @ds:61245206
+function broadcastWorldSync(forceAbsolute = false){
+    const preparationStartedAt = performance.now();
+    const cycle = ++syncCycle;
+    const encoded = encodeWorldCycle(world, lastWorldSyncState, cycle, objectBirthCycles);
     lastWorldSyncState = encoded.state;
-    syncMessageCount++;
+    performanceStatistics.preparedSyncCycleCount++;
     for( const [socket, meta] of sockets ){
         if( socket.readyState !== socket.OPEN ) continue;
-        send(socket, encoded.message);
+        queueWorldFragments(socket, meta, encoded, cycle, forceAbsolute, preparationStartedAt);
+    }
+}
+
+// @ds:c39827ed @ds:682570c7 @ds:61245206
+function queueWorldFragments(socket, meta, encoded, cycle, forceAbsolute = false, preparationStartedAt){
+    const fish = findClientFish(meta);
+    if( !fish ) return;
+    const ordered = [...encoded.cells].sort((a, b) => cellDistanceSquared(a, fish) - cellDistanceSquared(b, fish));
+    const ownCellX = Math.floor(fish.pos.x / SYNC.cellSize);
+    const ownCellY = Math.floor(fish.pos.y / SYNC.cellSize);
+    ordered.sort((a, b) => Number(!(a.cellX === ownCellX && a.cellY === ownCellY)) - Number(!(b.cellX === ownCellX && b.cellY === ownCellY)));
+    const allAbsolute = forceAbsolute || cycle % SYNC.globalAbsoluteEvery === 0;
+    const messages = ordered.map((cell, index) =>{
+        const absolute = allAbsolute || index < SYNC.nearestAbsoluteCells;
+        const source = absolute ? encoded.absoluteText : encoded.relativeText;
+        const start = absolute ? cell.absoluteStart : cell.relativeStart;
+        const end = absolute ? cell.absoluteEnd : cell.relativeEnd;
+        return `${absolute ? 'a:' : '|'}${cycle}:${cell.cellX}:${cell.cellY}|${source.slice(start, end)}`;
+    });
+    const previousQueue = fragmentQueues.get(socket);
+    if( previousQueue ) performanceStatistics.droppedFragmentCount += previousQueue.messages.length;
+    const generation = (previousQueue?.generation || 0) + 1;
+    fragmentQueues.set(socket, { generation, messages, preparationStartedAt });
+    flushFragmentQueue(socket, generation);
+}
+
+// @ds:61245206
+function flushFragmentQueue(socket, generation){
+    const queue = fragmentQueues.get(socket);
+    if( !queue || queue.generation !== generation || socket.readyState !== socket.OPEN ) return;
+    const message = queue.messages.shift();
+    if( message ) socket.send(message);
+    if( message && queue.messages.length === 0 ){
+        performanceStatistics.completedClientSessionTotalMs += performance.now() - queue.preparationStartedAt;
+        performanceStatistics.completedClientSessionCount++;
+    }
+    if( queue.messages.length > 0 ) setImmediate(() => flushFragmentQueue(socket, generation));
+}
+
+// @ds:61245206
+function makePerformanceStatistics(){
+    return {
+        windowStartedAt: performance.now(),
+        worldIterationCount: 0,
+        worldIterationTotalMs: 0,
+        controlledObjectTotal: 0,
+        preparedSyncCycleCount: 0,
+        droppedFragmentCount: 0,
+        completedClientSessionCount: 0,
+        completedClientSessionTotalMs: 0,
+    };
+}
+
+// @ds:61245206
+function reportPerformanceStatistics(){
+    const now = performance.now();
+    const averageWorldIterationMs = performanceStatistics.worldIterationCount
+        ? performanceStatistics.worldIterationTotalMs / performanceStatistics.worldIterationCount
+        : 0;
+    const averageSessionMs = performanceStatistics.completedClientSessionCount
+        ? performanceStatistics.completedClientSessionTotalMs / performanceStatistics.completedClientSessionCount
+        : null;
+    const averageControlledObjects = performanceStatistics.worldIterationCount
+        ? performanceStatistics.controlledObjectTotal / performanceStatistics.worldIterationCount
+        : 0;
+    const averageDroppedFragments = performanceStatistics.preparedSyncCycleCount
+        ? performanceStatistics.droppedFragmentCount / performanceStatistics.preparedSyncCycleCount
+        : 0;
+    console.log(
+        `[server stats ${((now - performanceStatistics.windowStartedAt) / 1000).toFixed(1)}s] `
+        + `world=${averageWorldIterationMs.toFixed(3)}ms/iteration; `
+        + `session=${averageSessionMs === null ? 'n/a' : `${averageSessionMs.toFixed(3)}ms/client`}; `
+        + `objects=${averageControlledObjects.toFixed(1)}; `
+        + `dropped=${averageDroppedFragments.toFixed(2)} fragments/cycle`
+    );
+    performanceStatistics.windowStartedAt = now;
+    performanceStatistics.worldIterationCount = 0;
+    performanceStatistics.worldIterationTotalMs = 0;
+    performanceStatistics.controlledObjectTotal = 0;
+    performanceStatistics.preparedSyncCycleCount = 0;
+    performanceStatistics.droppedFragmentCount = 0;
+    performanceStatistics.completedClientSessionCount = 0;
+    performanceStatistics.completedClientSessionTotalMs = 0;
+}
+
+function cellDistanceSquared(cell, fish){
+    const x = (cell.cellX + 0.5) * SYNC.cellSize;
+    const y = (cell.cellY + 0.5) * SYNC.cellSize;
+    const dx = shortestDelta(fish.pos.x, x, world.width);
+    const dy = shortestDelta(fish.pos.y, y, world.height);
+    return dx * dx + dy * dy;
+}
+
+function shortestDelta(from, to, size){
+    let delta = to - from;
+    if( delta > size / 2 ) delta -= size;
+    if( delta < -size / 2 ) delta += size;
+    return delta;
+}
+
+// @ds:0aaccaf8
+function broadcastRemovedObjects(beforeFish, beforeShreds){
+    const liveFish = new Set(world.fish.map(fish => fish.id));
+    const liveShreds = new Set(world.shreds.map(shred => shred.id));
+    for( const id of beforeFish ){
+        if( !liveFish.has(id) ){
+            objectBirthCycles.delete(`f${id}`);
+            broadcastEvent(encodeObjectRemoval('fish', id));
+        }
+    }
+    for( const id of beforeShreds ){
+        if( !liveShreds.has(id) ){
+            objectBirthCycles.delete(`s${id}`);
+            broadcastEvent(encodeObjectRemoval('shred', id));
+        }
     }
 }
 
@@ -252,9 +379,8 @@ function send(socket, message){
     if( socket.readyState === socket.OPEN ) socket.send(message);
 }
 
-function sendWorldSync(socket, absolute){
-    const encoded = encodeWorldSync(world, lastWorldSyncState, absolute);
-    send(socket, encoded.message);
+function sendWorldSync(){
+    broadcastWorldSync(true);
 }
 
 function broadcastEvent(message){
@@ -294,6 +420,7 @@ function contentType(path){
 
 setInterval(tick, 1000 / SERVER.tickRate);
 setInterval(broadcastWorldSync, 1000 / SYNC.snapshotHz);
+setInterval(reportPerformanceStatistics, SERVER.performanceStatisticsIntervalMs);
 
 server.listen(port, () =>{
     console.log(`Fish Eat Fish server: http://localhost:${port}`);

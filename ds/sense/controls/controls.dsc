@@ -3,6 +3,14 @@
 
 module: controls
 
+responsive_ui_repair:
+  from: fix:controls.responsive-join-and-status-layout
+  contract:
+    name: layoutResponsiveEntryAndStatusUi
+    inputs: [viewportWidthPx, viewportHeightPx, safeAreaInsets, joystickFootprintSizePx]
+    output: { joinFormLayout, statusBarBounds, joystickPanelBounds }
+    rule: "the entry layer vertically centers the form in the available viewport and uses internal scrolling when its content is taller than the viewport; the status bar occupies its own bottom strip, and the joystick bottom offset includes that strip plus a safe gap so their visible bounds never overlap"
+
 player:
   from: ds:controls.player
   rule: "each connected client instance controls exactly its own user fish; other user fish and NPC fish are not controlled by this client"
@@ -154,6 +162,13 @@ input:
       inputs: [activeControlMode, joystickBaseRect, pointerOrTouchPoint]
       output: { acceleration, speedLevel: integer[0,99] }
       rule: "when activeControlMode is not pointer or touch, the visible joystick base in the lower-right interface area defines movement direction and speedLevel from pointer displacement relative to its own center; releasing it stops directed movement and returns speedLevel to 0"
+  joystick_viewport_footprint:
+    from: ds:controls.joystick-viewport-footprint
+    contract:
+      name: sizeJoystickViewportFootprint
+      inputs: [viewportWidthPx, viewportHeightPx, safeAreaInsets, joystickKnobSizePx]
+      output: { joystickFootprintSizePx, joystickBaseSizePx, joystickPanelBounds }
+      rule: "the square panel bounds equal the complete visible joystick footprint, remain inset from the lower-right safe-area edges, and have size min(340px, 0.4 * min(viewportWidthPx, viewportHeightPx)); the circular base diameter is the footprint size minus the knob diameter so a maximally displaced knob remains inside the panel bounds"
   hunt:
     from: [ds:controls.hunt, ds:controls.mobile-hunt, ds:controls.mobile-joystick-hunt, ia:controls.hunt-binding]
     contract:

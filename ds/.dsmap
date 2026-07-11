@@ -1,12 +1,13 @@
-ds/sense/controls/controls.ds#2b0c2c4d - 323e0d97
+ds/sense/controls/controls.ds#e931a342 - 323e0d97
 ds/sense/controls/controls.ia#ea72de17 - 3ab6da12
 ds/fix/background.fix#0778747e - 8bccf725
+ds/fix/responsive-ui.fix#412c746b - fa07d905
 ds/sense/fish/fish.ds#785684de - 0e1af7e8
 ds/sense/fish/fish.ia#54e70523 - 2b751007
-ds/sense/main.ds#332ed63e - d3cd9207
+ds/sense/main.ds#f3ef0bf1 - d3cd9207
 ds/sense/main.ia#c266c5dc - feab7d75
-ds/sense/multiplayer/multiplayer.ds#4de5b311 - 021f8c6b
-ds/sense/multiplayer/ws-protocol.ds#517b8edc - 9c9a61e3
+ds/sense/multiplayer/multiplayer.ds#c469d80d - 021f8c6b
+ds/sense/multiplayer/ws-protocol.ds#0d0d7289 - 9c9a61e3
 ds/sense/player/player.ds#fae8d62d - 6f2d8c10
 ds/sense/predation/predation.ds#8b07d043 - c4f0fe31
 ds/sense/prey/prey.ds#3bc922ec - 3fbd0a6d
@@ -26,6 +27,8 @@ ds:controls.viewport-fish-capacity - e001d967 323e0d97
 ds:controls.inspect-click - 2e1570ed 323e0d97
 ds:controls.initial-mode - c2aeb63a 323e0d97
 ds:controls.joystick-current-burst-indicator - e41821af 323e0d97
+ds:controls.joystick-viewport-footprint - 6896cdc6 323e0d97
+fix:controls.responsive-join-and-status-layout - 3196de1d fa07d905
 ds:controls.join-after-leave - 9772e9ac 323e0d97
 ds:controls.join-presentation - 277a51d7 323e0d97
 ds:controls.join-world - 34ba255b 323e0d97
@@ -76,6 +79,7 @@ ds:goal.growth - b433f1bc d3cd9207
 ds:intent.game - 27fa3caa d3cd9207
 ds:project.mode - dd674a52 d3cd9207
 ds:ui.game-menu - ab1e4f02 d3cd9207
+ds:ui.world-map-toggle - 3a980720 d3cd9207
 ds:ui.version-visible - 8d13f6a2 d3cd9207
 ds:ui.world-snapshot-info - e42a7c19 d3cd9207
 ds:multiplayer.abandoned-fish-visual - bfd5a97a 021f8c6b
@@ -91,6 +95,7 @@ ds:multiplayer.server-authority - e4d375ed 021f8c6b
 ds:multiplayer.server-memory - 4c2c7ba3 021f8c6b
 ds:multiplayer.shared-world - 9ed7e713 021f8c6b
 ds:multiplayer.socket-sync - e559831a 021f8c6b
+ds:multiplayer.server-performance-statistics - 61245206 021f8c6b
 ds:predation.contact - a3e394a8 c4f0fe31
 ds:predation.attack-contact - b39c93a5 c4f0fe31
 ds:predation.effect - e9fb3705 c4f0fe31
@@ -176,9 +181,15 @@ ds:ws-protocol.events - a16328a6 9c9a61e3
 ds:ws-protocol.fish-row - ea18a088 9c9a61e3
 ds:ws-protocol.handshake-state - 4fad33f8 9c9a61e3
 ds:ws-protocol.server-sync - 682570c7 9c9a61e3
+ds:ws-protocol.spatial-fragments - c39827ed 9c9a61e3
+ds:ws-protocol.cell-local-position - e047bbdf 9c9a61e3
+ds:ws-protocol.new-object-row - 6c8c56e7 9c9a61e3
 ds:ws-protocol.shared-world-snapshot - 2afd71a0 9c9a61e3
 ds:ws-protocol.shred-row - 9f50b1be 9c9a61e3
 ds:ws-protocol.state-mods - f51a5030 9c9a61e3
+ds:ws-protocol.object-removal - 0aaccaf8 9c9a61e3
+ds:ws-protocol.client-fragment-validity - 28d9098a 9c9a61e3
+ds:ws-protocol.client-timing-and-visibility - 8c663384 9c9a61e3
 ia:controls.hunt-binding - 6b7c8d9e 3ab6da12
 ia:controls.key-combo-compose - 0a7383b1 3ab6da12
 ia:controls.key-layout-equivalents - aae3d11a 3ab6da12

@@ -1,9 +1,10 @@
 // imp/web-canvas/src/client-net.js
 // WebSocket client, reconnect code, server snapshots/events.
-// @ds:4bfe0352 @ds:93a64773 @ds:e559831a @ds:704ab317 @ds:671e9773
+// @ds:4bfe0352 @ds:93a64773 @ds:e559831a @ds:704ab317 @ds:671e9773 @ds:682570c7 @ds:0aaccaf8 @ds:28d9098a @ds:8c663384
 
 import {
-    applyWorldSync,
+    applyObjectRemoval,
+    applyWorldFragment,
     encodeClientControl,
     encodeClientJoin,
     encodeClientPing,
@@ -22,6 +23,7 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onI
     let lastSyncAt = null;
     let initialCommunicationSettled = false;
     const world = makeWorld();
+    const transportState = { currentCycle: null, cycleStartedAt: null, tombstones: new Map() };
 
     function status(value){
         if( onStatus ) onStatus(value);
@@ -79,21 +81,38 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onI
                 if( onEvent ) onEvent(message);
                 return;
             }
-            if( text[0] === 'a' || text[0] === '|' ){
+            if( text[0] === 'x' ){
+                const receivedAt = performance.now();
+                const removal = applyObjectRemoval(world, text, transportState, receivedAt);
+                publishSnapshot(receivedAt, null);
+                if( removal?.object ){
+                    window.setTimeout(() =>{
+                        const index = removal.collection.indexOf(removal.object);
+                        if( index >= 0 && removal.object._syncVisibility?.phase === 'removing' ) removal.collection.splice(index, 1);
+                        publishSnapshot(performance.now(), null);
+                    }, 110);
+                }
+                return;
+            }
+            if( text.startsWith('a:') || text[0] === '|' ){
                 const receivedAt = performance.now();
                 const elapsedSeconds = lastSyncAt === null ? 0 : (receivedAt - lastSyncAt) / 1000;
-                const syncDiagnostics = applyWorldSync(world, text);
+                const syncDiagnostics = applyWorldFragment(world, text, transportState, receivedAt);
+                if( !syncDiagnostics ) return;
                 logAbsolutePositionDrift(syncDiagnostics, elapsedSeconds);
                 lastSyncAt = receivedAt;
-                if( onSnapshot ){
-                    onSnapshot({
-                        world: structuredClone(world),
-                        currentUserFishId,
-                        receivedAt,
-                        syncDiagnostics,
-                    });
-                }
+                publishSnapshot(syncDiagnostics.cycleStartedAt, syncDiagnostics);
             }
+        });
+    }
+
+    function publishSnapshot(receivedAt, syncDiagnostics){
+        if( !onSnapshot ) return;
+        onSnapshot({
+            world: structuredClone(world),
+            currentUserFishId,
+            receivedAt,
+            syncDiagnostics,
         });
     }
 
@@ -111,10 +130,10 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onI
         const table = selected
             .filter(item => item.row.clientPos && item.row.clientVel && item.row.serverPos)
             .map(item => driftLogRow(item.role, item.row, elapsedSeconds));
-        if( table.length > 0 ){
-            console.debug('absolute sync accumulated position error');
-            console.table(table);
-        }
+        // if( table.length > 0 ){
+        //     console.debug('absolute sync accumulated position error');
+        //     console.table(table);
+        // }
     }
 
     function driftLogRow(role, row, elapsedSeconds){

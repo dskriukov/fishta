@@ -3,16 +3,18 @@
 // @ds b28b7af6 27fa3caa ec8cb052 ab1e4f02 c95ca496 48c4fc99 b433f1bc d2e8a84c 5fb1ff09 c83f4c1e ca07d970 d6cebf86 2b3e71e0 3ddf8f67 1f3abc43 cbc1225a 7ce238da c4073e51 ee07d6da 8869f043 07320d39 f51831f5 8d0ca6a8 d867989f 975ca168 bd354b7a 906be50b 91e32235 55c13a4f 10baf178 22fd3ab4 e6be3c03 0eef2d19 e001d967 cff27cd5 7b9a7984 ad8d81d8 31cb7a0d 579e4888 e699c42d e6ecfbdd 1e66d817 a3e394a8 98224ab9 e9fb3705 fcdfb2b7 0c8d4e2a 6f1b0a3c 39305789 2e91f6d4 b9136c2e c5a92431 c656f0ec e42a7c19 a2d5936f 73b91e4c ed2b4f19
 // @ia 3983084a
 
-import { DEBUG, ENERGY, EXHALE, FISH, LOOP, MOUTH, PLAYER, REGIME, SHRED, SIZE_DELTA_LABEL, SWIM, SYNC, VIEWPORT_FISH_CAPACITY } from './constants.js';
+import { DEBUG, ENERGY, EXHALE, FISH, LOOP, MOUTH, PLAYER, REGIME, SHRED, SIZE_DELTA_LABEL, SWIM, SYNC, VIEWPORT_FISH_CAPACITY, WORLD_MAP } from './constants.js';
 import { advanceBubbles, emitBubble, makeBubble, makeWorld } from './world.js';
 import { BURST_ENDURANCE_SIZE_THRESHOLDS, availableSpeedLevelForSize, burstEnergyFactorOf, maxSpeedOf, requestExhale, runExhaleCycle, serializeFish, speedCapOf } from './fish.js';
 import { createControlModeState, createInput, keySteer, pointerSteer, joystickSteer, speedLevel, speedLevelToControlMagnitude } from './controls.js';
 import { buildToroidalRenderWorld, loadFishGeometry, loadShredGeometry, render, viewportToWorld, worldToViewport } from './render.js';
 import { dist, normalize, scale, v } from './vec.js';
 import { createClientNet } from './client-net.js';
+import { syncOpacityAt } from './protocol.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
+const hud = document.getElementById('hud');
 const playerMetrics = document.getElementById('player-metrics');
 const playerColorIndicator = document.getElementById('player-color-indicator');
 const playerSizeValue = document.getElementById('player-size-value');
@@ -42,6 +44,8 @@ const joinTier = document.getElementById('join-tier');
 const leaveButton = document.getElementById('leave-game');
 const gameMenuToggle = document.getElementById('game-menu-toggle');
 const gameMenu = document.getElementById('game-menu');
+const worldMapToggle = document.getElementById('world-map-toggle');
+const worldMap = document.getElementById('world-map');
 const debugModeToggle = document.getElementById('debug-mode-toggle');
 const controlModes = document.getElementById('control-modes');
 const controlModeButtons = [...document.querySelectorAll('[data-control-mode]')];
@@ -66,6 +70,7 @@ let serializeKeyLatch = false;
 let lastSentInputKey = null;
 let lastInputFlushAt = 0;
 let gameMenuOpen = false;
+let worldMapVisible = false;
 let debugMode = false;
 let debugPositionTraces = [];
 let latestAbsoluteServerPositions = new Map();
@@ -94,6 +99,13 @@ async function init(){
 function resize(){
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
+}
+
+// @ds:3a980720
+function getWorldMapTop(){
+    const hudBottom = hud?.getBoundingClientRect().bottom || 0;
+    const metricsBottom = playerMetrics?.hidden ? 0 : (playerMetrics?.getBoundingClientRect().bottom || 0);
+    return Math.ceil(Math.max(hudBottom, metricsBottom) + WORLD_MAP.overlayGapPx);
 }
 
 const input = createInput(canvas);
@@ -258,6 +270,10 @@ if( gameMenuToggle ){
     gameMenuToggle.addEventListener('click', toggleGameMenu);
     gameMenuToggle.setAttribute('aria-expanded', 'false');
 }
+if( worldMapToggle ){
+    worldMapToggle.addEventListener('click', toggleWorldMap);
+    worldMapToggle.setAttribute('aria-pressed', 'false');
+}
 if( debugModeToggle ){
     debugModeToggle.addEventListener('click', toggleDebugMode);
     debugModeToggle.setAttribute('aria-pressed', 'false');
@@ -295,6 +311,8 @@ function setJoinedUiState(joined, { showJoinForm = false, sessionReady = entrySe
     const joinVisible = entrySessionReady && !joined && showJoinForm;
     const gameControlsVisible = entrySessionReady && joined;
     if( gameMenuToggle ) gameMenuToggle.hidden = !entrySessionReady;
+    if( worldMapToggle ) worldMapToggle.hidden = !gameControlsVisible;
+    if( !gameControlsVisible ) worldMapVisible = false;
     if( !entrySessionReady ){
         gameMenuOpen = false;
         if( gameMenu ) gameMenu.hidden = true;
@@ -309,6 +327,7 @@ function setJoinedUiState(joined, { showJoinForm = false, sessionReady = entrySe
     updateJoystickPanelVisibility();
     updatePlayerMetricsVisibility(currentUserFish());
     updateGameMenu();
+    updateWorldMapUi();
 }
 
 // @ds:9772e9ac
@@ -340,6 +359,8 @@ function frame(now){
         clientBubbles,
         sizeDeltaLabels: sizeDeltaLabelState.labels,
         debug: { enabled: debugMode, positionTraces: debugPositionTraces, now },
+        worldMapVisible,
+        worldMapTop: getWorldMapTop(),
     });
     sendInputIfChanged(now);
 
@@ -493,28 +514,30 @@ function formatArea(value){
 function renderState(now){
     const latest = snapshotBuffer[snapshotBuffer.length - 1];
     if( !latest ) return state;
-    const elapsedSeconds = Math.min(SYNC.maxExtrapolationMs / 1000, Math.max(0, (now - latest.receivedAt) / 1000));
 
     return {
         ...state,
         currentUserFishId: latest.currentUserFishId,
-        world: extrapolateWorld(latest.world, elapsedSeconds),
+        world: extrapolateWorld(latest.world, now),
     };
 }
 
-function extrapolateWorld(world, elapsedSeconds){
+// @ds:8c663384
+function extrapolateWorld(world, now){
     return {
         ...world,
         bubbles: world.bubbles || [],
-        shreds: (world.shreds || []).map(shred => extrapolateShred(shred, elapsedSeconds, world.width, world.height)),
-        fish: (world.fish || []).map(fish => extrapolateFish(fish, elapsedSeconds, world.width, world.height)),
+        shreds: (world.shreds || []).map(shred => extrapolateShred(shred, now, world.width, world.height)).filter(object => object.syncOpacity > 0),
+        fish: (world.fish || []).map(fish => extrapolateFish(fish, now, world.width, world.height)).filter(object => object.syncOpacity > 0),
     };
 }
 
-// @ds:8b62d9ce
-function extrapolateShred(shred, elapsedSeconds, worldWidth, worldHeight){
+// @ds:8b62d9ce @ds:8c663384
+function extrapolateShred(shred, now, worldWidth, worldHeight){
+    const elapsedSeconds = Math.max(0, (now - (shred._syncBaseAt ?? now)) / 1000);
     return {
         ...shred,
+        syncOpacity: syncOpacityAt(shred, now),
         pos: {
             x: wrapValue(shred.pos.x + (shred.vel?.x || 0) * elapsedSeconds, worldWidth),
             y: wrapValue(shred.pos.y + (shred.vel?.y || 0) * elapsedSeconds, worldHeight),
@@ -522,9 +545,11 @@ function extrapolateShred(shred, elapsedSeconds, worldWidth, worldHeight){
     };
 }
 
-function extrapolateFish(fish, elapsedSeconds, worldWidth, worldHeight){
+function extrapolateFish(fish, now, worldWidth, worldHeight){
+    const elapsedSeconds = Math.max(0, (now - (fish._syncBaseAt ?? now)) / 1000);
     return {
         ...fish,
+        syncOpacity: syncOpacityAt(fish, now),
         pos: {
             x: wrapValue(fish.pos.x + (fish.vel?.x || 0) * elapsedSeconds, worldWidth),
             y: wrapValue(fish.pos.y + (fish.vel?.y || 0) * elapsedSeconds, worldHeight),
@@ -808,6 +833,19 @@ function toggleGameMenu(){
 function toggleDebugMode(){
     debugMode = !debugMode;
     updateGameMenu();
+}
+
+// @ds:3a980720
+function toggleWorldMap(){
+    if( !entrySessionReady || !net?.isJoined ) return;
+    worldMapVisible = !worldMapVisible;
+    updateWorldMapUi();
+}
+
+// @ds:3a980720
+function updateWorldMapUi(){
+    if( worldMapToggle ) worldMapToggle.setAttribute('aria-pressed', worldMapVisible ? 'true' : 'false');
+    if( worldMap ) worldMap.hidden = !worldMapVisible;
 }
 
 // @ds:ab1e4f02 @ds:59c118f5 @ds:70871bc5 @ds:22fd3ab4

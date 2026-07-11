@@ -4,7 +4,7 @@
 // @ia 2f6e7a91 3983084a
 // @fix 4bbc0692
 
-import { BACKGROUND, BUBBLE, DEBUG, FISH, PLAYER, SHRED, SIZE_DELTA_LABEL, SWIM, FEAR_EYE, WORLD } from './constants.js';
+import { BACKGROUND, BUBBLE, DEBUG, FISH, PLAYER, SHRED, SIZE_DELTA_LABEL, SWIM, FEAR_EYE, WORLD, WORLD_MAP } from './constants.js';
 
 const DEFAULT_SVG_GEOMETRY = {
     width: 494,
@@ -420,9 +420,7 @@ export function render(ctx, state){
     }
     ctx.restore();
 
-    if( state.debug?.enabled ){
-        drawDebugFishMinimap(ctx, world, state.currentUserFishId);
-    }
+    if( state.worldMapVisible ) drawWorldMap(ctx, world, state.currentUserFishId, state.worldMapTop);
 }
 
 // @ds:2b3e71e0 @fix:4bbc0692 @ia:3983084a
@@ -508,10 +506,12 @@ export function worldToViewport(world, followed, canvas, options = {}){
 // @ds:e001d967
 export function viewportScaleForFishCapacity(world, canvas, value){
     const minScreenSide = Math.min(canvas?.width || 0, canvas?.height || 0);
-    const maxScreenSide = Math.max(canvas?.width || 0, canvas?.height || 0);
-    const minWorldSide = Math.min(world?.width || 0, world?.height || 0);
-    const maxScale = maxScreenSide > 0 && minWorldSide > 0
-        ? maxScreenSide / minWorldSide
+    const screenWidth = canvas?.width || 0;
+    const screenHeight = canvas?.height || 0;
+    const worldWidth = world?.width || 0;
+    const worldHeight = world?.height || 0;
+    const maxScale = screenWidth > 0 && screenHeight > 0 && worldWidth > 0 && worldHeight > 0
+        ? Math.max(screenWidth / worldWidth, screenHeight / worldHeight)
         : WORLD.initialViewportScale;
     if( value === 'max' ) return maxScale;
     const capacity = Number(value);
@@ -575,9 +575,10 @@ export function buildToroidalRenderWorld(world, followed, debugTraces = []){
     };
 }
 
-// @ds:6f3a9c20 @ds:73b91e4c
+// @ds:6f3a9c20 @ds:73b91e4c @ds:8c663384
 function drawShred(ctx, shred, timeSeconds = 0){
     ctx.save();
+    ctx.globalAlpha *= shred.syncOpacity ?? 1;
     ctx.translate(shred.pos.x, shred.pos.y);
     const scale = Math.max(0.001, shred.size || 1) / Math.max(1, shredSvgGeometry.width);
     ctx.scale(scale, scale);
@@ -714,12 +715,13 @@ function traceAlpha(trace, now){
     return Math.max(0, 1 - (now - trace.fadeStartAt) / DEBUG.traceFadeMs);
 }
 
-// @ds:8f2c91ad
-function drawDebugFishMinimap(ctx, world, currentUserFishId){
-    const size = DEBUG.minimapSizePx;
-    const left = DEBUG.minimapLeftPx;
-    const top = DEBUG.minimapTopPx;
+// @ds:8f2c91ad @ds:3a980720
+function drawWorldMap(ctx, world, currentUserFishId, top){
+    const size = WORLD_MAP.sizePx;
+    const left = WORLD_MAP.leftPx;
     if( !Number.isFinite(world.width) || !Number.isFinite(world.height) || world.width <= 0 || world.height <= 0 ) return;
+    const maxLinearSize = (world.fish || []).reduce((max, fish) => Math.max(max, linearMapFishSize(fish)), 0);
+    const nominalLinearSize = Math.sqrt(PLAYER.startSize);
 
     ctx.save();
     ctx.fillStyle = 'rgba(3, 19, 30, 0.72)';
@@ -730,19 +732,46 @@ function drawDebugFishMinimap(ctx, world, currentUserFishId){
 
     for( const fish of world.fish || [] ){
         if( !fish?.pos ) continue;
-        const pointSize = minimapPointSize(fish, currentUserFishId);
-        const x = left + clamp01(fish.pos.x / world.width) * (size - pointSize);
-        const y = top + clamp01(fish.pos.y / world.height) * (size - pointSize);
-        ctx.fillStyle = minimapFishColor(fish);
-        ctx.fillRect(Math.floor(x), Math.floor(y), pointSize, pointSize);
+        const x = left + clamp01(fish.pos.x / world.width) * size;
+        const y = top + clamp01(fish.pos.y / world.height) * size;
+        drawWorldMapFish(ctx, fish, currentUserFishId, x, y, maxLinearSize, nominalLinearSize);
     }
     ctx.restore();
 }
 
-function minimapPointSize(fish, currentUserFishId){
-    if( fish.id === currentUserFishId ) return DEBUG.minimapCurrentUserPointPx;
-    if( fish.ownerKind === 'user' ) return DEBUG.minimapUserPointPx;
-    return DEBUG.minimapNpcPointPx;
+function drawWorldMapFish(ctx, fish, currentUserFishId, x, y, maxLinearSize, nominalLinearSize){
+    const color = minimapFishColor(fish);
+    if( fish.ownerKind === 'user' ){
+        const pointDiameter = fish.id === currentUserFishId ? 5 : 3;
+        const lineWidth = fish.id === currentUserFishId ? 2 : 1;
+        const gap = 1;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(x, y, pointDiameter / 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = lineWidth;
+        ctx.beginPath();
+        ctx.arc(x, y, pointDiameter / 2 + gap + lineWidth / 2, 0, Math.PI * 2);
+        ctx.stroke();
+        return;
+    }
+    const diameter = mapNpcDiameter(fish, maxLinearSize, nominalLinearSize);
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(x, y, diameter / 2, 0, Math.PI * 2);
+    ctx.fill();
+}
+
+function linearMapFishSize(fish){
+    return Math.sqrt(Math.max(0, Number(fish?.size) || 0));
+}
+
+function mapNpcDiameter(fish, maxLinearSize, nominalLinearSize){
+    const linearSize = linearMapFishSize(fish);
+    if( maxLinearSize <= nominalLinearSize ) return 2;
+    const t = clamp((linearSize - nominalLinearSize) / (maxLinearSize - nominalLinearSize), 0, 1);
+    return clamp(2 + t * 3, 2, 5);
 }
 
 function minimapFishColor(fish){
@@ -777,7 +806,7 @@ function drawSizeDeltaLabel(ctx, label, fish){
     ctx.restore();
 }
 
-// @ds:df06827a @ds:bd354b7a @ds:906be50b @ia:2f6e7a91
+// @ds:df06827a @ds:bd354b7a @ds:906be50b @ds:8c663384 @ia:2f6e7a91
 function drawFish(ctx, f, currentUserFishId){
     const visualScale = Math.max(0.5, f.visualScale || 1);
     const r = f.radius * visualScale;
@@ -796,6 +825,7 @@ function drawFish(ctx, f, currentUserFishId){
             eyeScale,
         };
         ctx.save();
+        ctx.globalAlpha *= f.syncOpacity ?? 1;
         ctx.translate(f.pos.x, f.pos.y);
         // The authored SVG faces left; the domain facing convention is 1 = right.
         ctx.scale(-f.facing, 1);
@@ -805,5 +835,8 @@ function drawFish(ctx, f, currentUserFishId){
         ctx.restore();
     }
 
+    ctx.save();
+    ctx.globalAlpha *= f.syncOpacity ?? 1;
     drawFishLabel(ctx, f, currentUserFishId);
+    ctx.restore();
 }

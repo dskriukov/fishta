@@ -115,3 +115,7 @@
 - [x] **[bug:entry-ui-before-session-resolution]**\
   При загрузке клиент держит экран входа, рыбьи элементы управления, индикатор жизни и индикатор размера скрытыми до первой коммуникации с сервером; после нее восстановленная сессия сразу показывает игровой UI, а новая сессия показывает форму входа без рыбьих элементов управления и пустых пользовательских индикаторов. Нижняя группа индикаторов расположена выше нижней зоны управления и видна только для текущей пользовательской рыбы.
   Source: user report 2026-07-09; affected DSR/code: `ds/dsr/imp/web-canvas.dsr#join_identity`, `ds/dsr/imp/web-canvas.dsr#reconnect_and_timeout`, `ds/dsr/imp/web-canvas.dsr#player_lifetime_ui`, `ds/dsr/imp/web-canvas.dsr#player_size_ui`, `client-net.js#createClientNet`, `main.js#setJoinedUiState`, `style.css#player-metrics`, `index.html#join`, `index.html#player-metrics`.
+
+- [x] **[bug:world-map-toolbar-wrap]**\
+  Кнопка карты в верхнем тулбаре не должна переноситься на следующую строку или накладываться на игровую область. Во всех responsive-режимах она остаётся в одной строке с кнопкой меню, имеет те же размеры и визуальный контейнер, а центральная область метрик может сжиматься между двумя кнопками.
+  Source: user report 2026-07-11; affected DSR/code: `ds/dsr/imp/web-canvas.dsr#world_map_ui`, `style.css#hud .hud-row`, `style.css#game-menu-toggle`, `style.css#world-map-toggle`.
