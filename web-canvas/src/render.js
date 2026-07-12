@@ -522,13 +522,15 @@ export function viewportScaleForFishCapacity(world, canvas, value){
     const screenHeight = canvas?.height || 0;
     const worldWidth = world?.width || 0;
     const worldHeight = world?.height || 0;
+    const worldScale = Math.max(1e-6, world?.scale || 1);
     const maxScale = screenWidth > 0 && screenHeight > 0 && worldWidth > 0 && worldHeight > 0
         ? Math.max(screenWidth / worldWidth, screenHeight / worldHeight)
-        : WORLD.initialViewportScale;
+            / worldScale
+        : WORLD.initialViewportScale / worldScale;
     if( value === 'max' ) return maxScale;
     const capacity = Number(value);
-    if( !Number.isFinite(capacity) || capacity <= 0 || minScreenSide <= 0 ) return Math.max(WORLD.initialViewportScale, maxScale);
-    const nominalDiameter = FISH.nominalStartDiameter * WORLD.pixelsPerWorldUnit * Math.sqrt(PLAYER.startSize);
+    if( !Number.isFinite(capacity) || capacity <= 0 || minScreenSide <= 0 ) return maxScale;
+    const nominalDiameter = FISH.nominalStartDiameter * Math.sqrt(PLAYER.startSize);
     const numericScale = minScreenSide / (capacity * nominalDiameter);
     return Math.max(numericScale, maxScale);
 }

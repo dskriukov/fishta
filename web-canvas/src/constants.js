@@ -49,8 +49,8 @@ export const PLAYER = {
 };
 
 export const VIEWPORT_FISH_CAPACITY = {
-    options: ['10', '20', '30', 'max'], // @ds:e001d967
-    defaultValue: '20',                 // @ds:e001d967
+    options: ['5', '10', '30', 'max'], // @ds:e001d967
+    defaultValue: '10',                // @ds:e001d967
 };
 
 export const SERVER = {
