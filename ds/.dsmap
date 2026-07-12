@@ -9,6 +9,7 @@ ds/sense/main.ds#3b2e1e12 - d3cd9207
 ds/sense/main.ia#c266c5dc - feab7d75
 ds/sense/multiplayer/multiplayer.ds#82ccc728 - 021f8c6b
 ds/sense/multiplayer/ws-protocol.ds#5a631141 - 9c9a61e3
+ds/fix/sync-delivery.fix#5bdc1000 - 4e7f2a91
 ds/sense/player/player.ds#fae8d62d - 6f2d8c10
 ds/sense/predation/predation.ds#8b07d043 - c4f0fe31
 ds/sense/prey/prey.ds#3bc922ec - 3fbd0a6d
@@ -101,6 +102,8 @@ ds:multiplayer.shared-world - 9ed7e713 021f8c6b
 ds:multiplayer.socket-sync - e559831a 021f8c6b
 ds:multiplayer.server-performance-statistics - 61245206 021f8c6b
 ds:multiplayer.phase-synchronized-delivery - 0a2b6379 021f8c6b
+fix:multiplayer.connection-does-not-start-global-sync - 7c4d2e91 4e7f2a91
+fix:multiplayer.sync-delivery-time-budget - 91ab6e30 4e7f2a91
 ds:predation.contact - a3e394a8 c4f0fe31
 ds:predation.attack-contact - b39c93a5 c4f0fe31
 ds:predation.effect - e9fb3705 c4f0fe31

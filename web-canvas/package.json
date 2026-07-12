@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "load-test": "export CLIENTS=45; node tools/load-test.mjs",
+    "load-test": "export CLIENTS=75; node tools/load-test.mjs",
     "fishta-test": "export CLIENTS=4; export URL=http://fishta.staging.globalqb.com/; node tools/load-test.mjs"
   },
   "dependencies": {

@@ -100,7 +100,6 @@ function handleJoin(socket, meta, message){
         updateUserFishProfile(existing, message);
         send(socket, encodeIdentity(meta.fishId, existing.temporaryConnectionCode));
         send(socket, encodeWorldScale(world.scale));
-        sendWorldSync(socket, true);
         return;
     }
     inputsByClient.delete(meta.clientId);
@@ -121,7 +120,6 @@ function handleJoin(socket, meta, message){
     send(socket, encodeIdentity(meta.fishId, temporaryConnectionCode));
     updateWorldScale();
     send(socket, encodeWorldScale(world.scale));
-    sendWorldSync(socket, true);
 }
 
 // @ds:4bfe0352 @ds:58050922
@@ -144,7 +142,6 @@ function handleReconnectGrace(socket, meta, message){
         meta.temporaryConnectionCode = message.temporaryConnectionCode;
         send(socket, encodeIdentity(meta.fishId, message.temporaryConnectionCode));
         send(socket, encodeWorldScale(world.scale));
-        sendWorldSync(socket, true);
         return;
     }
     meta.fishId = null;
@@ -290,29 +287,40 @@ function makeSyncPlan(encoded, cycle, forceAbsolute){
             phases[phaseIndex].push({ socket, meta, x, y });
         }));
     }
-    return { cycle, encoded, forceAbsolute, phases, phase: 0, remaining: phases.reduce((total, phase) => total + phase.length, 0), lookup, cancelled: false };
+    return { cycle, encoded, forceAbsolute, phases, phase: 0, entryIndex: 0, remaining: phases.reduce((total, phase) => total + phase.length, 0), lookup, cancelled: false };
 }
 
 function runSyncPhases(plan){
     if( activeSyncPlan !== plan || plan.cancelled || plan.phase >= plan.phases.length ) return;
     const startedAt = performance.now();
-    for( const entry of plan.phases[plan.phase] ) sendPlanFragment(plan, entry);
+    const entries = plan.phases[plan.phase];
+    const deadline = startedAt + SYNC.deliveryBudgetMs;
+    while( plan.entryIndex < entries.length && (plan.entryIndex === 0 || performance.now() < deadline) ){
+        const entry = entries[plan.entryIndex++];
+        sendPlanFragment(plan, entry);
+        plan.remaining--;
+    }
     performanceStatistics.phaseTotalMs += performance.now() - startedAt;
+    if( plan.entryIndex < entries.length ){
+        setImmediate(() => runSyncPhases(plan));
+        return;
+    }
     performanceStatistics.phaseCount++;
     plan.phase++;
+    plan.entryIndex = 0;
     if( plan.phase < plan.phases.length ) setImmediate(() => runSyncPhases(plan));
     else activeSyncPlan = null;
 }
 
 function sendPlanFragment(plan, entry){
     if( entry.socket.readyState !== entry.socket.OPEN ) return;
+    if( entry.socket.bufferedAmount > SYNC.maxSocketBufferedBytes ) return;
     const absolute = plan.forceAbsolute || plan.cycle % SYNC.globalAbsoluteEvery === 0 || plan.phase === 0;
     const cell = plan.lookup.get(`${entry.x}:${entry.y}`);
     const prefix = `${absolute ? 'a:' : '|'}${plan.cycle}:${entry.x}:${entry.y}|`;
     const source = absolute ? plan.encoded.absoluteText : plan.encoded.relativeText;
     const message = cell ? `${prefix}${source.slice(absolute ? cell.absoluteStart : cell.relativeStart, absolute ? cell.absoluteEnd : cell.relativeEnd)}` : `${prefix}~`;
     entry.socket.send(message);
-    plan.remaining--;
     entry.meta.syncCycles ??= new Map();
     const stat = entry.meta.syncCycles.get(plan.cycle) || { firstSentAt: performance.now(), bytes: 0 };
     stat.bytes += Buffer.byteLength(message);
@@ -404,10 +412,6 @@ function broadcastRemovedObjects(beforeFish, beforeShreds){
 
 function send(socket, message){
     if( socket.readyState === socket.OPEN ) socket.send(message);
-}
-
-function sendWorldSync(){
-    broadcastWorldSync(true);
 }
 
 function broadcastEvent(message){

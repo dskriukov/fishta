@@ -71,7 +71,7 @@ contract_map:
   multiplayer.reconnectGrace:               server.js#handleReconnectGrace  # @ds:93a64773
   multiplayer.convertDisconnectedUserFishToNpc: server.js#convertUserFishToNpc  # @ds:eba75588 @ds:a6c9e8b4
   multiplayer.leaveGame:                    server.js#handleLeaveGame  # @ds:704ab317
-  multiplayer.syncWorld:                    server.js#broadcastWorldSync server.js#runSyncPhases  # @ds:e559831a @ds:e4d375ed @ds:0a2b6379
+  multiplayer.syncWorld:                    server.js#broadcastWorldSync server.js#runSyncPhases server.js#sendPlanFragment  # @ds:e559831a @ds:e4d375ed @ds:0a2b6379 @fix:7c4d2e91 @fix:91ab6e30
   multiplayer.serverPerformanceStatistics:  server.js#performanceStatistics server.js#reportPerformanceStatistics  # @ds:61245206 @ds:0a2b6379 @ds:77faf734
   wsProtocol.encoding:                       protocol.js#encodeName protocol.js#decodeName  # @ds:839f8cd0
   wsProtocol.clientMessages:                 protocol.js#encodeClientJoin protocol.js#parseClientMessage  # @ds:5a4d3d6d
@@ -302,6 +302,17 @@ implementation_instructions:
     The server runs the authoritative world step at a fixed tick rate.
     Connected clients send compact input messages for their own user fish only.
     Server broadcasts compact state strings shared by all clients; per-client messages are limited to identity and events.  # @ds:e559831a
+  sync_delivery_control: |
+    server.js#handleJoin and server.js#handleReconnectGrace send only identity and current scale;
+    they must not call broadcastWorldSync or otherwise increment the shared sync cycle. The next
+    timer-owned cycle includes the new client through the normal plan. broadcastWorldSync prepares
+    one immutable encoded snapshot and replaces only the unsent portion of the previous plan.
+    server.js#runSyncPhases processes the current phase until either all entries are consumed or
+    SYNC.deliveryBudgetMs elapses, then yields with setImmediate; it advances phase/index only after
+    the current phase is complete. Each entry is consumed exactly once. sendPlanFragment skips a
+    socket whose bufferedAmount exceeds SYNC.maxSocketBufferedBytes, so that socket cannot delay
+    other clients or phases. The plan's encoded strings are never rebuilt during delivery, and its
+    cycle/state remain independent of input, join, reconnect, or ACK timing.  # @fix:7c4d2e91 @fix:91ab6e30
   server_performance_statistics: |
     server.js owns one module-level performanceStatistics accumulator and resets it only after reporting. In tick(), time only stepAuthoritativeWorld({ world }, inputsByClient, dt, Math.random), then add its elapsed milliseconds, increment the iteration count, and add world.fish.length + world.shreds.length after the step. broadcastWorldSync() increments preparedSyncCycleCount once, replaces any unsubmitted common phase plan while adding its remaining message count to droppedFragmentCount, and records each completed phase duration. `v:N` records cycle, sent-byte total, first-send timestamp, ACK timestamp, and socket bufferedAmount without gating any phase. The five-second report prints world iteration time, phase time, controlled object count, dropped fragments per cycle, and ACK count.  # @ds:61245206 @ds:0a2b6379 @ds:77faf734
   join_identity: |

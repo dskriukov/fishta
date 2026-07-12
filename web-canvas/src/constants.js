@@ -61,6 +61,8 @@ export const SERVER = {
 
 export const SYNC = {
     snapshotHz: 10,         // @ds:e559831a
+    deliveryBudgetMs: 2,    // @fix:7c4d2e91 @fix:91ab6e30
+    maxSocketBufferedBytes: 256 * 1024, // @fix:91ab6e30
     maxExtrapolationMs: 180, // @ds:e559831a @ds:7b9a7984
     cellSize: WORLD.cellSize, // @ds:c39827ed @ds:10dc892b
     nearestAbsoluteCells: 4, // @ds:c39827ed
