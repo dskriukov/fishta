@@ -7,13 +7,15 @@
 
 export const WORLD = {
     // size set at runtime to canvas size — world.air#ia:5a6b7c8d, ds:b28b7af6 ds:c83f4c1e
-    drag: 1.6,              // linear damping per second — world.air#ia:1c2d3e4f, ds:ca07d970
+    drag: 1.2,              // linear damping per second — world.air#ia:1c2d3e4f, ds:ca07d970
     sizeDrag: 0.18,         // @ds:ca07d970 @ds:8869f043
-    initialWidth: 1000,      // @ds:19c14fea
-    initialHeight: 1000,     // @ds:19c14fea
-    initialViewportScale: 1.5, // @ds:19c14fea
-    resizeHysteresisUsers: 1,  // @ds:19c14fea
-    npcDensity: 0.00002,    // @ds:53db39eb 0.000006
+    initialWidth: 500,       // @ds:10dc892b
+    initialHeight: 500,      // @ds:10dc892b
+    cellSize: 100,           // @ds:10dc892b
+    pixelsPerWorldUnit: 4, // @ds:10dc892b
+    userAreaSideDiameters: 10, // @ds:8b998807
+    initialViewportScale: 1.5,
+    npcDensity: 0.000005,    // @ds:53db39eb 0.000006
     maxControlledObjects: 200, // @ds:eccfca7e
     oldAgeSuspendFillRatio: 0.9, // @ds:d140effd
     densitySamples: 18,      // @ds:53db39eb
@@ -29,12 +31,13 @@ export const BACKGROUND = {
 };
 
 export const FISH = {
-    baseRadius: 16,         // px; radius = baseRadius * sqrt(size) — fish.air#ia:1e2f3a4b, ds:cbc1225a
-    baseNoDragSpeed: 1000,   // px/s before size water-drag penalty — fish.air#ia:3e4f5a6b, ds:8869f043
-    waterDragByLinearSize: 0.32, // size is area; drag grows with sqrt(size) — @ds:8869f043
+    nominalStartDiameter: 16, // normalized world units; size=1 user diameter
+    baseNoDragSpeed: 280,   // px/s before size water-drag penalty — fish.air#ia:3e4f5a6b, ds:8869f043
+    waterDragByLinearSize: 0.45, // size is area; drag grows with sqrt(size) — @ds:8869f043
     minLinearSpeedSize: 0.6, // prevents tiny fish from gaining unbounded speed — @ds:8869f043
     minBurstSpeed: 220,     // > PREY.maxSpeed + PREY.speedMargin; user hunt floor — @ds:8869f043 @ds:d4f6a1c2
-    accel: 1000,            // px/s^2 steering force — ds:55c13a4f ds:10baf178 ds:7ce238da
+    npcSpeedFactor: 0.6,    // NPC maximum speed multiplier — @ds:8869f043
+    accel: 500,            // px/s^2 steering force — ds:55c13a4f ds:10baf178 ds:7ce238da
     facingThreshold: 8,     // velocity.x deadzone to avoid flip jitter — fish.air#ia:9a0b1c2d, ds:8d0ca6a8
 };
 
@@ -59,7 +62,7 @@ export const SERVER = {
 export const SYNC = {
     snapshotHz: 10,         // @ds:e559831a
     maxExtrapolationMs: 180, // @ds:e559831a @ds:7b9a7984
-    cellSize: 100,          // @ds:c39827ed
+    cellSize: WORLD.cellSize, // @ds:c39827ed @ds:10dc892b
     nearestAbsoluteCells: 4, // @ds:c39827ed
     globalAbsoluteEvery: 20, // @ds:682570c7
     newObjectAbsoluteCycles: 10, // @ds:6c8c56e7
@@ -71,8 +74,11 @@ export const DEBUG = {
     traceVisibleMs: 3000,   // @ds:727e9afe
     traceFadeMs: 700,       // @ds:727e9afe
     traceSampleMs: 150,     // @ds:727e9afe
+    cellSyncWindowCycles: 10, // @ds:8f2c91ad
     relativeTraceColor: '#ffe45c', // @ds:727e9afe
     absoluteTraceColor: '#5cff9d', // @ds:727e9afe
+    receivedQuadrantFadeMs: 200, // @ds:727e9afe
+    receivedQuadrantColor: '#3f8cff', // @ds:727e9afe
 };
 
 export const WORLD_MAP = {
@@ -100,7 +106,7 @@ export const LEAVE = {
 
 export const REGIME = {
     cruiseFactor: 0.7,      // joystick/touch cruise speed = maxSpeed * v/100 * factor
-    keyboardCruiseSpeed: 97, // px/s at v30 for keyboard movement, capped by maxSpeedOf(size)
+    keyboardCruiseSpeed: 36, // px/s at v30 for keyboard movement, capped by maxSpeedOf(size)
     speedLevels: 99,        // relative speed scale v1..v99 — @ds:8869f043 @ds:07320d39
     cruiseMaxSpeedLevel: 30, // v1..v30 are cruise speed levels — @ds:8869f043
     burstStartSpeedLevel: 31, // v31 is the first burst speed — @ds:8869f043
@@ -137,14 +143,14 @@ export const PREY = {
     minSize: 0.3,           // prey.variety range (biased to small) — ds:1e66d817
     maxSize: 1.4,
     smallBias: 2.0,         // exponent biasing spawns toward small — ds:1e66d817
-    wanderAccel: 240,       // gentler than player — prey.dsc wander, ds:31cb7a0d
+    wanderAccel: 70,       // gentler than player — prey.dsc wander, ds:31cb7a0d
     wanderTurn: 0.9,        // chance/s to pick a new heading — ds:31cb7a0d
-    fleeAccel: 760,         // stronger close-range escape — ds:579e4888 ds:e6ecfbdd
-    fleeRadius: 240,        // wider threat awareness before contact pressure — ds:579e4888 ds:e6ecfbdd
-    speedMargin: 35,        // px/s surplus before skipping burst — @ia:5f6a7b8c
+    fleeAccel: 360,         // stronger close-range escape — ds:579e4888 ds:e6ecfbdd
+    fleeRadius: 190,        // wider threat awareness before contact pressure — ds:579e4888 ds:e6ecfbdd
+    speedMargin: 30,        // px/s surplus before skipping burst — @ia:5f6a7b8c
     spawnMargin: 20,        // px beyond edge before new prey enters view — prey.air#ia:3b4c5d6e, ds:e6ecfbdd
     spawnGrace: 0.75,       // s without world clamp after spawning — prey.air#ia:3b4c5d6e, ds:e6ecfbdd
-    maxSpeed: 170,          // caps prey speed — ds:579e4888 ds:31cb7a0d
+    maxSpeed: 90,          // caps prey speed — ds:579e4888 ds:31cb7a0d
 };
 
 export const FRY = {
@@ -172,19 +178,19 @@ export const NPC = {
 export const SHRED = {
     areaRatio: 0.5,         // @ds:e13d7a52
     nutritionMultiplier: 1.05, // @ds:0b8e71d4 @ds:f0a6c5d8
-    minSize: FISH.baseRadius * Math.sqrt(PREY.minSize) * 0.45, // @ds:7c2f91ad
-    maxSize: FISH.baseRadius * Math.sqrt(PREY.minSize) * 1.8, // @ds:7c2f91ad
-    fragmentation: 0.58,    // @ds:7c2f91ad @ds:5a9c0e77
+    minDiameterRatio: 0.2, // fraction of the nominal start-fish diameter — @ds:7c2f91ad
+    maxDiameterRatio: 0.6, // fraction of the nominal start-fish diameter — @ds:7c2f91ad
+    fragmentation: 0.72,    // @ds:7c2f91ad @ds:5a9c0e77
     sizeJitter: 0.34,       // @ds:7c2f91ad @ds:5a9c0e77
     eatSizeRatio: 1.08,     // @ds:c14f7a08
     minFeedingSpeed: 18,    // @ds:c14f7a08
     mouthCueSeconds: 0.3,   // @ds:a2d5936f
     decayIntervalSeconds: 10, // @ds:d3187816 @ds:5a9c0e77
-    densityLimitBase: 0.000015, // @ds:31a8f5c2 @ds:5a9c0e77
+    densityLimitBase: 0.00002, // @ds:31a8f5c2 @ds:5a9c0e77
     densityLimitSmoothRate: 0.35, // @ds:31a8f5c2 @ds:5a9c0e77
     scatterRadiusRatio: 0.82, // @ds:918d4b63
-    initialSpeedMin: 18,    // @ds:918d4b63
-    initialSpeedMax: 70,    // @ds:918d4b63
+    initialSpeedMin: 4,    // @ds:918d4b63
+    initialSpeedMax: 12,    // @ds:918d4b63
     dragMin: 0.55,          // @ds:8b62d9ce
     dragMax: 1.1,           // @ds:8b62d9ce
     restSpeed: 0.35,        // @ds:8b62d9ce
@@ -230,6 +236,15 @@ export const BUBBLE = {
     pulseStep: 0.12,        // seconds between circle/oval toggles — ds:d6cebf86
     pulseSquash: 0.92,      // vertical scale when oval is shown — ds:d6cebf86
     fillAlpha: 0.1,         // near-invisible filled bubble — ds:d6cebf86
+    strokeWidthPx: 0.55,    // screen-pixel outline thickness — ds:d6cebf86
+};
+
+export const RENDER_LAYERS = {
+    npcFishMin: 100,
+    npcFishMax: 9000,
+    playerFishMin: 10002,
+    playerFishMax: 29000,
+    shredExtraFishSlots: 5,
 };
 
 export const MOUTH = {

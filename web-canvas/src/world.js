@@ -3,7 +3,15 @@
 // Decisions: world.air#ia:7e8f9a0b (clamp, not bounce), ia:1c2d3e4f (linear damping)
 // @ds c83f4c1e ca07d970 d6cebf86
 
-import { WORLD, BUBBLE } from './constants.js';
+import { WORLD, FISH, BUBBLE } from './constants.js';
+
+export function worldPixelsToTechnical(value, scale = 1){
+    return Number(value || 0) / Math.max(1e-6, WORLD.pixelsPerWorldUnit) / Math.max(1e-6, scale);
+}
+
+export function technicalToWorldPixels(value, scale = 1){
+    return Number(value || 0) * WORLD.pixelsPerWorldUnit * Math.max(1e-6, scale);
+}
 
 // ds:c83f4c1e
 export function wrapPosition(fish, world){
@@ -22,10 +30,20 @@ export function wrapPoint(pos, world){
 export const clampToBounds = wrapPosition;
 
 // ds:ca07d970
-export function applyDrag(vel, dt, size = 1){
+// export function applyDrag(vel, dt, size = 1){
+//     const sizeDrag = 1 + Math.max(0, size - 1) * WORLD.sizeDrag;
+//     const factor = Math.max(0, 1 - WORLD.drag * sizeDrag * dt);
+//     return { x: vel.x * factor, y: vel.y * factor };
+// }
+
+export function applyDrag(vel, dt, size = 1) {
     const sizeDrag = 1 + Math.max(0, size - 1) * WORLD.sizeDrag;
     const factor = Math.max(0, 1 - WORLD.drag * sizeDrag * dt);
-    return { x: vel.x * factor, y: vel.y * factor };
+    return {
+        x: vel.x * factor,
+        y: vel.y * factor,
+    };
+
 }
 
 // @ia 7a8b9c0d
@@ -35,7 +53,7 @@ function bubbleCooldown(rng){
 
 // @ia 7a8b9c0d
 function bubbleGapSeconds(fish, rng){
-    const targetRadius = fish.radius * BUBBLE.maxRatio * BUBBLE.displayScale;
+    const targetRadius = fishPixelRadius(fish) * BUBBLE.maxRatio * BUBBLE.displayScale;
     const maxGapPx = Math.max(BUBBLE.gapMinPx, targetRadius * BUBBLE.gapMaxRatio);
     const minGapPx = BUBBLE.gapMinPx;
     const gapPx = Math.max(minGapPx, Math.min(maxGapPx, targetRadius * (0.6 + 0.2 * rng())));
@@ -61,16 +79,19 @@ export function emitBubble(fish, dt, rng){
 
 // @ds:d6cebf86
 export function makeBubble(fish, rng){
-    const targetRadius = fish.radius * BUBBLE.maxRatio * BUBBLE.displayScale;
-    const radius = Math.max(BUBBLE.minRadius, targetRadius * (0.6 + 0.4 * rng()));
+    const fishRadiusPx = fishPixelRadius(fish);
+    const targetRadiusPx = fishRadiusPx * BUBBLE.maxRatio * BUBBLE.displayScale;
+    const fishPosPx = fishPixelPosition(fish);
+    const fishRadius = Math.max(0, fishRadiusPx);
     return {
-        pos: {
-            x: fish.pos.x - fish.facing * fish.radius * 0.15,
-            y: fish.pos.y + fish.radius * 0.05,
+        sourceFishId: fish.id,
+        posPx: {
+            x: fishPosPx.x - fish.facing * fishRadius * 0.15,
+            y: fishPosPx.y + fishRadius * 0.05,
         },
-        radius: 0,
-        targetRadius: radius,
-        vel: {
+        radiusPx: 0,
+        targetRadiusPx,
+        velPx: {
             x: (rng() - 0.5) * BUBBLE.drift,
             y: -BUBBLE.riseSpeed * (0.8 + 0.4 * rng()),
         },
@@ -78,6 +99,19 @@ export function makeBubble(fish, rng){
         age: 0,
         alpha: 0,
         phase: rng(),
+    };
+}
+
+function fishPixelRadius(fish){
+    const size = Math.max(0, Number(fish?.size) || 0);
+    return FISH.nominalStartDiameter * WORLD.pixelsPerWorldUnit * Math.sqrt(size) / 2;
+}
+
+function fishPixelPosition(fish){
+    const factor = WORLD.pixelsPerWorldUnit;
+    return {
+        x: (Number(fish?.pos?.x) || 0) * factor,
+        y: (Number(fish?.pos?.y) || 0) * factor,
     };
 }
 
@@ -92,54 +126,51 @@ function easeOutCubic(t){
 
 // ds:d6cebf86
 export function advanceBubbles(bubbles, world, dt){
+    const worldWidthPx = world.width * WORLD.pixelsPerWorldUnit;
     for( let i = bubbles.length - 1; i >= 0; i-- ){
         const bubble = bubbles[i];
-        bubble.pos.x += bubble.vel.x * dt;
-        bubble.pos.y += bubble.vel.y * dt;
+        bubble.posPx.x += bubble.velPx.x * dt;
+        bubble.posPx.y += bubble.velPx.y * dt;
         bubble.age = (bubble.age || 0) + dt;
         bubble.life -= dt;
-        const targetRadius = bubble.targetRadius || bubble.radius || 0;
-        bubble.targetRadius = targetRadius;
+        const targetRadiusPx = bubble.targetRadiusPx || bubble.radiusPx || 0;
+        bubble.targetRadiusPx = targetRadiusPx;
         const birth = BUBBLE.birthDuration > 0 ? clamp01(bubble.age / BUBBLE.birthDuration) : 1;
         const fade = clamp01(bubble.life / BUBBLE.life);
-        bubble.radius = targetRadius * easeOutCubic(birth);
+        bubble.radiusPx = targetRadiusPx * easeOutCubic(birth);
         bubble.alpha = Math.min(birth, fade);
-        const boundsRadius = Math.max(bubble.radius, targetRadius);
-        if( bubble.life <= 0 || bubble.pos.y + boundsRadius < 0 || bubble.pos.x < -boundsRadius || bubble.pos.x > world.width + boundsRadius ){
+        const boundsRadiusPx = Math.max(bubble.radiusPx, targetRadiusPx);
+        if( bubble.life <= 0 || bubble.posPx.y + boundsRadiusPx < 0 || bubble.posPx.x < -boundsRadiusPx || bubble.posPx.x > worldWidthPx + boundsRadiusPx ){
             bubbles.splice(i, 1);
         }
     }
 }
 
-// @ds:19c14fea
-export function nextWorldSize(userFishCount, current){
-    const step = Math.max(0, Math.ceil((userFishCount - WORLD.resizeHysteresisUsers) / 3));
-    return {
-        width: WORLD.initialWidth + step * 480,
-        height: WORLD.initialHeight + step * 320,
-    };
+// @ds:8b998807 @ds:915ab0e4
+export function effectiveWorldArea(userCount){
+    const gameWidth = WORLD.initialWidth * WORLD.pixelsPerWorldUnit;
+    const gameHeight = WORLD.initialHeight * WORLD.pixelsPerWorldUnit;
+    const baseArea = gameWidth * gameHeight;
+    const side = WORLD.userAreaSideDiameters * FISH.nominalStartDiameter * WORLD.pixelsPerWorldUnit;
+    return baseArea + Math.max(0, userCount) * side * side;
 }
 
-// @ds:19c14fea
-export function scaleWorldEntities(world, nextSize){
-    const sx = nextSize.width / world.width;
-    const sy = nextSize.height / world.height;
-    for( const fish of world.fish || [] ){
-        fish.pos.x *= sx;
-        fish.pos.y *= sy;
-    }
-    for( const shred of world.shreds || [] ){
-        shred.pos.x *= sx;
-        shred.pos.y *= sy;
-    }
-    world.width = nextSize.width;
-    world.height = nextSize.height;
-    world.nextSizeStep = { ...nextSize };
+// @ds:8b998807 @ds:915ab0e4
+export function worldScale(userCount){
+    const gameWidth = WORLD.initialWidth * WORLD.pixelsPerWorldUnit;
+    const gameHeight = WORLD.initialHeight * WORLD.pixelsPerWorldUnit;
+    const baseArea = gameWidth * gameHeight;
+    return Number(Math.sqrt(effectiveWorldArea(userCount) / baseArea).toFixed(3));
+}
+
+// @ds:915ab0e4
+export function formatWorldScale(scale){
+    return String(Number(Number(scale || 1).toFixed(3)));
 }
 
 // @ds:53db39eb
 export function targetNpcCount(world){
-    return Math.max(6, Math.floor(world.width * world.height * WORLD.npcDensity));
+    return Math.max(6, Math.floor(effectiveWorldArea(world.userCount || 0) * WORLD.npcDensity));
 }
 
 // @ds:53db39eb
@@ -192,5 +223,5 @@ export function isOldAgeSuspended(world){
 
 // @ia 5a6b7c8d
 export function makeWorld(width = WORLD.initialWidth, height = WORLD.initialHeight){
-    return { width, height, nextSizeStep: null, fish: [], shreds: [], bubbles: [], tick: 0, nextShredId: 1 };
+    return { width, height, scale: 1, userCount: 0, fish: [], shreds: [], bubbles: [], tick: 0, nextShredId: 1 };
 }

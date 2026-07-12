@@ -60,9 +60,13 @@ authority:
     contract:
       name: syncWorld
       client_to_server: [userInput]
-      server_to_client: [domainEvents, mandatoryObjectRemoval, spatialCoordinateFragments, worldSizeSteps]
-      rule: "the server prepares one complete authoritative cycle, while each client receives its prepared cell fragments in a user-relative priority order; concrete WebSocket message format is specified by ws-protocol.dsc"
+      server_to_client: [domainEvents, mandatoryObjectRemoval, spatialCoordinateFragments, worldScale]
+      rule: "the server prepares one complete authoritative cycle and executes one shared phase order across all clients; concrete WebSocket message format is specified by ws-protocol.dsc"
     protocol_module: ws-protocol.dsc
+  phase_synchronized_delivery:
+    from: ds:multiplayer.phase-synchronized-delivery
+    phases: [own, horizontal, vertical, remaining]
+    rule: "for each shared cycle, schedule every client's own cell first, then left/right cells, then top/bottom cells, then remaining template cells; a new cycle discards unsent work from the preceding common phase plan"
   performance_statistics:
     from: ds:multiplayer.server-performance-statistics
     output:
@@ -70,11 +74,10 @@ authority:
       destination: server_console
     window_averages:
       world_iteration_ms: "elapsed time of one authoritative world iteration"
-      completed_client_sync_session_ms: "from preparation start of a cycle through socket.send of that client's final fragment"
+      phase_duration_ms: "common delivery phase duration"
       controlled_object_count: "all live fish plus shreds sampled during authoritative iterations"
-      dropped_fragments_per_sync_cycle: "unsent client queue fragments discarded by a newer cycle, divided by prepared cycles"
-    exclusions:
-      replaced_client_session: "does not contribute a transfer-duration sample"
+      dropped_fragments_per_sync_cycle: "unsent common-plan fragments discarded by a newer cycle, divided by prepared cycles"
+      sync_ack: "received v:N timestamps and sent-fragment byte counts"
 
 identity:
   from: ds:multiplayer.identity

@@ -3,8 +3,8 @@
 rationale_notes:
   - "World edges use toroidal wrap, not clamp or bounce; fish positions transfer to the opposite side without stopping."
   - "Linear drag is sufficient for water-like feel at current scope."
-  - "World coordinates are game units; client pixels are a viewport projection."
-  - "World resizing scales fish coordinates, not fish sizes."
+  - "World coordinates are normalized technical units; pixelsPerWorldUnit and worldScale are separate projection layers."
+  - "World area expansion keeps canonical coordinates fixed. It changes the conversion from game lengths to normalized technical lengths and narrows the client viewport by the same scale."
   - "Spawn and respawn low-density areas are computed over all fish, not only dangerous fish."
   - "Bubble decor should remain subtle and asynchronous to avoid visual noise."
   - "Bubble rise speed should stay near-constant and close to median cruise fish speed, so decor pacing remains readable across fish sizes."

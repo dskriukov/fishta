@@ -1,5 +1,9 @@
 # Bugs
 
+- [x] **[bug:fish-predation-contact-reach]**\
+  Поедание рыб должно засчитываться только при фактическом атакующем контакте: канонические круги хищника и жертвы пересекаются, жертва находится в передней ротовой зоне хищника, а относительное движение увеличивает это пересечение.
+  Source: user report 2026-07-12; affected requirement/DSR/code: `ds/sense/predation/predation.ds#ds:predation.contact`, `ds/sense/predation/predation.ds#ds:predation.attack-contact`, `ds/dsr/imp/web-canvas.dsr#eating_resolution`, `predation.js#isAttackContact`, `predation.js#collectFeedingCandidates`.
+
 - [x] **[bug:joystick-burst-rings-inside-cruise-zone]**\
   Визуальный джойстик должен отображать центральную cruise-зону и burst-кольца в одной радиальной системе: burst-уровень `1` находится на границе cruise-зоны, а все остальные burst-уровни располагаются только за её пределами.
   Source: user report 2026-07-10; affected requirement/DSR/code: `ds/sense/controls/controls.ds#ds:controls.mobile-joystick-hunt`, `ds/sense/controls/controls.ds#ds:controls.burst-endurance-joystick-ui`, `ds/dsr/imp/web-canvas.dsr#mobile_joystick_layout`, `style.css#joystick-base::before`, `style.css#joystick-burst-rings`.

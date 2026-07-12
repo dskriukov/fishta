@@ -4,7 +4,7 @@
 
 import { FISH, FRY, NPC, PREDATION, PREY, WORLD } from './constants.js';
 import { v, add, sub, scale, normalize, dist, clampLen } from './vec.js';
-import { growSizeFromAreas, makeFish, radiusOf } from './fish.js';
+import { growSizeFromAreas, makeFish, technicalRadiusOf } from './fish.js';
 import { canBeVictimOf, estimatedAttackContactTime, isAttackContact, isEdibleBySize, nearestToroidalDelta } from './predation.js';
 import { spawnShredsFromFish } from './shred.js';
 import { findLowestDensitySpawn, isOldAgeSuspended, targetNpcCount } from './world.js';
@@ -86,6 +86,7 @@ function spawnOne(world, rng, densitySpawn){
         fryAge: densitySpawn ? 0 : null,
         nominalStartSize,
         courage: densitySpawn ? assignNpcCourage(world, rng) : NPC.courageBase,
+        worldScale: world.scale,
     });
     fish.spawnGrace = densitySpawn ? 0 : PREY.spawnGrace;
 
@@ -107,7 +108,7 @@ export function findSafeNpcSpawn(world, nominalStartSize, rng){
     const samples = Math.max(WORLD.densitySamples, WORLD.densitySamples * 2);
     for( let i = 0; i < samples; i++ ){
         const pos = i === 0 ? findLowestDensitySpawn(world, rng) : v(rng() * world.width, rng() * world.height);
-        const candidate = spawnCandidate(pos, nominalStartSize);
+        const candidate = spawnCandidate(pos, nominalStartSize, world.scale);
         const densityScore = wrapAwareDensityScore(world, pos);
         const risk = spawnAttackRisk(world, candidate);
         if( !risk.risky && densityScore < bestSafeScore ){
@@ -126,14 +127,14 @@ export function findSafeNpcSpawn(world, nominalStartSize, rng){
     return bestSafe || bestFallback?.pos || findLowestDensitySpawn(world, rng);
 }
 
-function spawnCandidate(pos, nominalStartSize){
+function spawnCandidate(pos, nominalStartSize, worldScale = 1){
     const spawnSize = FRY.startSize;
     return {
         id: -1,
         pos,
         vel: v(0, 0),
         size: spawnSize,
-        radius: radiusOf(spawnSize),
+        radius: technicalRadiusOf(spawnSize, worldScale),
         nominalStartSize,
         fryAge: 0,
         ownerKind: 'npc',
@@ -230,7 +231,7 @@ export function chooseNpcIntent(self, world, rng, dt){
     if( selectedPrey ){
         const ownTime = estimatedAttackContactTime(burstCapablePredator(self, selectedPrey, world), selectedPrey, world);
         const postEatSize = growSizeFromAreas(self.size, selectedPrey.size);
-        const postEatSelf = { ...self, size: postEatSize, radius: radiusOf(postEatSize) };
+        const postEatSelf = { ...self, size: postEatSize, radius: technicalRadiusOf(postEatSize, world.scale) };
         if( ownTime <= incomingTime && !isEdibleBySize(nearestThreat, postEatSelf) ){
             return pursueIntent(self, selectedPrey, world, dt, rng);
         }
@@ -458,20 +459,21 @@ function edgeSpawn(world, rng){
 }
 
 // @ds:e6ecfbdd
-export function advanceFryGrowth(fish, dt){
+export function advanceFryGrowth(fish, dt, worldScale = 1){
     if( fish.fryAge === null || fish.fryAge === undefined ) return;
     fish.fryAge = Math.min(FRY.growthSeconds, fish.fryAge + dt);
     const t = fish.fryAge / FRY.growthSeconds;
     fish.size = FRY.startSize + (fish.nominalStartSize - FRY.startSize) * t;
-    fish.radius = radiusOf(fish.size);
+    fish.radius = technicalRadiusOf(fish.size, worldScale);
     if( fish.fryAge >= FRY.growthSeconds ) fish.fryAge = null;
 }
 
 // @ia 2d3e4f5a
 // @ds:d4f6a1c2
 // @ds:9ce87fee
-export function capPreySpeed(p, previousSpeed = PREY.maxSpeed){
-    p.vel = clampLen(p.vel, Math.max(PREY.maxSpeed, previousSpeed));
+export function capPreySpeed(p, previousSpeed = PREY.maxSpeed, worldScale = 1){
+    const scaleFactor = Math.max(1e-6, worldScale || 1);
+    p.vel = clampLen(p.vel, Math.max(PREY.maxSpeed / scaleFactor, previousSpeed));
 }
 
 function clamp(value, min, max){

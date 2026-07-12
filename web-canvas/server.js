@@ -8,10 +8,10 @@ import { execFileSync } from 'node:child_process';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
-import { SERVER, SYNC, RECONNECT, REGIME } from './src/constants.js';
-import { makeFish, updateAbandonedGradient } from './src/fish.js';
+import { SERVER, SYNC, RECONNECT, REGIME, WORLD } from './src/constants.js';
+import { makeFish, technicalRadiusOf, updateAbandonedGradient } from './src/fish.js';
 import { startUserFryStage } from './src/player.js';
-import { makeWorld, findLowestDensitySpawn, nextWorldSize, scaleWorldEntities } from './src/world.js';
+import { makeWorld, findLowestDensitySpawn, formatWorldScale, worldScale } from './src/world.js';
 import { maintainPopulation } from './src/prey.js';
 import { stepAuthoritativeWorld } from './src/step.js';
 import { isLeaveBlockedByUserAttack } from './src/predation.js';
@@ -19,6 +19,7 @@ import {
     encodeEvent,
     encodeIdentity,
     encodeObjectRemoval,
+    encodeWorldScale,
     encodeWorldSize,
     encodeWorldCycle,
     parseClientMessage,
@@ -36,7 +37,7 @@ let nextClientId = 1;
 let syncCycle = 0;
 let lastWorldSyncState = new Map();
 const objectBirthCycles = new Map();
-const fragmentQueues = new Map();
+let activeSyncPlan = null;
 const performanceStatistics = makePerformanceStatistics();
 
 maintainPopulation({ world }, Math.random);
@@ -82,12 +83,12 @@ wss.on('connection', socket =>{
             else inputsByClient.delete(meta.clientId);
         }
         if( message.type === 'leave' ) handleLeaveGame(socket, meta);
+        if( message.type === 'syncAck' ) handleSyncAck(socket, meta, message);
     });
 
     socket.on('close', () =>{
         const meta = sockets.get(socket);
         sockets.delete(socket);
-        fragmentQueues.delete(socket);
         if( meta?.fishId ) markDisconnected(meta);
     });
 });
@@ -98,7 +99,7 @@ function handleJoin(socket, meta, message){
     if( existing ){
         updateUserFishProfile(existing, message);
         send(socket, encodeIdentity(meta.fishId, existing.temporaryConnectionCode));
-        send(socket, encodeWorldSize(world));
+        send(socket, encodeWorldScale(world.scale));
         sendWorldSync(socket, true);
         return;
     }
@@ -110,14 +111,16 @@ function handleJoin(socket, meta, message){
         ownerKind: 'user',
         clientId: meta.clientId,
         temporaryConnectionCode,
+        worldScale: world.scale,
         ...normalizedUserProfile(message),
     });
-    startUserFryStage(fish, fish.pos, 'join');
+    startUserFryStage(fish, fish.pos, 'join', world.scale);
     world.fish.push(fish);
     meta.fishId = fish.id;
     meta.temporaryConnectionCode = temporaryConnectionCode;
     send(socket, encodeIdentity(meta.fishId, temporaryConnectionCode));
-    send(socket, encodeWorldSize(world));
+    updateWorldScale();
+    send(socket, encodeWorldScale(world.scale));
     sendWorldSync(socket, true);
 }
 
@@ -140,7 +143,7 @@ function handleReconnectGrace(socket, meta, message){
     if( restored ){
         meta.temporaryConnectionCode = message.temporaryConnectionCode;
         send(socket, encodeIdentity(meta.fishId, message.temporaryConnectionCode));
-        send(socket, encodeWorldSize(world));
+        send(socket, encodeWorldScale(world.scale));
         sendWorldSync(socket, true);
         return;
     }
@@ -187,6 +190,7 @@ function convertUserFishToNpc(fish){
     fish.clientId = null;
     fish.age = 0; // @ds:a6c9e8b4
     updateAbandonedGradient(fish);
+    updateWorldScale();
 }
 
 function releaseClientFish(meta){
@@ -231,12 +235,7 @@ function tick(){
         disconnects.delete(fishId);
     }
 
-    const userCount = world.fish.filter(fish => fish.ownerKind === 'user').length;
-    const nextSize = nextWorldSize(userCount, world);
-    if( nextSize.width !== world.width || nextSize.height !== world.height ){
-        scaleWorldEntities(world, nextSize);
-        broadcastEvent(encodeWorldSize(world));
-    }
+    updateWorldScale();
     const beforeFish = new Set(world.fish.map(fish => fish.id));
     const beforeShreds = new Set(world.shreds.map(shred => shred.id));
     const iterationStartedAt = performance.now();
@@ -249,51 +248,75 @@ function tick(){
 
 // @ds:e559831a @ds:c39827ed @ds:2afd71a0 @ds:61245206
 function broadcastWorldSync(forceAbsolute = false){
-    const preparationStartedAt = performance.now();
+    if( activeSyncPlan ) performanceStatistics.droppedFragmentCount += activeSyncPlan.remaining;
     const cycle = ++syncCycle;
     const encoded = encodeWorldCycle(world, lastWorldSyncState, cycle, objectBirthCycles);
     lastWorldSyncState = encoded.state;
     performanceStatistics.preparedSyncCycleCount++;
+    activeSyncPlan = makeSyncPlan(encoded, cycle, forceAbsolute);
+    runSyncPhases(activeSyncPlan);
+}
+
+// @ds:c39827ed @ds:0a2b6379 @ds:682570c7
+function makeSyncPlan(encoded, cycle, forceAbsolute){
+    const lookup = new Map(encoded.cells.map(cell => [cell.key, cell]));
+    const columns = Math.round(world.width / SYNC.cellSize);
+    const rows = Math.round(world.height / SYNC.cellSize);
+    const phases = [[], [], [], []];
+    const offsets = [
+        [[0, 0]],
+        [[-1, 0], [1, 0]],
+        [[0, -1], [0, 1]],
+        [],
+    ];
+    for( let dy = -2; dy <= 2; dy++ ){
+        for( let dx = -2; dx <= 2; dx++ ){
+            if( Math.abs(dx) <= 1 && Math.abs(dy) <= 1 ){
+                if( dx === 0 || dy === 0 ) continue;
+            }
+            offsets[3].push([dx, dy]);
+        }
+    }
     for( const [socket, meta] of sockets ){
-        if( socket.readyState !== socket.OPEN ) continue;
-        queueWorldFragments(socket, meta, encoded, cycle, forceAbsolute, preparationStartedAt);
+        const fish = findClientFish(meta);
+        if( !fish || socket.readyState !== socket.OPEN ) continue;
+        const ownX = Math.floor(fish.pos.x / SYNC.cellSize);
+        const ownY = Math.floor(fish.pos.y / SYNC.cellSize);
+        offsets.forEach((phaseOffsets, phaseIndex) => phaseOffsets.forEach(([dx, dy]) => {
+            const x = (ownX + dx + columns) % columns;
+            const y = (ownY + dy + rows) % rows;
+            const cell = lookup.get(`${x}:${y}`);
+            if( !cell && phaseIndex !== 1 ) return;
+            phases[phaseIndex].push({ socket, meta, x, y });
+        }));
     }
+    return { cycle, encoded, forceAbsolute, phases, phase: 0, remaining: phases.reduce((total, phase) => total + phase.length, 0), lookup, cancelled: false };
 }
 
-// @ds:c39827ed @ds:682570c7 @ds:61245206
-function queueWorldFragments(socket, meta, encoded, cycle, forceAbsolute = false, preparationStartedAt){
-    const fish = findClientFish(meta);
-    if( !fish ) return;
-    const ordered = [...encoded.cells].sort((a, b) => cellDistanceSquared(a, fish) - cellDistanceSquared(b, fish));
-    const ownCellX = Math.floor(fish.pos.x / SYNC.cellSize);
-    const ownCellY = Math.floor(fish.pos.y / SYNC.cellSize);
-    ordered.sort((a, b) => Number(!(a.cellX === ownCellX && a.cellY === ownCellY)) - Number(!(b.cellX === ownCellX && b.cellY === ownCellY)));
-    const allAbsolute = forceAbsolute || cycle % SYNC.globalAbsoluteEvery === 0;
-    const messages = ordered.map((cell, index) =>{
-        const absolute = allAbsolute || index < SYNC.nearestAbsoluteCells;
-        const source = absolute ? encoded.absoluteText : encoded.relativeText;
-        const start = absolute ? cell.absoluteStart : cell.relativeStart;
-        const end = absolute ? cell.absoluteEnd : cell.relativeEnd;
-        return `${absolute ? 'a:' : '|'}${cycle}:${cell.cellX}:${cell.cellY}|${source.slice(start, end)}`;
-    });
-    const previousQueue = fragmentQueues.get(socket);
-    if( previousQueue ) performanceStatistics.droppedFragmentCount += previousQueue.messages.length;
-    const generation = (previousQueue?.generation || 0) + 1;
-    fragmentQueues.set(socket, { generation, messages, preparationStartedAt });
-    flushFragmentQueue(socket, generation);
+function runSyncPhases(plan){
+    if( activeSyncPlan !== plan || plan.cancelled || plan.phase >= plan.phases.length ) return;
+    const startedAt = performance.now();
+    for( const entry of plan.phases[plan.phase] ) sendPlanFragment(plan, entry);
+    performanceStatistics.phaseTotalMs += performance.now() - startedAt;
+    performanceStatistics.phaseCount++;
+    plan.phase++;
+    if( plan.phase < plan.phases.length ) setImmediate(() => runSyncPhases(plan));
+    else activeSyncPlan = null;
 }
 
-// @ds:61245206
-function flushFragmentQueue(socket, generation){
-    const queue = fragmentQueues.get(socket);
-    if( !queue || queue.generation !== generation || socket.readyState !== socket.OPEN ) return;
-    const message = queue.messages.shift();
-    if( message ) socket.send(message);
-    if( message && queue.messages.length === 0 ){
-        performanceStatistics.completedClientSessionTotalMs += performance.now() - queue.preparationStartedAt;
-        performanceStatistics.completedClientSessionCount++;
-    }
-    if( queue.messages.length > 0 ) setImmediate(() => flushFragmentQueue(socket, generation));
+function sendPlanFragment(plan, entry){
+    if( entry.socket.readyState !== entry.socket.OPEN ) return;
+    const absolute = plan.forceAbsolute || plan.cycle % SYNC.globalAbsoluteEvery === 0 || plan.phase === 0;
+    const cell = plan.lookup.get(`${entry.x}:${entry.y}`);
+    const prefix = `${absolute ? 'a:' : '|'}${plan.cycle}:${entry.x}:${entry.y}|`;
+    const source = absolute ? plan.encoded.absoluteText : plan.encoded.relativeText;
+    const message = cell ? `${prefix}${source.slice(absolute ? cell.absoluteStart : cell.relativeStart, absolute ? cell.absoluteEnd : cell.relativeEnd)}` : `${prefix}~`;
+    entry.socket.send(message);
+    plan.remaining--;
+    entry.meta.syncCycles ??= new Map();
+    const stat = entry.meta.syncCycles.get(plan.cycle) || { firstSentAt: performance.now(), bytes: 0 };
+    stat.bytes += Buffer.byteLength(message);
+    entry.meta.syncCycles.set(plan.cycle, stat);
 }
 
 // @ds:61245206
@@ -305,8 +328,9 @@ function makePerformanceStatistics(){
         controlledObjectTotal: 0,
         preparedSyncCycleCount: 0,
         droppedFragmentCount: 0,
-        completedClientSessionCount: 0,
-        completedClientSessionTotalMs: 0,
+        phaseCount: 0,
+        phaseTotalMs: 0,
+        syncAckCount: 0,
     };
 }
 
@@ -316,9 +340,7 @@ function reportPerformanceStatistics(){
     const averageWorldIterationMs = performanceStatistics.worldIterationCount
         ? performanceStatistics.worldIterationTotalMs / performanceStatistics.worldIterationCount
         : 0;
-    const averageSessionMs = performanceStatistics.completedClientSessionCount
-        ? performanceStatistics.completedClientSessionTotalMs / performanceStatistics.completedClientSessionCount
-        : null;
+    const averagePhaseMs = performanceStatistics.phaseCount ? performanceStatistics.phaseTotalMs / performanceStatistics.phaseCount : 0;
     const averageControlledObjects = performanceStatistics.worldIterationCount
         ? performanceStatistics.controlledObjectTotal / performanceStatistics.worldIterationCount
         : 0;
@@ -328,9 +350,9 @@ function reportPerformanceStatistics(){
     console.log(
         `[server stats ${((now - performanceStatistics.windowStartedAt) / 1000).toFixed(1)}s] `
         + `world=${averageWorldIterationMs.toFixed(3)}ms/iteration; `
-        + `session=${averageSessionMs === null ? 'n/a' : `${averageSessionMs.toFixed(3)}ms/client`}; `
+        + `phase=${averagePhaseMs.toFixed(3)}ms; `
         + `objects=${averageControlledObjects.toFixed(1)}; `
-        + `dropped=${averageDroppedFragments.toFixed(2)} fragments/cycle`
+        + `dropped=${averageDroppedFragments.toFixed(2)} fragments/cycle; acks=${performanceStatistics.syncAckCount}`
     );
     performanceStatistics.windowStartedAt = now;
     performanceStatistics.worldIterationCount = 0;
@@ -338,23 +360,28 @@ function reportPerformanceStatistics(){
     performanceStatistics.controlledObjectTotal = 0;
     performanceStatistics.preparedSyncCycleCount = 0;
     performanceStatistics.droppedFragmentCount = 0;
-    performanceStatistics.completedClientSessionCount = 0;
-    performanceStatistics.completedClientSessionTotalMs = 0;
+    performanceStatistics.phaseCount = 0;
+    performanceStatistics.phaseTotalMs = 0;
+    performanceStatistics.syncAckCount = 0;
 }
 
-function cellDistanceSquared(cell, fish){
-    const x = (cell.cellX + 0.5) * SYNC.cellSize;
-    const y = (cell.cellY + 0.5) * SYNC.cellSize;
-    const dx = shortestDelta(fish.pos.x, x, world.width);
-    const dy = shortestDelta(fish.pos.y, y, world.height);
-    return dx * dx + dy * dy;
+function handleSyncAck(socket, meta, message){
+    const stat = meta.syncCycles?.get(message.cycle);
+    if( !stat ) return;
+    stat.ackAt = performance.now();
+    stat.bufferedAmount = socket.bufferedAmount;
+    performanceStatistics.syncAckCount++;
 }
 
-function shortestDelta(from, to, size){
-    let delta = to - from;
-    if( delta > size / 2 ) delta -= size;
-    if( delta < -size / 2 ) delta += size;
-    return delta;
+function updateWorldScale(){
+    const userCount = world.fish.filter(fish => fish.ownerKind === 'user').length;
+    const scale = worldScale(userCount);
+    const changed = scale !== world.scale;
+    world.userCount = userCount;
+    world.scale = scale;
+    for( const fish of world.fish ) fish.radius = technicalRadiusOf(fish.size, scale);
+    for( const shred of world.shreds ) shred.radius = (shred.size || 0) / 2 / WORLD.pixelsPerWorldUnit / scale;
+    if( changed ) broadcastEvent(encodeWorldScale(formatWorldScale(scale)));
 }
 
 // @ds:0aaccaf8

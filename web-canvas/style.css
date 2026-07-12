@@ -1555,8 +1555,8 @@ body::after {
     #world-info {
         left: 10px;
         bottom: calc(15px + env(safe-area-inset-bottom));
-        width: min(145px, calc(100vw - 12px));
-        min-width: min(130px, calc(100vw - 12px));
+        width: min(220px, calc(100vw - 12px));
+        min-width: min(190px, calc(100vw - 12px));
         padding: 7px 11px;
         border-radius: 12px;
     }
@@ -1736,7 +1736,7 @@ body::after {
         min-width: 0;
         height: auto;
         display: grid;
-        grid-template-columns: repeat(5, minmax(0, 1fr));
+        grid-template-columns: repeat(7, minmax(0, 1fr));
         gap: clamp(6px, 1.8vw, 22px);
         align-items: stretch;
         padding: 5px 14px max(5px, env(safe-area-inset-bottom));

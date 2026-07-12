@@ -71,14 +71,15 @@ contract_map:
   multiplayer.reconnectGrace:               server.js#handleReconnectGrace  # @ds:93a64773
   multiplayer.convertDisconnectedUserFishToNpc: server.js#convertUserFishToNpc  # @ds:eba75588 @ds:a6c9e8b4
   multiplayer.leaveGame:                    server.js#handleLeaveGame  # @ds:704ab317
-  multiplayer.syncWorld:                    server.js#broadcastWorldSync  # @ds:e559831a @ds:e4d375ed
-  multiplayer.serverPerformanceStatistics:  server.js#performanceStatistics server.js#tick server.js#broadcastWorldSync server.js#queueWorldFragments server.js#flushFragmentQueue  # @ds:61245206
+  multiplayer.syncWorld:                    server.js#broadcastWorldSync server.js#runSyncPhases  # @ds:e559831a @ds:e4d375ed @ds:0a2b6379
+  multiplayer.serverPerformanceStatistics:  server.js#performanceStatistics server.js#reportPerformanceStatistics  # @ds:61245206 @ds:0a2b6379 @ds:77faf734
   wsProtocol.encoding:                       protocol.js#encodeName protocol.js#decodeName  # @ds:839f8cd0
   wsProtocol.clientMessages:                 protocol.js#encodeClientJoin protocol.js#parseClientMessage  # @ds:5a4d3d6d
   wsProtocol.clientDeltaInput:               client-net.js#sendInput  # @ds:671e9773
   wsProtocol.handshakeState:                 client-net.js#connect server.js#handleMessage  # @ds:4fad33f8
-  wsProtocol.serverSync:                     protocol.js#encodeWorldCycle protocol.js#applyWorldFragment  # @ds:682570c7
-  wsProtocol.spatialFragments:                server.js#broadcastWorldSync server.js#queueWorldFragments protocol.js#encodeWorldCycle  # @ds:c39827ed
+  wsProtocol.serverSync:                     protocol.js#encodeWorldCycle protocol.js#parseWorldFragment client-net.js#connect  # @ds:682570c7 @ds:915ab0e4
+  wsProtocol.spatialFragments:                server.js#broadcastWorldSync server.js#runSyncPhases protocol.js#encodeWorldCycle  # @ds:c39827ed @ds:0a2b6379
+  wsProtocol.syncAckThroughput:               client-net.js#connect server.js#handleSyncAck  # @ds:77faf734
   wsProtocol.cellLocalPosition:               protocol.js#encodeFishRow protocol.js#encodeShredRow protocol.js#applyWorldFragment  # @ds:e047bbdf
   wsProtocol.newObjectRow:                    protocol.js#encodeWorldCycle protocol.js#applyWorldFragment  # @ds:6c8c56e7
   wsProtocol.sharedWorldSnapshot:            server.js#broadcastWorldSync protocol.js#encodeWorldCycle  # @ds:2afd71a0
@@ -126,12 +127,13 @@ contract_map:
   debug.drawPositionTraces:                 render.js#drawDebugPositionTraces  # @ds:727e9afe
   debug.drawFishCollisionRadius:            render.js#drawDebugFishCollisionRadius  # @ds:6b4e90d2 @ds:a3e394a8
   ui.showAppVersion:                         server.js#appVersion main.js#showAppVersion index.html#app-version  # @ds:8d13f6a2
-  ui.worldSnapshotInfo:                      main.js#updateWorldSnapshotInfo index.html#world-info style.css#world-info  # @ds:e42a7c19
+  ui.worldSnapshotInfo:                      main.js#updateWorldSnapshotInfo main.js#updateWorldSyncMetrics index.html#world-info style.css#world-info  # @ds:e42a7c19 @ds:world.status-sync-metrics
   world.wrapPosition:                       world.js#wrapPosition  # @ds:c83f4c1e @ia:dd909d1a
   world.applyDrag:                          world.js#applyDrag  # @ds:ca07d970
-  world.resizeWorld:                        world.js#nextWorldSize  # @ds:19c14fea
-  world.scaleFishCoordinatesForWorldResize: world.js#scaleWorldEntities  # @ds:19c14fea
-  world.playWorldResize:                    render.js#interpolateWorldResize  # @ds:19c14fea
+  world.fixedCoordinateGrid:                world.js#makeWorld constants.js#WORLD  # @ds:10dc892b
+  world.virtualAreaPerUser:                 world.js#worldScale world.js#effectiveWorldArea  # @ds:8b998807 @ds:915ab0e4
+  world.scaleDensity:                       world.js#targetNpcCount  # @ds:6ca3cb74 @ds:53db39eb
+  world.scaleProjection:                    render.js#worldToViewport render.js#viewportToWorld  # @ds:915ab0e4 @ds:7b9a7984
   world.maintainNpcDensity:                 world.js#targetNpcCount  # @ds:53db39eb
   world.findLowestFishDensityArea:          world.js#findLowestDensitySpawn  # @ds:53db39eb
   world.controlledObjectLimit:               world.js#controlledObjectCount world.js#canAddControlledObjects world.js#isOldAgeSuspended  # @ds:eccfca7e @ds:d140effd
@@ -183,7 +185,7 @@ contract_map:
   prey.growSpawnedFryToNominalSize:         prey.js#advanceFryGrowth  # @ds:e6ecfbdd
   prey.expireOldNpcFish:                     prey.js#expireOldNpcFish step.js#stepAuthoritativeWorld  # @ds:a6c9e8b4 @ds:d140effd
   predation.overlaps:                       predation.js#overlaps  # @ds:a3e394a8 @ds:b024b514
-  predation.isAttackContact:                predation.js#isAttackContact  # @ds:b39c93a5 @ds:b024b514
+  predation.isAttackContact:                predation.js#isAttackContact  # @ds:b39c93a5 @ds:b024b514 @fix:3e7a9c21
   predation.isEdibleBySize:                 predation.js#isEdibleBySize  # @ds:98224ab9
   predation.canBeVictimOf:                  predation.js#canBeVictimOf  # @ds:32745a4f @ds:9d62f0a7 @ia:01fe68fa
   predation.canEat:                         predation.js#canEat  # @ds:98224ab9 @ds:32745a4f @ds:b39c93a5
@@ -267,7 +269,7 @@ data_model:
       - eating and respawn events
       - NPC motivations
       - synchronizing coordinates
-      - world resize steps
+      - world scale
     client_owns:
       - current input
       - join form draft values
@@ -278,9 +280,10 @@ data_model:
       worldIterationTotalMs: "sum of stepAuthoritativeWorld elapsed durations"
       controlledObjectTotal: "sum of world.fish.length + world.shreds.length after each authoritative step"
       preparedSyncCycleCount: "broadcastWorldSync invocations in the current window"
-      droppedFragmentCount: "unsubmitted queue messages discarded by a newer client queue"
-      completedClientSessionCount: "client queues whose final fragment was submitted in the current window"
-      completedClientSessionTotalMs: "sum from broadcast preparation start through final socket.send"
+      droppedFragmentCount: "unsubmitted common-phase messages discarded by a newer cycle"
+      phaseTotalMs: "sum of common delivery phase durations"
+      phaseCount: "completed common delivery phases"
+      syncAckCount: "received v:N confirmations in the current window"
       - render interpolation and prediction cache
       - decorative bubble emission, advancement, and rendering
       - size delta label accumulation, lifetime, current user size metric, and rendering for the current user fish only
@@ -300,8 +303,7 @@ implementation_instructions:
     Connected clients send compact input messages for their own user fish only.
     Server broadcasts compact state strings shared by all clients; per-client messages are limited to identity and events.  # @ds:e559831a
   server_performance_statistics: |
-    server.js owns one module-level performanceStatistics accumulator and resets it only after reporting. Use performance.now() for all durations. In tick(), time only stepAuthoritativeWorld({ world }, inputsByClient, dt, Math.random), then add its elapsed milliseconds, increment the iteration count, and add world.fish.length + world.shreds.length after the step. In broadcastWorldSync(), capture preparationStartedAt before encodeWorldCycle(), increment preparedSyncCycleCount once for that shared cycle, and pass preparationStartedAt into every queueWorldFragments call.
-    queueWorldFragments stores preparationStartedAt with each per-socket queue. Before replacing an existing queue, add its current unsent messages.length to droppedFragmentCount. flushFragmentQueue records a completed-client-session duration only after socket.send() submits the final message of its unchanged queue; replaced queues contribute no duration. A five-second server timer calls reportPerformanceStatistics(), which prints one stable console line containing the current-window averages: authoritative iteration milliseconds, completed client-session milliseconds (or n/a when there are no completed sessions), controlled object count, and dropped fragments divided by prepared sync cycles (or 0 when none). Then reset all window totals and set windowStartedAt to the report timestamp.  # @ds:61245206
+    server.js owns one module-level performanceStatistics accumulator and resets it only after reporting. In tick(), time only stepAuthoritativeWorld({ world }, inputsByClient, dt, Math.random), then add its elapsed milliseconds, increment the iteration count, and add world.fish.length + world.shreds.length after the step. broadcastWorldSync() increments preparedSyncCycleCount once, replaces any unsubmitted common phase plan while adding its remaining message count to droppedFragmentCount, and records each completed phase duration. `v:N` records cycle, sent-byte total, first-send timestamp, ACK timestamp, and socket bufferedAmount without gating any phase. The five-second report prints world iteration time, phase time, controlled object count, dropped fragments per cycle, and ACK count.  # @ds:61245206 @ds:0a2b6379 @ds:77faf734
   join_identity: |
     Join form starts with generated name and generated user color.
     It includes a paid/free toggle. The toggle is only a local domain attribute,
@@ -502,9 +504,12 @@ implementation_instructions:
     index.html contains #world-map-toggle in the top-right of #hud and #world-map as a screen-space 200x200 px overlay. The map button is visible only while an active joined session exists, has the same toolbar button footprint as #game-menu-toggle, and independently toggles worldMapVisible without changing debugMode, world state, input, or socket messages. #world-map is hidden unless worldMapVisible is true. In every responsive breakpoint, #hud .hud-row keeps explicit left-button, shrinkable metrics, and right-button grid tracks; #world-map-toggle uses the same breakpoint-specific width, height, border radius, and visual container as #game-menu-toggle, so neither button can wrap below the toolbar.  # @ds:3a980720
     constants.js exports WORLD_MAP with the fixed 200px square size, 12px left inset, and 12px overlay gap; do not reuse DEBUG minimap coordinates for player-facing map UI. main.js#getWorldMapTop reads #hud and visible #player-metrics bounding rectangles every animation frame, takes the greater bottom edge, and adds WORLD_MAP.overlayGapPx. Pass this screen-space top coordinate in the render state. render.js#drawWorldMap(ctx, world, currentUserFishId, top) runs after restoring the viewport transform, uses WORLD_MAP.sizePx and WORLD_MAP.leftPx with the supplied top coordinate, validates positive world dimensions, draws the fixed square frame, and maps each canonical fish position into the square using clamped float coordinates without mutating fish.pos. NPC point diameter is derived from linear size sqrt(max(0, fish.size)): nominal PLAYER.startSize maps to 2px, every smaller value also maps to 2px, and the largest current fish maps to 5px; clamp the final diameter to [2, 5] and handle the no-range case without division by zero. Other user fish use a 3px inner point plus a 1px-gap, 1px-stroke outer circle; the current user uses a 5px inner point plus a 1px-gap, 2px-stroke outer circle. Keep the fish color resolution used by the existing minimap.  # @ds:3a980720 @ds:8f2c91ad
   world_snapshot_info_ui: |
-    index.html contains #world-info in the bottom-left overlay layer. It has four
-    value spans: #world-fish-count, #world-fish-area, #world-nutrient-count, and
-    #world-nutrient-area.
+    index.html contains #world-info in the bottom-left overlay layer. It has six
+    value spans: #world-fish-count, #world-fish-area, #world-nutrient-count,
+    #world-nutrient-area, #world-scale, and #world-sync. The Scale value shows
+    world.scale. The Sync value shows the latest received sync cycle and the
+    rolling average number of distinct received quadrants per iteration over the
+    last 20 completed cycles.
     main.js#updateWorldSnapshotInfo(world) reads only the latest world object
     stored from WebSocket synchronization, not extrapolated render-only bubbles
     or server-only state:
@@ -534,13 +539,16 @@ implementation_instructions:
     main.js then calls setJoinedUiState(false) and shows the join panel. On event
     wrn, keep the joined state and leave button label unchanged because the
     server denied the explicit leave.  # @ds:9772e9ac @ds:fb11044e @ds:704ab317 @ds:8917ad63
-  world_resize: |
-    nextWorldSize(userFishCount) changes size only across thresholds with hysteresis.
-    When size changes, scale every fish position proportionally:
-      x' = x * newWidth / oldWidth
-      y' = y * newHeight / oldHeight
-    Do not scale fish.size or radius from resize itself.
-    Broadcast the world-size step so clients interpolate coordinate stretching.  # @ds:19c14fea
+  world_scale: |
+    WORLD has fixed technical width=500, height=500, cellSize=100, pixelsPerWorldUnit=4, and userAreaSideDiameters=10. FISH owns nominalStartDiameter=8 normalized units; size=1 is dimensionless and changes diameter by sqrt(size). world.js#makeWorld always uses the fixed technical dimensions. world.js#effectiveWorldArea(userCount) returns (500*4)^2 + userCount*(10*8*4)^2 in player-facing pixel area. world.js#worldScale(userCount) returns sqrt(effectiveWorldArea/(2000*2000)), rounded to three decimals. Convert a player-facing pixel length to technical coordinates as pixelLength / pixelsPerWorldUnit / world.scale. Do not rescale canonical pos values when the count changes.
+    fish.js#radiusOf returns the base pixel radius and fish.js#technicalRadiusOf applies both conversion layers for server/client collision geometry. Keep speed and acceleration tuning in px/s and px/s² and convert at the simulation boundary; keep time, probabilities, damping rates, and dimensionless size values unchanged. targetNpcCount(world) uses effectiveWorldArea(world.userCount) rather than width*height. server.js sends `s:<formatted scale>` after identity/reconnect and broadcasts it whenever user count changes. The formatter removes insignificant trailing zeroes. render.js changes only the projection factor, uses the same factor in both viewport transforms, and never recreates the Canvas.  # @ds:10dc892b @ds:8b998807 @ds:6ca3cb74 @ds:915ab0e4 @ds:2595a2d
+  client_pixel_decor: |
+    main.js owns clientBubbles and clientBubbleEmitters. world.js#makeBubble and fish.js#makeExhaleBubble create decor records with only `posPx`, `velPx`, `radiusPx`, `targetRadiusPx`, age, lifetime, alpha and phase; derive fish size exclusively from `FISH.nominalStartDiameter * WORLD.pixelsPerWorldUnit * sqrt(size) / 2`, never from technical `fish.radius`. world.js#advanceBubbles mutates only pixel positions, pixel velocities and pixel radii; it uses pixel world bounds and does not read or apply world.scale. fish.js exhale displacement uses `posPx` and pixel mouth coordinates. render.js#buildToroidalRenderWorld must not contain or project decor; render.js#drawPixelBubbles may map pixel decor to screen coordinates only for the current draw call and must style it with screen-pixel values such as `BUBBLE.strokeWidthPx`, never with technical radii or a technical-unit minimum line width. A worldScale message therefore changes only the transient render projection, not any existing decor radius, speed, position, trajectory or styling values.  # @ds:d6cebf86 @ia:3c4d5e6f @fn:a9a3ed12
+  visual_layer_matrix: |
+    render.js owns a client-only `renderLayer` assignment cache and never writes layers into synchronized fish, shred or world state. `assignFishRenderLayers(fish)` sorts visible fish deterministically and assigns even layers: NPC fish use 100..9000 and user fish use 10002..29000, with user layers always higher. `renderLayerForBubble(bubble, fishLayers)` resolves `bubble.sourceFishId` to the source fish layer and returns `fishLayer - 1`; makeBubble and makeExhaleBubble must preserve that source id. `assignShredRenderLayers(shreds, occupiedFishLayers)` creates only odd candidates derived from occupied fish layers, distributes shreds deterministically and evenly across those candidates, and may use at most five extra fish slots; it must not use empty layer ranges. render.js builds one render-item list for fish, shreds and bubbles, sorts ascending by renderLayer and draws it in that order, so a bubble is under its source fish while shreds can cover any fish. `drawPixelBubbles` is folded into this ordered pass; its radius and stroke remain screen-pixel styling and only its transient position is projected. CSS background/parallax remains outside the gameplay canvas and below all gameplay items; lower `BACKGROUND.parallaxFactor` remains farther back. Layer values never enter physics, collision, protocol or synchronized state.  # @ds:7c2f91ad @ds:e13d7a52 @ds:d6cebf86
+  phased_spatial_sync: |
+    protocol.js#encodeWorldCycle serializes only non-empty cell rows and indexes only those ranges. It also returns an empty-cell boolean lookup for all 25 coordinates. Prebuild coordinate-specific empty payload templates with the one-byte delta marker for horizontal neighbors only; at send time interpolate only the current cycle number and choose the absolute or relative header. The central cell is sent when non-empty, and empty placeholders are sent only for the left and right phases. Empty cells in vertical, diagonal, and remaining phases are omitted from the common plan.
+    server.js#broadcastWorldSync creates one common plan for cycle N. For every live user socket, resolve its wrapped cell and add messages in phases: own; left and right; top and bottom; then top-left, bottom-left, top-right, bottom-right. Run each phase across all sockets before scheduling the next phase with setImmediate. A socket send only skips that socket when it is closed; it never blocks phase advancement. Starting N+1 cancels the remaining scheduled plan and counts its unsent entries. Do not allocate per-client queues or sort cells by distance. client-net.js sends `v:N` once after receiving any three fragments of N; server.js#handleSyncAck logs it with recorded sent bytes and timestamps only.  # @ds:e559831a @ds:c39827ed @ds:682570c7 @ds:77faf734 @ds:0a2b6379
   wrap_position: |
     function wrapPosition(fish, world){
       fish.pos.x = ((fish.pos.x % world.width) + world.width) % world.width
@@ -665,9 +673,13 @@ implementation_instructions:
     spawnShredsFromFish(world, fish, rng):
       - compute dead fish canonical circular area as Math.PI * fish.radius^2;
       - compute total shred geometric area = deadArea * SHRED.areaRatio;
-      - repeatedly sample individual shred diameter in SHRED.minSize..SHRED.maxSize
-        with SHRED.fragmentation/sizeJitter, convert diameter to circle area, clamp
-        the final piece to remaining area, and derive shred.size from that area;
+      - derive the configurable visual diameter bounds from the nominal start-fish
+        diameter multiplied by SHRED.minDiameterRatio/maxDiameterRatio, independent
+        of PREY.minSize; sample within those bounds with
+        SHRED.fragmentation/sizeJitter, convert the sampled visual diameter once to
+        technical units using WORLD.pixelsPerWorldUnit and world.scale, convert to
+        circle area, clamp the final piece to remaining area, and derive shred.size
+        from that technical area;
       - place each shred at a random polar offset within min(fish.radius,
         fish.radius * SHRED.scatterRadiusRatio) around fish.pos and wrap it;
       - sourceColor = fish.formerUserColor for npcRole='abandoned-user-fish' when
@@ -901,9 +913,9 @@ implementation_instructions:
       - compute mouth/head direction from current facing/velocity and reject victims outside the forward mouth cone;
       - compute relativeVelocity = predator.vel - victim.vel and separation = victim.pos - predator.pos in the nearest toroidal image;
       - require dot(relativeVelocity, separation) > 0 so the current motion increases overlap;
-      - allow contact when center distance < predator.radius + victim.radius or when the victim circle intersects the predator mouth/head reach area.
+      - allow contact only when center distance < predator.radius + victim.radius; forward attack reach remains available for threat, spawn, and steering heuristics, but it must not make fish candidates edible before circle intersection.
     On NPC victim: grow predator, splice victim from world.fish, and adjust outer loop index when needed.
-    On user victim: grow predator and respawnUserFishAfterEating(world,victim,rng) in place, preserving id, clientId, temporaryConnectionCode, userName, userColor, and userTier, then start the 3 second player start window.  # @ds:75a5aa4f @ds:39305789 @ds:4c7a2b91 @ds:9d62f0a7 @ds:a3e394a8 @ds:b39c93a5 @ds:b024b514 @ds:98224ab9
+    On user victim: grow predator and respawnUserFishAfterEating(world,victim,rng) in place, preserving id, clientId, temporaryConnectionCode, userName, userColor, and userTier, then start the 3 second player start window.  # @ds:75a5aa4f @ds:39305789 @ds:4c7a2b91 @ds:9d62f0a7 @ds:a3e394a8 @ds:b39c93a5 @ds:b024b514 @ds:98224ab9 @fix:3e7a9c21
   client_prediction_and_render: |
     main.js owns snapshotBuffer and clientBubbles outside state.world.
     main.js also owns debugMode, debugPositionTraces, and latestAbsoluteServerPositions outside state.world.
@@ -1180,8 +1192,8 @@ new_or_changed_constants:
   NPC.maxLifetimeSeconds: 300          # @ds:a6c9e8b4
   SHRED.areaRatio: 0.5                 # @ds:e13d7a52
   SHRED.nutritionMultiplier: 3         # @ds:0b8e71d4 @ds:f0a6c5d8
-  SHRED.minSize: "small enough for tiny fish to eat some pieces" # @ds:7c2f91ad
-  SHRED.maxSize: "upper shred diameter" # @ds:7c2f91ad
+  SHRED.minDiameterRatio: "minimum shred visual diameter as a fraction of nominal start-fish diameter" # @ds:7c2f91ad
+  SHRED.maxDiameterRatio: "maximum shred visual diameter as a fraction of nominal start-fish diameter" # @ds:7c2f91ad
   SHRED.fragmentation: "controls average sampled shred diameter" # @ds:7c2f91ad @ds:5a9c0e77
   SHRED.sizeJitter: "randomized individual shred size variation" # @ds:7c2f91ad @ds:5a9c0e77
   SHRED.eatSizeRatio: "fish.size threshold relative to shred.size" # @ds:c14f7a08

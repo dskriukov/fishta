@@ -4,15 +4,19 @@
 // @ds:07320d39
 // @ds:9ce87fee
 
-import { FISH, GROWTH, ENERGY, REGIME, MOUTH, SWIM, FEAR_EYE, BUBBLE, EXHALE, PREDATION } from './constants.js';
+import { FISH, WORLD, GROWTH, ENERGY, REGIME, MOUTH, SWIM, FEAR_EYE, BUBBLE, EXHALE, PREDATION } from './constants.js';
 import { add, sub, scale, normalize, clampLen, len } from './vec.js';
 import { clampToBounds, applyDrag } from './world.js';
 
 let nextId = 1;
 
 // ds:cbc1225a
-export function radiusOf(size){
-    return FISH.baseRadius * Math.sqrt(size);
+export function pixelRadiusOf(size){
+    return FISH.nominalStartDiameter * WORLD.pixelsPerWorldUnit * Math.sqrt(Math.max(0, size)) / 2;
+}
+
+export function technicalRadiusOf(size, worldScale = 1){
+    return FISH.nominalStartDiameter * Math.sqrt(Math.max(0, size)) / 2 / Math.max(1e-6, worldScale);
 }
 
 // ds:8869f043
@@ -21,7 +25,7 @@ export function maxSpeedOf(size, ownerKind = null){
     const linearSize = Math.max(FISH.minLinearSpeedSize, Math.sqrt(area));
     const dragDenominator = 1 + FISH.waterDragByLinearSize * (linearSize - 1);
     const sizeCap = FISH.baseNoDragSpeed / Math.max(0.01, dragDenominator);
-    return ownerKind === 'user' ? Math.max(FISH.minBurstSpeed, sizeCap) : sizeCap;
+    return ownerKind === 'user' ? Math.max(FISH.minBurstSpeed, sizeCap) : sizeCap * FISH.npcSpeedFactor;
 }
 
 export const BURST_ENDURANCE_SIZE_THRESHOLDS = buildBurstEnduranceThresholds();
@@ -123,13 +127,14 @@ export function makeFish({
     fryAge = null,
     nominalStartSize = null,
     courage = null,
+    worldScale = 1,
 }){
     return {
         id: nextId++,
         pos: { ...pos },
         vel: { x: 0, y: 0 },
         size,
-        radius: radiusOf(size),
+        radius: technicalRadiusOf(size, worldScale),
         facing: 1,          // 1 = right, -1 = left
         mode: 'cruise',
         speedLevel: 0,
@@ -195,19 +200,22 @@ export function updateAbandonedGradient(fish){
 // contract: fish.integrateMotion  (v += a*dt; v = drag(v); p += v*dt)
 export function integrate(fish, accel, world, dt){
     fish.age += dt;
+    const worldScale = Math.max(1e-6, world?.scale || 1);
     const level = normalizeSpeedLevel(fish.speedLevel);
     const thrusting = level > 0 && len(accel) > 1e-6;
     const previousSpeed = len(fish.vel);
     if( thrusting ){
-        fish.vel = add(fish.vel, scale(accel, dt));
-        const speedCap = speedCapOf(fish.size, fish.ownerKind, level, fish.cruiseControl);
+        // Speed tunables are expressed in game pixels per second; positions
+        // are stored in the fixed technical grid.
+        fish.vel = add(fish.vel, scale(accel, dt / worldScale));
+        const speedCap = speedCapOf(fish.size, fish.ownerKind, level, fish.cruiseControl) / worldScale;
         fish.vel = clampLen(fish.vel, Math.max(speedCap, previousSpeed));
     }
     fish.vel = applyDrag(fish.vel, dt, fish.size);
     const move = scale(fish.vel, dt);
     fish.pos = add(fish.pos, move);
     const activeBurstThrust = thrusting && level >= REGIME.burstStartSpeedLevel;
-    spendEnergy(fish, activeBurstThrust ? len(move) : 0);   // ds:f51831f5
+    spendEnergy(fish, activeBurstThrust ? len(move) * worldScale : 0, worldScale);   // ds:f51831f5
     if( fish.spawnGrace > 0 ){
         fish.spawnGrace = Math.max(0, fish.spawnGrace - dt);
     }else{
@@ -238,12 +246,12 @@ export function serializeFish(fish){
 // @ds:f51831f5 @ds:6aa7c828
 // @ds:9ce87fee
 // Drift (no thrust) is free; traveling 100*size with thrust => -1% size.
-export function spendEnergy(fish, distance){
+export function spendEnergy(fish, distance, worldScale = 1){
     if( normalizeSpeedLevel(fish.speedLevel) < REGIME.burstStartSpeedLevel || distance <= 0 ) return;
     if( fish.ownerKind === 'user' && fish.fryAge !== null && fish.fryAge !== undefined ) return; // @ds:4c7a2b91
     const minSize = fish.ownerKind === 'user' ? ENERGY.userMinSize : ENERGY.minSize;
     fish.size = sizeAfterBurstDistance(fish.size, fish.speedLevel, distance, minSize);
-    fish.radius = radiusOf(fish.size);
+    fish.radius = technicalRadiusOf(fish.size, worldScale);
 }
 
 // ds:8d0ca6a8
@@ -253,19 +261,19 @@ export function updateFacing(fish){
 }
 
 // ds:d867989f
-export function grow(fish, preySize){
+export function grow(fish, preySize, worldScale = 1){
     const gain = growSizeFromAreas(fish.size, preySize) - fish.size;
     fish.size += gain;
-    fish.radius = radiusOf(fish.size);
+    fish.radius = technicalRadiusOf(fish.size, worldScale);
     fish.eatenFishCount += 1;
     fish.mouthEatenSize = Math.max(fish.mouthEatenSize, preySize);
     fish.mouthHold = Math.max(fish.mouthHold, MOUTH.holdDuration);
 }
 
 // @ds:79c1e3a5 @ds:d867989f
-export function growFromNutrient(fish, areaValue){
+export function growFromNutrient(fish, areaValue, worldScale = 1){
     fish.size += Math.max(0, areaValue);
-    fish.radius = radiusOf(fish.size);
+    fish.radius = technicalRadiusOf(fish.size, worldScale);
 }
 
 // @ds:d867989f @ds:b024b514
@@ -324,9 +332,10 @@ function lerp(a, b, t){
 }
 
 function mouthPos(fish){
+    const radiusPx = pixelRadiusOf(fish.size);
     return {
-        x: fish.pos.x + fish.facing * fish.radius * 0.9,
-        y: fish.pos.y + fish.radius * 0.05,
+        x: fish.pos.x * WORLD.pixelsPerWorldUnit + fish.facing * radiusPx * 0.9,
+        y: fish.pos.y * WORLD.pixelsPerWorldUnit + radiusPx * 0.05,
     };
 }
 
@@ -338,32 +347,34 @@ function displacementWeight(dist, radius){
 function displaceExistingBubbles(fish, bubbles, dt, towardMouth){
     if( !Array.isArray(bubbles) || bubbles.length === 0 ) return;
     const mouth = mouthPos(fish);
-    const radius = Math.max(1, fish.radius * EXHALE.influenceRadiusSizes);
+    const radius = Math.max(1, pixelRadiusOf(fish.size) * EXHALE.influenceRadiusSizes);
     const sign = towardMouth ? 1 : -1;
     for( const bubble of bubbles ){
-        const toMouth = sub(mouth, bubble.pos);
+        const toMouth = sub(mouth, bubble.posPx);
         const d = len(toMouth);
         const w = displacementWeight(d, radius);
         if( w <= 0 ) continue;
         const dir = normalize(toMouth);
         const shift = scale(dir, sign * EXHALE.bubbleDisplaceSpeed * w * dt);
-        bubble.pos = add(bubble.pos, shift);
+        bubble.posPx = add(bubble.posPx, shift);
     }
 }
 
 // @ds:a44b9d2c @fn:a9a3ed12
 function makeExhaleBubble(fish, rng){
-    const radius = Math.max(BUBBLE.minRadius, fish.radius * BUBBLE.maxRatio * BUBBLE.displayScale * (0.6 + 0.4 * rng()));
+    const fishRadiusPx = pixelRadiusOf(fish.size);
+    const targetRadiusPx = fishRadiusPx * BUBBLE.maxRatio * BUBBLE.displayScale;
     const mouth = mouthPos(fish);
     const red = rng() < (fish.exhale.redRatio || 0);
     const bubble = {
-        pos: {
-            x: mouth.x - fish.facing * fish.radius * 0.5,
+        sourceFishId: fish.id,
+        posPx: {
+            x: mouth.x - fish.facing * fishRadiusPx * 0.5,
             y: mouth.y,
         },
-        radius: 0,
-        targetRadius: radius,
-        vel: {
+        radiusPx: 0,
+        targetRadiusPx,
+        velPx: {
             x: fish.facing * (BUBBLE.drift * (0.35 + 0.65 * rng())),
             y: -BUBBLE.riseSpeed * (0.8 + 0.4 * rng()),
         },

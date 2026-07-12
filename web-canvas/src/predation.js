@@ -14,7 +14,7 @@ export function overlaps(a, b, world = null){
     return toroidalDistance(a.pos, b.pos, world) < a.radius + b.radius;
 }
 
-// @ds:b39c93a5 @ds:b024b514
+// @ds:b39c93a5 @ds:b024b514 @fix:3e7a9c21
 export function isAttackContact(predator, victim, world = null){
     if( predator.mode !== 'burst' ) return false;
     const speed = Math.hypot(predator.vel?.x || 0, predator.vel?.y || 0);
@@ -36,10 +36,7 @@ export function isAttackContact(predator, victim, world = null){
     };
     if( relativeVelocity.x * separation.x + relativeVelocity.y * separation.y <= 0 ) return false;
 
-    if( distance < contactDistance ) return true;
-
-    const reach = contactDistance * PREDATION.attackReachRatio;
-    return distance < contactDistance + reach;
+    return distance < contactDistance;
 }
 
 // Backward-compatible name for legacy call sites; new IMP code uses isAttackContact.
@@ -80,6 +77,7 @@ export function respawnPlayerAfterEating(state){
         },
         size: PLAYER.startSize,
         isPlayer: true,
+        worldScale: world.scale,
     });
     state.player.prevAccel = { x: 0, y: 0 };
 }
@@ -99,10 +97,11 @@ export function respawnUserFishAfterEating(world, fish, rng){
         size: PLAYER.fryStartSize,
         isPlayer: true,
         ownerKind: 'user',
+        worldScale: world.scale,
         ...saved,
     });
     respawned.id = saved.id;
-    startUserFryStage(respawned, respawned.pos, 'eaten');
+    startUserFryStage(respawned, respawned.pos, 'eaten', world.scale);
     Object.assign(fish, respawned);
 }
 
@@ -135,7 +134,7 @@ export function resolveEating(state){
         const p = prey[i];
         const attackContact = isAttackContact(p, player, state.world);
         if( attackContact && canEat(p, player, state.world, attackContact) && canRemoveVictim(state, player) ){
-            grow(p, player.size);
+            grow(p, player.size, state.world?.scale);
             respawnPlayerAfterEating(state);
             return eatenByPlayer;
         }
@@ -146,7 +145,7 @@ export function resolveEating(state){
         const p = prey[i];
         const attackContact = isAttackContact(player, p, state.world);
         if( attackContact && canEat(player, p, state.world, attackContact) && canRemoveVictim(state, p) ){
-            grow(player, p.size);
+            grow(player, p.size, state.world?.scale);
             prey.splice(i, 1);
             eatenByPlayer++;
         }
@@ -162,7 +161,7 @@ export function resolveEating(state){
             if( !b ) continue;
             const attackContact = isAttackContact(a, b, state.world);
             if( attackContact && canEat(a, b, state.world, attackContact) && canRemoveVictim(state, b) ){
-                grow(a, b.size);
+                grow(a, b.size, state.world?.scale);
                 prey.splice(j, 1);
                 if( j < i ) i--;
             }
@@ -241,7 +240,7 @@ export function processFeedingBatch(feeder, candidates, world, rng){
 
         successfulArea += current.swallowedArea;
         if( current.type === 'fish' ){
-            grow(feeder, current.target.size);
+            grow(feeder, current.target.size, world.scale);
             if( feeder.ownerKind === 'user' ) eatenByUsers++;
             if( current.target.ownerKind === 'user' ){
                 respawnUserFishAfterEating(world, current.target, rng);
@@ -250,7 +249,7 @@ export function processFeedingBatch(feeder, candidates, world, rng){
                 if( index >= 0 ) world.fish.splice(index, 1);
             }
         }else{
-            growFromNutrient(feeder, current.nutrition);
+            growFromNutrient(feeder, current.nutrition, world.scale);
             consumeShredLayer(feeder, current.target, current.group);
             if( !current.target.remainingLayers || current.target.remainingLayers.length === 0 ){
                 const index = (world.shreds || []).indexOf(current.target);

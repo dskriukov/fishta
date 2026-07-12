@@ -2,11 +2,11 @@
 // @ds 4c7a2b91 c18e5b42 9d62f0a7 b7a4c391 2e91f6d4
 
 import { PLAYER } from './constants.js';
-import { radiusOf } from './fish.js';
+import { technicalRadiusOf } from './fish.js';
 import { findLowestDensitySpawn, wrapPoint } from './world.js';
 
 // @ds:4c7a2b91
-export function startUserFryStage(fish, position, reason = 'spawn'){
+export function startUserFryStage(fish, position, reason = 'spawn', worldScale = 1){
     const saved = {
         id: fish.id,
         clientId: fish.clientId,
@@ -20,7 +20,7 @@ export function startUserFryStage(fish, position, reason = 'spawn'){
         pos: { ...position },
         vel: { x: 0, y: 0 },
         size: PLAYER.fryStartSize,
-        radius: radiusOf(PLAYER.fryStartSize),
+        radius: technicalRadiusOf(PLAYER.fryStartSize, worldScale),
         facing: fish.facing || 1,
         mode: 'cruise',
         age: 0,
@@ -49,7 +49,7 @@ export function placeUserSpawn(world, reason, rng, options = {}){
 }
 
 // @ds:4c7a2b91 @ds:b7a4c391
-export function advanceUserFryStage(fish, dt){
+export function advanceUserFryStage(fish, dt, worldScale = 1){
     if( fish.ownerKind !== 'user' ) return false;
     if( fish.fryAge === null || fish.fryAge === undefined ) return false;
     fish.fryAge = Math.min(PLAYER.fryGrowthSeconds, fish.fryAge + dt);
@@ -58,7 +58,7 @@ export function advanceUserFryStage(fish, dt){
         const grownSize = PLAYER.fryStartSize + (PLAYER.startSize - PLAYER.fryStartSize) * t;
         fish.size = Math.min(PLAYER.startSize, Math.max(fish.size, grownSize));
     }
-    fish.radius = radiusOf(fish.size);
+    fish.radius = technicalRadiusOf(fish.size, worldScale);
     fish.playerActiveAge = 0;
     if( fish.fryAge >= PLAYER.fryGrowthSeconds ){
         fish.fryAge = null;

@@ -4,7 +4,7 @@
 // @ia 2f6e7a91 3983084a
 // @fix 4bbc0692
 
-import { BACKGROUND, BUBBLE, DEBUG, FISH, PLAYER, SHRED, SIZE_DELTA_LABEL, SWIM, FEAR_EYE, WORLD, WORLD_MAP } from './constants.js';
+import { BACKGROUND, BUBBLE, DEBUG, FISH, PLAYER, RENDER_LAYERS, SHRED, SIZE_DELTA_LABEL, SWIM, FEAR_EYE, SYNC, WORLD, WORLD_MAP } from './constants.js';
 
 const DEFAULT_SVG_GEOMETRY = {
     width: 494,
@@ -375,11 +375,13 @@ function clamp(value, min, max){
 }
 
 // @ds:c5a92431
-function drawFishLabel(ctx, f, currentUserFishId){
+function drawFishLabel(ctx, f, currentUserFishId, viewport){
     if( f.id === currentUserFishId || f.ownerKind !== 'user' || !f.userName ) return;
     ctx.save();
     ctx.fillStyle = '#edf8ff';
-    ctx.font = `${Math.max(10, Math.min(16, f.radius * 0.42))}px system-ui, sans-serif`;
+    const viewportScale = Math.max(1e-6, viewport?.scale || 1);
+    const fontPx = Math.max(10, Math.min(16, f.radius * viewportScale * 0.42));
+    ctx.font = `${fontPx / viewportScale}px system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.fillText(f.userName, f.pos.x, f.pos.y - f.radius * 1.35);
     ctx.restore();
@@ -406,21 +408,31 @@ export function render(ctx, state){
     ctx.translate(viewport.offsetX, viewport.offsetY);
     ctx.scale(viewport.scale, viewport.scale);
 
-    for( const bubble of renderWorld.bubbles ) drawBubble(ctx, bubble); // ds:d6cebf86
-    for( const shred of renderWorld.shreds || [] ) drawShred(ctx, shred, (state.debug?.now || performance.now()) / 1000); // @ds:6f3a9c20
-    for( const f of renderWorld.fish ) drawFish(ctx, f, state.currentUserFishId); // ds:1f3abc43
+    const renderItems = buildRenderItems(renderWorld, (state.debug?.now || performance.now()) / 1000);
+    for( const item of renderItems ){
+        if( item.kind === 'fish' ) drawFish(ctx, item.value, state.currentUserFishId, viewport); // ds:1f3abc43
+        else if( item.kind === 'shred' ) drawShred(ctx, item.value, (state.debug?.now || performance.now()) / 1000); // @ds:6f3a9c20
+        else drawBubble(ctx, item.value, renderWorld, world, viewport);
+    }
     for( const label of state.sizeDeltaLabels || [] ){
         const fishForLabel = renderWorld.fish.find(fishItem => fishItem.id === label.fishId);
-        if( fishForLabel ) drawSizeDeltaLabel(ctx, label, fishForLabel);
+        if( fishForLabel ) drawSizeDeltaLabel(ctx, label, fishForLabel, viewport);
     }
     if( state.debug?.enabled ){
-        drawDebugWorldRepeatBounds(ctx, world, renderWorld.anchor);
-        drawDebugFishCollisionRadius(ctx, renderWorld.fish);
-        drawDebugPositionTraces(ctx, renderWorld.debugTraces || [], state.debug.now || performance.now());
+        drawDebugWorldRepeatBounds(ctx, world, renderWorld.anchor, viewport);
+        drawDebugFishCollisionRadius(ctx, renderWorld.fish, viewport);
+        drawDebugReceivedQuadrants(ctx, world, renderWorld.anchor, state.debug.receivedQuadrants || [], state.debug.now || performance.now(), viewport);
+        drawDebugPositionTraces(ctx, renderWorld.debugTraces || [], state.debug.now || performance.now(), viewport);
     }
     ctx.restore();
 
-    if( state.worldMapVisible ) drawWorldMap(ctx, world, state.currentUserFishId, state.worldMapTop);
+    if( state.worldMapVisible ) drawWorldMap(
+        ctx,
+        world,
+        state.currentUserFishId,
+        state.worldMapTop,
+        state.debug?.enabled ? state.debug.cellSyncAverages : [],
+    );
 }
 
 // @ds:2b3e71e0 @fix:4bbc0692 @ia:3983084a
@@ -494,7 +506,7 @@ function wrappedTileOffset(value, size){
 
 // @ds:7b9a7984 @ds:e001d967
 export function worldToViewport(world, followed, canvas, options = {}){
-    const scale = viewportScaleForFishCapacity(world, canvas, options.viewportFishCapacity);
+    const scale = viewportScaleForFishCapacity(world, canvas, options.viewportFishCapacity) * (world?.scale || 1);
     const focus = followed ? followed.pos : { x: world.width / 2, y: world.height / 2 };
     return {
         scale,
@@ -516,7 +528,7 @@ export function viewportScaleForFishCapacity(world, canvas, value){
     if( value === 'max' ) return maxScale;
     const capacity = Number(value);
     if( !Number.isFinite(capacity) || capacity <= 0 || minScreenSide <= 0 ) return Math.max(WORLD.initialViewportScale, maxScale);
-    const nominalDiameter = FISH.baseRadius * Math.sqrt(PLAYER.startSize) * 2;
+    const nominalDiameter = FISH.nominalStartDiameter * WORLD.pixelsPerWorldUnit * Math.sqrt(PLAYER.startSize);
     const numericScale = minScreenSide / (capacity * nominalDiameter);
     return Math.max(numericScale, maxScale);
 }
@@ -564,10 +576,7 @@ export function buildToroidalRenderWorld(world, followed, debugTraces = []){
             ...shred,
             pos: projectPos(shred.pos),
         })),
-        bubbles: (world.bubbles || []).map(bubble => ({
-            ...bubble,
-            pos: projectPos(bubble.pos),
-        })),
+        bubbles: world.bubbles || [],
         debugTraces: (debugTraces || []).map(trace => ({
             ...trace,
             pos: projectPos(trace.pos),
@@ -645,32 +654,96 @@ function seededUnit(seed){
     return value - Math.floor(value);
 }
 
-// @ia 3c4d5e6f
-function drawBubble(ctx, bubble){
+const fishLayerCache = new Map();
+
+function buildRenderItems(renderWorld, timeSeconds){
+    const fishLayers = assignFishRenderLayers(renderWorld.fish || []);
+    const occupied = [...fishLayers.values()].sort((a, b) => a - b);
+    const items = [];
+    for( const fish of renderWorld.fish || [] ){
+        items.push({ kind: 'fish', value: fish, renderLayer: fishLayers.get(fish.id) });
+    }
+    const shredLayers = assignShredRenderLayers(renderWorld.shreds || [], occupied);
+    for( const shred of renderWorld.shreds || [] ){
+        items.push({ kind: 'shred', value: shred, renderLayer: shredLayers.get(shred.id) });
+    }
+    for( const bubble of renderWorld.bubbles || [] ){
+        const sourceLayer = fishLayers.get(bubble.sourceFishId);
+        if( sourceLayer === undefined ) continue;
+        items.push({ kind: 'bubble', value: bubble, renderLayer: sourceLayer - 1 });
+    }
+    return items.sort((a, b) => a.renderLayer - b.renderLayer || String(a.value.id).localeCompare(String(b.value.id)));
+}
+
+function assignFishRenderLayers(fish){
+    const ordered = [...fish].sort((a, b) => {
+        const aPlayer = a.ownerKind === 'user' || a.isPlayer ? 1 : 0;
+        const bPlayer = b.ownerKind === 'user' || b.isPlayer ? 1 : 0;
+        return aPlayer - bPlayer || String(a.id).localeCompare(String(b.id));
+    });
+    const result = new Map();
+    let npcIndex = 0;
+    let playerIndex = 0;
+    for( const fishItem of ordered ){
+        const isPlayer = fishItem.ownerKind === 'user' || fishItem.isPlayer;
+        const min = isPlayer ? RENDER_LAYERS.playerFishMin : RENDER_LAYERS.npcFishMin;
+        const max = isPlayer ? RENDER_LAYERS.playerFishMax : RENDER_LAYERS.npcFishMax;
+        const index = isPlayer ? playerIndex++ : npcIndex++;
+        const layer = Math.min(max, min + index * 2);
+        result.set(fishItem.id, layer);
+        fishLayerCache.set(fishItem.id, layer);
+    }
+    return result;
+}
+
+function assignShredRenderLayers(shreds, occupiedFishLayers){
+    const candidates = [];
+    const maxSlots = occupiedFishLayers.length + RENDER_LAYERS.shredExtraFishSlots;
+    const slotCount = Math.max(1, Math.min(maxSlots, occupiedFishLayers.length));
+    for( let i = 0; i < slotCount; i++ ){
+        const fishLayer = occupiedFishLayers[Math.floor(i * occupiedFishLayers.length / slotCount)];
+        if( fishLayer !== undefined ) candidates.push(fishLayer - 1);
+    }
+    const uniqueCandidates = [...new Set(candidates)];
+    const result = new Map();
+    const ordered = [...shreds].sort((a, b) => String(a.id).localeCompare(String(b.id)));
+    for( let i = 0; i < ordered.length; i++ ){
+        result.set(ordered[i].id, uniqueCandidates.length ? uniqueCandidates[i % uniqueCandidates.length] : RENDER_LAYERS.npcFishMin - 1);
+    }
+    return result;
+}
+
+function drawBubble(ctx, bubble, renderWorld, world, viewport){
+    const pixelsPerWorldUnit = WORLD.pixelsPerWorldUnit;
+    const anchor = renderWorld.anchor || { x: world.width / 2, y: world.height / 2 };
+    const x = nearestToroidalCoordinate(bubble.posPx.x / pixelsPerWorldUnit, anchor.x, world.width);
+    const y = nearestToroidalCoordinate(bubble.posPx.y / pixelsPerWorldUnit, anchor.y, world.height);
+    const radius = (bubble.radiusPx || 0) / pixelsPerWorldUnit / Math.max(1e-6, world.scale || 1);
     const age = bubble.age || 0;
     const pulsePhase = Math.floor((age + bubble.phase) / BUBBLE.pulseStep) % 2;
     const squash = pulsePhase === 0 ? 1 : BUBBLE.pulseSquash;
     const red = bubble.color === 'red';
     ctx.save();
-    ctx.translate(bubble.pos.x, bubble.pos.y);
+    ctx.translate(x, y);
     ctx.scale(1, squash);
     ctx.globalAlpha = bubble.alpha;
     ctx.fillStyle = red ? `rgba(255, 72, 72, ${BUBBLE.fillAlpha * 1.35})` : `rgba(183, 236, 255, ${BUBBLE.fillAlpha})`;
     ctx.strokeStyle = red ? '#ff6b6b' : '#d9f6ff';
-    ctx.lineWidth = Math.max(1, bubble.radius * 0.1);
+    ctx.lineWidth = BUBBLE.strokeWidthPx / Math.max(1e-6, viewport.scale);
     ctx.beginPath();
-    ctx.arc(0, 0, bubble.radius, 0, Math.PI * 2);
+    ctx.arc(0, 0, radius, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
     ctx.restore();
 }
 
 // @ds:7435b6ce
-function drawDebugWorldRepeatBounds(ctx, world, anchor){
+function drawDebugWorldRepeatBounds(ctx, world, anchor, viewport){
     ctx.save();
     ctx.strokeStyle = 'rgba(255, 228, 92, 0.68)';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([12, 8]);
+    const viewportScale = Math.max(1e-6, viewport?.scale || 1);
+    ctx.lineWidth = 2 / viewportScale;
+    ctx.setLineDash([12 / viewportScale, 8 / viewportScale]);
     const baseX = anchor ? nearestToroidalCoordinate(0, anchor.x, world.width) : 0;
     const baseY = anchor ? nearestToroidalCoordinate(0, anchor.y, world.height) : 0;
     for( let dx = -1; dx <= 1; dx++ ){
@@ -682,10 +755,10 @@ function drawDebugWorldRepeatBounds(ctx, world, anchor){
 }
 
 // @ds:6b4e90d2 @ds:a3e394a8
-function drawDebugFishCollisionRadius(ctx, fish){
+function drawDebugFishCollisionRadius(ctx, fish, viewport){
     ctx.save();
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 1.5 / Math.max(1e-6, viewport?.scale || 1);
     for( const item of fish || [] ){
         if( !item?.pos || !Number.isFinite(item.radius) ) continue;
         ctx.beginPath();
@@ -696,7 +769,25 @@ function drawDebugFishCollisionRadius(ctx, fish){
 }
 
 // @ds:727e9afe
-function drawDebugPositionTraces(ctx, traces, now){
+function drawDebugReceivedQuadrants(ctx, world, anchor, quadrants, now, viewport){
+    ctx.save();
+    ctx.strokeStyle = DEBUG.receivedQuadrantColor;
+    ctx.lineWidth = 2 / Math.max(1e-6, viewport?.scale || 1);
+    ctx.setLineDash([]);
+    for( const quadrant of quadrants || [] ){
+        const alpha = Math.max(0, 1 - (now - quadrant.receivedAt) / DEBUG.receivedQuadrantFadeMs);
+        if( alpha <= 0 ) continue;
+        const x = nearestToroidalCoordinate(quadrant.cellX * SYNC.cellSize, anchor.x, world.width);
+        const y = nearestToroidalCoordinate(quadrant.cellY * SYNC.cellSize, anchor.y, world.height);
+        ctx.globalAlpha = alpha;
+        ctx.strokeRect(x, y, SYNC.cellSize, SYNC.cellSize);
+    }
+    ctx.restore();
+}
+
+// @ds:727e9afe
+function drawDebugPositionTraces(ctx, traces, now, viewport){
+    const viewportScale = Math.max(1e-6, viewport?.scale || 1);
     for( const trace of traces ){
         const alpha = traceAlpha(trace, now);
         if( alpha <= 0 ) continue;
@@ -704,7 +795,7 @@ function drawDebugPositionTraces(ctx, traces, now){
         ctx.globalAlpha = alpha;
         ctx.fillStyle = trace.kind === 'absolute' ? DEBUG.absoluteTraceColor : DEBUG.relativeTraceColor;
         ctx.beginPath();
-        ctx.arc(trace.pos.x, trace.pos.y, trace.kind === 'absolute' ? 4 : 3, 0, Math.PI * 2);
+        ctx.arc(trace.pos.x, trace.pos.y, (trace.kind === 'absolute' ? 4 : 3) / viewportScale, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
     }
@@ -716,7 +807,7 @@ function traceAlpha(trace, now){
 }
 
 // @ds:8f2c91ad @ds:3a980720
-function drawWorldMap(ctx, world, currentUserFishId, top){
+function drawWorldMap(ctx, world, currentUserFishId, top, cellSyncAverages = []){
     const size = WORLD_MAP.sizePx;
     const left = WORLD_MAP.leftPx;
     if( !Number.isFinite(world.width) || !Number.isFinite(world.height) || world.width <= 0 || world.height <= 0 ) return;
@@ -724,17 +815,46 @@ function drawWorldMap(ctx, world, currentUserFishId, top){
     const nominalLinearSize = Math.sqrt(PLAYER.startSize);
 
     ctx.save();
-    ctx.fillStyle = 'rgba(3, 19, 30, 0.72)';
+    ctx.fillStyle = '#04263b';
     ctx.strokeStyle = 'rgba(216, 246, 255, 0.72)';
     ctx.lineWidth = 1;
     ctx.fillRect(left, top, size, size);
     ctx.strokeRect(left + 0.5, top + 0.5, size, size);
+
+    if( cellSyncAverages.length > 0 ){
+        drawDebugCellSyncAveragesOnMap(ctx, world, cellSyncAverages, left, top, size);
+    }
 
     for( const fish of world.fish || [] ){
         if( !fish?.pos ) continue;
         const x = left + clamp01(fish.pos.x / world.width) * size;
         const y = top + clamp01(fish.pos.y / world.height) * size;
         drawWorldMapFish(ctx, fish, currentUserFishId, x, y, maxLinearSize, nominalLinearSize);
+    }
+    ctx.restore();
+}
+
+// @ds:8f2c91ad
+function drawDebugCellSyncAveragesOnMap(ctx, world, cellAverages, left, top, size){
+    const columns = Math.max(1, Math.round(world.width / SYNC.cellSize));
+    const rows = Math.max(1, Math.round(world.height / SYNC.cellSize));
+    const cellWidth = size / columns;
+    const cellHeight = size / rows;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(left, top, size, size);
+    ctx.clip();
+    ctx.fillStyle = 'rgba(3, 19, 30, 0.72)';
+    for( const cell of cellAverages || [] ){
+        const alpha = clamp01(cell.ratio);
+        if( alpha <= 0 ) continue;
+        ctx.globalAlpha = alpha;
+        ctx.fillRect(
+            left + cell.cellX * cellWidth,
+            top + cell.cellY * cellHeight,
+            cellWidth,
+            cellHeight,
+        );
     }
     ctx.restore();
 }
@@ -787,17 +907,18 @@ function clamp01(value){
 }
 
 // @ds:c2d7f4a1
-function drawSizeDeltaLabel(ctx, label, fish){
+function drawSizeDeltaLabel(ctx, label, fish, viewport){
     const t = Math.max(0, Math.min(1, label.age / label.life));
     const alpha = 1 - t;
     if( alpha <= 0 ) return;
     const text = `${label.value > 0 ? '+' : ''}${label.value.toFixed(1)}`;
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.font = '700 18px system-ui, -apple-system, sans-serif';
+    const viewportScale = Math.max(1e-6, viewport?.scale || 1);
+    ctx.font = `700 ${18 / viewportScale}px system-ui, -apple-system, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 4 / viewportScale;
     ctx.strokeStyle = 'rgba(2, 18, 28, 0.72)';
     ctx.fillStyle = label.value > 0 ? SIZE_DELTA_LABEL.gainColor : SIZE_DELTA_LABEL.lossColor;
     const y = fish.pos.y - fish.radius - SIZE_DELTA_LABEL.gapPx + label.yOffset;
@@ -807,7 +928,7 @@ function drawSizeDeltaLabel(ctx, label, fish){
 }
 
 // @ds:df06827a @ds:bd354b7a @ds:906be50b @ds:8c663384 @ia:2f6e7a91
-function drawFish(ctx, f, currentUserFishId){
+function drawFish(ctx, f, currentUserFishId, viewport){
     const visualScale = Math.max(0.5, f.visualScale || 1);
     const r = f.radius * visualScale;
     const swimPhase = f.swimPhase || 0;
@@ -837,6 +958,6 @@ function drawFish(ctx, f, currentUserFishId){
 
     ctx.save();
     ctx.globalAlpha *= f.syncOpacity ?? 1;
-    drawFishLabel(ctx, f, currentUserFishId);
+    drawFishLabel(ctx, f, currentUserFishId, viewport);
     ctx.restore();
 }

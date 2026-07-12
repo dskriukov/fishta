@@ -26,31 +26,37 @@ bounds:
     output: position'
     invariant: "position is mapped into [0,width) x [0,height) by toroidal wrapping, without stopping or reflecting velocity"
 
-dynamic_size:
-  from: ds:world.dynamic-size
-  contract:
-    name: resizeWorld
-    inputs: [worldSize, userFishCount]
-    output: nextWorldSize
-    rule: "server changes world size by user-count thresholds with hysteresis; initial world size is approximately 1.5x normalized viewport"
-  coordinate_scaling:
-    name: scaleFishCoordinatesForWorldResize
-    inputs: [fish.position, oldWorldSize, newWorldSize]
-    output: fish.position'
-    rule: "scale fish coordinates proportionally to new world bounds; fish size values are not scaled"
-  client_playback:
-    name: playWorldResize
-    rule: "client receives the next server world-size step and visually interpolates coordinate stretching"
+fixed_coordinate_grid:
+  from: ds:world.fixed-coordinate-grid
+  dimensions: { width: 500, height: 500 }
+  game_dimensions: { width: 2000, height: 2000 }
+  pixels_per_world_unit: 4
+  cells: { columns: 5, rows: 5, size: 100 }
+  invariant: "fish and shred canonical positions stay in the fixed wrapped coordinate grid when user count changes"
+
+virtual_area_scale:
+  from: [ds:world.virtual-area-per-user, ds:world.scale-visualization]
+  nominal_start_diameter_normalized: 8
+  user_area_side_diameters: 10
+  effective_area: "(500 * 4) * (500 * 4) + userCount * (10 * 8 * 4)^2"
+  scale: "round(sqrt(effectiveArea / ((500 * 4) * (500 * 4))), 3)"
+  scale_wire_format: "decimal without insignificant trailing zeros"
+  technical_length: "pixelLength / pixelsPerWorldUnit / scale"
+  scales: [collision_diameter, shred_size, velocity, acceleration, search_distance, flee_distance, attack_distance, spawn_margin]
+  excludes: [time, probability, temporal_damping, dimensionless_size]
+  client_contract:
+    name: applyWorldScale
+    rule: "client receives s:<scale>, narrows its normalized viewport by scale, and interpolates the projection without changing canonical positions"
 
 npc_density:
-  from: ds:world.npc-density
+  from: [ds:world.npc-density, ds:world.scale-density]
   target_density:
     relation_to_previous_base_density: 4x
   contract:
     name: maintainNpcDensity
-    inputs: [worldArea, npcFishCount, targetNpcDensity]
+    inputs: [effectiveWorldArea, npcFishCount, targetNpcDensity]
     output: targetNpcFishCount
-    rule: "target NPC count follows targetNpcDensity * world area; targetNpcDensity is four times the previous base density"
+    rule: "target NPC count follows targetNpcDensity * effective game area; with one user and game area 2000*2000 the current density yields about 40 NPC; targetNpcDensity is four times the previous base density and controlled-object limit remains authoritative"
   density_field:
     name: findLowestFishDensityArea
     inputs: [allFish[], worldSize]

@@ -22,6 +22,8 @@
     "/^sha1sum ds/sense/main\\.ds \\| cut -c1-8$/": {
       "approve": true,
       "matchCommandLine": true
-    }
+    },
+    "sha1sum": true,
+    "shasum": true
   }
 }

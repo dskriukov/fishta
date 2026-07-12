@@ -1,7 +1,7 @@
 // Server-owned shred mechanics.
 // @ds e13d7a52 7c2f91ad 918d4b63 d5e7a01c 0b8e71d4 3ad65f20 8b62d9ce c14f7a08 9e4c1b7a b6f08d21 4d7c2e93 f0a6c5d8 a2d5936f ed2b4f19 d3187816 31a8f5c2 fb0f32c4 eccfca7e
 
-import { FISH, SHRED } from './constants.js';
+import { FISH, WORLD, SHRED } from './constants.js';
 import { nearestToroidalDelta } from './predation.js';
 import { canAddControlledObjects, wrapPoint } from './world.js';
 
@@ -16,9 +16,9 @@ export function spawnShredsFromFish(world, fish, rng){
     const created = [];
     let guard = 0;
 
-    while( remainingArea > minShredArea() * 0.35 && guard < 500 ){
+    while( remainingArea > minShredArea(world.scale) * 0.35 && guard < 500 ){
         if( !canAddControlledObjects(world, 1) ) return created;
-        const sampledSize = sampleShredSize(random);
+        const sampledSize = technicalDiameterFromPixelDiameter(sampleShredDiameterPx(random), world.scale);
         const sampledArea = circleAreaFromDiameter(sampledSize);
         const geometricArea = Math.min(remainingArea, sampledArea);
         const size = diameterFromCircleArea(geometricArea);
@@ -69,19 +69,28 @@ function nextShredId(world){
     return world.nextShredId - 1;
 }
 
-function sampleShredSize(rng){
-    const span = Math.max(0, SHRED.maxSize - SHRED.minSize);
+function sampleShredDiameterPx(rng){
+    const startDiameterPx = FISH.nominalStartDiameter * WORLD.pixelsPerWorldUnit;
+    const minSize = startDiameterPx * SHRED.minDiameterRatio;
+    const maxSize = startDiameterPx * SHRED.maxDiameterRatio;
+    const span = Math.max(0, maxSize - minSize);
     const biased = Math.pow(rng(), SHRED.fragmentation);
     const jitter = 1 + (rng() * 2 - 1) * SHRED.sizeJitter;
-    return clamp(SHRED.minSize + span * biased * jitter, SHRED.minSize, SHRED.maxSize);
+    return clamp(minSize + span * biased * jitter, minSize, maxSize);
 }
 
-function minShredArea(){
-    return circleAreaFromDiameter(SHRED.minSize);
+function minShredArea(worldScale = 1){
+    const minDiameterPx = FISH.nominalStartDiameter * WORLD.pixelsPerWorldUnit * SHRED.minDiameterRatio;
+    return circleAreaFromDiameter(technicalDiameterFromPixelDiameter(minDiameterPx, worldScale));
 }
 
 function baseFishArea(){
-    return Math.PI * FISH.baseRadius * FISH.baseRadius;
+    const radius = FISH.nominalStartDiameter / 2;
+    return Math.PI * radius * radius;
+}
+
+function technicalDiameterFromPixelDiameter(diameter, worldScale = 1){
+    return Math.max(0, diameter) / WORLD.pixelsPerWorldUnit / Math.max(1e-6, worldScale);
 }
 
 function circleAreaFromDiameter(diameter){
@@ -176,7 +185,7 @@ function applyFishWake(world, shred, dt){
 export function canEatShred(fish, shred, world){
     const speed = Math.hypot(fish.vel?.x || 0, fish.vel?.y || 0);
     if( speed < SHRED.minFeedingSpeed ) return false;
-    if( (fish.radius || 0) * 2 < (shred.size || 0) * SHRED.eatSizeRatio ) return false;
+    if( (fish.radius || 0) * 2 < (shred.radius || 0) * 2 * SHRED.eatSizeRatio ) return false;
     const delta = nearestToroidalDelta(fish.pos, shred.pos, world);
     return Math.hypot(delta.x, delta.y) <= (fish.radius || 0) + (shred.radius || 0);
 }

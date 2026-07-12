@@ -8,11 +8,14 @@ import {
     encodeClientControl,
     encodeClientJoin,
     encodeClientPing,
+    encodeClientSyncAck,
     encodeClientReconnect,
     parseEvent,
     parseIdentity,
 } from './protocol.js';
 import { makeWorld } from './world.js';
+import { WORLD } from './constants.js';
+import { technicalRadiusOf } from './fish.js';
 
 export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onInitialCommunication }){
     let socket = null;
@@ -22,6 +25,7 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onI
     let pingCounter = 0;
     let lastSyncAt = null;
     let initialCommunicationSettled = false;
+    const acknowledgedCycles = new Set();
     const world = makeWorld();
     const transportState = { currentCycle: null, cycleStartedAt: null, tombstones: new Map() };
 
@@ -81,6 +85,15 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onI
                 if( onEvent ) onEvent(message);
                 return;
             }
+            if( text[0] === 's' ){
+                const scale = Number(text.slice(2));
+                if( Number.isFinite(scale) && scale > 0 ){
+                    world.scale = scale;
+                    applyTechnicalScale();
+                }
+                publishSnapshot(performance.now(), null);
+                return;
+            }
             if( text[0] === 'x' ){
                 const receivedAt = performance.now();
                 const removal = applyObjectRemoval(world, text, transportState, receivedAt);
@@ -99,11 +112,30 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onI
                 const elapsedSeconds = lastSyncAt === null ? 0 : (receivedAt - lastSyncAt) / 1000;
                 const syncDiagnostics = applyWorldFragment(world, text, transportState, receivedAt);
                 if( !syncDiagnostics ) return;
+                applyTechnicalScale();
+                acknowledgeCycle(syncDiagnostics.cycle);
                 logAbsolutePositionDrift(syncDiagnostics, elapsedSeconds);
                 lastSyncAt = receivedAt;
                 publishSnapshot(syncDiagnostics.cycleStartedAt, syncDiagnostics);
             }
         });
+    }
+
+    function applyTechnicalScale(){
+        const scale = Math.max(1e-6, world.scale || 1);
+        for( const fish of world.fish || [] ) fish.radius = technicalRadiusOf(fish.size, scale);
+        for( const shred of world.shreds || [] ) shred.radius = (shred.size || 0) / 2;
+    }
+
+    function acknowledgeCycle(cycle){
+        if( acknowledgedCycles.has(cycle) ) return;
+        const received = transportState.receivedFragmentsByCycle ||= new Map();
+        const count = (received.get(cycle) || 0) + 1;
+        received.set(cycle, count);
+        if( count < 3 ) return;
+        acknowledgedCycles.add(cycle);
+        sendRaw(encodeClientSyncAck(cycle));
+        while( acknowledgedCycles.size > 12 ) acknowledgedCycles.delete(acknowledgedCycles.values().next().value);
     }
 
     function publishSnapshot(receivedAt, syncDiagnostics){

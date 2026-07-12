@@ -32,6 +32,9 @@ client_messages:
     format: "p:${N}"
     fields:
       N: { type: integer, rule: "increments for each sent ping" }
+  sync_ack:
+    format: "v:${N}"
+    rule: "statistical acknowledgment of a received fragment set for cycle N; never gates sending"
   control:
     format: "c${x}${y}${mods}"
     fields:
@@ -79,6 +82,9 @@ server_sync:
     fields:
       ID: "current user's fish ID in the world"
       token: "temporary reconnect token for future r:${token}"
+  scale_message:
+    format: "s:${scale}"
+    rule: "current rounded world scale after identity/reconnect and every user-count change"
   world_messages:
     absolute:
       format: "a:N:CELL_X:CELL_Y|ROWS"
@@ -88,9 +94,11 @@ server_sync:
       position: "deltas from immediately preceding server cycle"
     cycle:
       field: N
-      rule: "strictly increases and never repeats or decreases within one socket connection"
+      rule: "one common cycle number strictly increases and never repeats or decreases"
       global_absolute_period: 20
       global_absolute_rule: "every twentieth cycle sends every delivered non-empty cell from the absolute row set regardless of distance"
+    empty_fragment:
+      rule: "use the prebuilt coordinate-specific empty template with a one-byte delta marker; empty cells are not serialized into shared row strings"
     fragment:
       fields: [N, CELL_X, CELL_Y, ROWS]
       row_separator: "|"
@@ -105,19 +113,16 @@ spatial_fragments:
     absolute: "one shared serialized row set per completed server cycle"
     relative: "one shared serialized row set per completed server cycle"
   indexing:
-    rule: "record start and end row indices in both shared sets for every non-empty cell"
-    empty_cells: "not indexed and never queued or sent"
+    rule: "record start and end row indices in both shared sets only for non-empty cells"
+    empty_cells: "hold only an empty flag and use one of 25 prebuilt empty-fragment templates"
   delivery:
-    anchor: "current user's fish cell"
-    order: "increasing toroidal distance from the current user's fish"
-    ordinary_cycle_absolute_cells: "four nearest non-empty cells; the user fish cell is first"
-    ordinary_cycle_relative_cells: "all other non-empty cells in the same order"
-    twentieth_cycle_absolute_cells: "all non-empty cells"
-  queue_reset:
-    trigger: "next completed server cycle exists before the client's current queue is fully sent"
-    action: "drop the remaining queue and start the newer N from its nearest cells"
-    reset_message: none
-    detection: "client sees a greater N"
+    template: [own, left, right, top, bottom, top_left, bottom_left, top_right, bottom_right]
+    phases: ["all own", "all left/right", "all top/bottom", "all remaining"]
+    wrap: toroidal
+    rule: "no per-client distance sorting; all clients advance through the same phase before the next phase"
+  reset:
+    trigger: "next completed shared cycle exists before common phase plan is exhausted"
+    action: "drop unsent plan entries and start the newer N"
 
 cell_local_position:
   from: ds:ws-protocol.cell-local-position
@@ -143,7 +148,7 @@ shared_world_snapshot:
   prepared_cycle:
     scope: all_live_fish_and_shreds
     serialization: "one shared absolute row set and one shared relative row set"
-    grouping: "non-empty cells with row index ranges"
+    grouping: "non-empty cells with row index ranges plus empty-cell flags and prebuilt templates"
     per_client_object_serialization: false
     per_client_delivery: "only chooses and sends ranges from the shared prepared sets"
 

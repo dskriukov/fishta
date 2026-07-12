@@ -2,7 +2,7 @@
 // Compact WebSocket string protocol.
 // @ds:839f8cd0 @ds:5a4d3d6d @ds:671e9773 @ds:e6be3c03 @ds:4fad33f8 @ds:682570c7 @ds:ea18a088 @ds:f51a5030 @ds:a16328a6 @ds:ed2b4f19 @ds:a2d5936f @ds:2e91f6d4 @ds:2afd71a0 @ds:9f50b1be
 
-import { FISH, REGIME, SHRED, SYNC } from './constants.js';
+import { FISH, WORLD, REGIME, SHRED, SYNC } from './constants.js';
 
 export function encodeName(name){
     const bytes = new TextEncoder().encode(String(name || ''));
@@ -32,6 +32,10 @@ export function encodeClientPing(n){
     return `p:${n}`;
 }
 
+export function encodeClientSyncAck(cycle){
+    return `v:${Math.max(0, Math.floor(Number(cycle) || 0))}`;
+}
+
 export function encodeClientControl(payload = {}){
     const x = encodeSignedThousand(payload.accel?.x || 0);
     const y = encodeSignedThousand(payload.accel?.y || 0);
@@ -55,6 +59,7 @@ export function parseClientMessage(raw){
     if( kind === 'r' ) return { type: 'reconnect', temporaryConnectionCode: text.slice(2) };
     if( kind === 'q' ) return { type: 'leave' };
     if( kind === 'p' ) return { type: 'ping', n: Number(text.slice(2)) || 0 };
+    if( kind === 'v' ) return { type: 'syncAck', cycle: Number(text.slice(2)) || 0 };
     if( kind === 'c' ){
         const mods = text.slice(9);
         const speedLevel = parseSpeedLevelMod(mods);
@@ -93,6 +98,10 @@ export function encodeWorldSize(world){
     return encodeEvent('w', `${round(world.width, 0)}:${round(world.height, 0)}`);
 }
 
+export function encodeWorldScale(scale){
+    return `s:${String(Number(Number(scale || 1).toFixed(3)))}`;
+}
+
 // @ds:682570c7 @ds:c39827ed @ds:e047bbdf @ds:6c8c56e7 @ds:2afd71a0 @ds:9f50b1be
 export function encodeWorldCycle(world, previousState = new Map(), cycle = 1, birthCycles = new Map()){
     const previousFishById = previousState?.fish || (previousState instanceof Map ? previousState : new Map());
@@ -101,7 +110,7 @@ export function encodeWorldCycle(world, previousState = new Map(), cycle = 1, bi
     const nextShredsById = new Map();
     const rowsByCell = new Map();
     for( const fish of world.fish || [] ){
-        const cell = cellOf(fish.pos);
+        const cell = cellOf(fish.pos, world);
         const previous = previousFishById.get(fish.id);
         const key = transportId('fish', fish.id);
         const isNew = isNewTransportObject(key, cycle, birthCycles);
@@ -112,7 +121,7 @@ export function encodeWorldCycle(world, previousState = new Map(), cycle = 1, bi
         nextFishById.set(fish.id, fishSnapshot(fish));
     }
     for( const shred of world.shreds || [] ){
-        const cell = cellOf(shred.pos);
+        const cell = cellOf(shred.pos, world);
         const previous = previousShredsById.get(shred.id);
         const key = transportId('shred', shred.id);
         const isNew = isNewTransportObject(key, cycle, birthCycles);
@@ -134,10 +143,12 @@ export function encodeObjectRemoval(kind, id){
     return `x:${kind === 'shred' ? 's' : ''}${id}`;
 }
 
-function cellOf(pos){
+function cellOf(pos, world){
+    const columns = Math.max(1, Math.round((world?.width || SYNC.cellSize) / SYNC.cellSize));
+    const rows = Math.max(1, Math.round((world?.height || SYNC.cellSize) / SYNC.cellSize));
     return {
-        x: Math.floor((Number(pos?.x) || 0) / SYNC.cellSize),
-        y: Math.floor((Number(pos?.y) || 0) / SYNC.cellSize),
+        x: ((Math.floor((Number(pos?.x) || 0) / SYNC.cellSize) % columns) + columns) % columns,
+        y: ((Math.floor((Number(pos?.y) || 0) / SYNC.cellSize) % rows) + rows) % rows,
     };
 }
 
@@ -246,9 +257,10 @@ export function applyWorldFragment(world, message, transportState, receivedAt){
     const rows = text.slice(separator + 1).split('|').filter(Boolean);
     const byId = new Map((world.fish || []).map(fish => [fish.id, fish]));
     const shredById = new Map((world.shreds || []).map(shred => [shred.id, shred]));
-    const syncDiagnostics = { absolute: absoluteFragment, cycle, fish: [] };
+    const syncDiagnostics = { absolute: absoluteFragment, cycle, cellX, cellY, fish: [] };
 
     for( const sourceRow of rows ){
+        if( sourceRow === '~' ) continue;
         const newObject = sourceRow[0] === 'n';
         const row = newObject ? sourceRow.slice(1) : sourceRow;
         const full = absoluteFragment || newObject;
@@ -516,7 +528,7 @@ export function parseFishRow(row, byId = new Map(), absolute = false, cellX = 0,
         facing,
         eaten: mods.includes('e'),
     };
-    parsed.radius = FISH.baseRadius * Math.sqrt(parsed.size);
+    parsed.radius = FISH.nominalStartDiameter * WORLD.pixelsPerWorldUnit * Math.sqrt(parsed.size) / 2;
     return parsed;
 }
 

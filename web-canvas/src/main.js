@@ -5,7 +5,7 @@
 
 import { DEBUG, ENERGY, EXHALE, FISH, LOOP, MOUTH, PLAYER, REGIME, SHRED, SIZE_DELTA_LABEL, SWIM, SYNC, VIEWPORT_FISH_CAPACITY, WORLD_MAP } from './constants.js';
 import { advanceBubbles, emitBubble, makeBubble, makeWorld } from './world.js';
-import { BURST_ENDURANCE_SIZE_THRESHOLDS, availableSpeedLevelForSize, burstEnergyFactorOf, maxSpeedOf, requestExhale, runExhaleCycle, serializeFish, speedCapOf } from './fish.js';
+import { BURST_ENDURANCE_SIZE_THRESHOLDS, availableSpeedLevelForSize, burstEnergyFactorOf, maxSpeedOf, requestExhale, runExhaleCycle, serializeFish, speedCapOf, technicalRadiusOf } from './fish.js';
 import { createControlModeState, createInput, keySteer, pointerSteer, joystickSteer, speedLevel, speedLevelToControlMagnitude } from './controls.js';
 import { buildToroidalRenderWorld, loadFishGeometry, loadShredGeometry, render, viewportToWorld, worldToViewport } from './render.js';
 import { dist, normalize, scale, v } from './vec.js';
@@ -29,6 +29,8 @@ const worldFishCount = document.getElementById('world-fish-count');
 const worldFishArea = document.getElementById('world-fish-area');
 const worldNutrientCount = document.getElementById('world-nutrient-count');
 const worldNutrientArea = document.getElementById('world-nutrient-area');
+const worldScaleValue = document.getElementById('world-scale');
+const worldSyncValue = document.getElementById('world-sync');
 const joinPanel = document.getElementById('join');
 const joinForm = document.getElementById('join-form');
 const joinName = document.getElementById('join-name');
@@ -73,6 +75,12 @@ let gameMenuOpen = false;
 let worldMapVisible = false;
 let debugMode = false;
 let debugPositionTraces = [];
+let debugReceivedQuadrants = new Map();
+const receivedQuadrantsByCycle = new Map();
+const receivedQuadrantAverages = [];
+const debugSyncCellHistories = new Map();
+let debugSyncOpenCycle = null;
+let debugSyncOpenCells = new Set();
 let latestAbsoluteServerPositions = new Map();
 let lastDebugTraceAt = 0;
 let lastVisibleState = state;
@@ -114,6 +122,15 @@ net = createClientNet({
         if( state.currentUserFishId !== message.currentUserFishId ) lastSentInputKey = null;
         state.world = message.world;
         state.currentUserFishId = message.currentUserFishId;
+        updateWorldSyncMetrics(message);
+        if( debugMode && Number.isInteger(message.syncDiagnostics?.cellX) && Number.isInteger(message.syncDiagnostics?.cellY) ){
+            const key = `${message.syncDiagnostics.cellX}:${message.syncDiagnostics.cellY}`;
+            debugReceivedQuadrants.set(key, {
+                cellX: message.syncDiagnostics.cellX,
+                cellY: message.syncDiagnostics.cellY,
+                receivedAt: message.receivedAt ?? performance.now(),
+            });
+        }
         if( message.syncDiagnostics?.absolute ){
             latestAbsoluteServerPositions = new Map(
                 (message.syncDiagnostics.fish || []).map(row => [row.id, row.serverPos]).filter(([, pos]) => pos)
@@ -158,6 +175,71 @@ net = createClientNet({
         setJoinedUiState(true, { sessionReady: true });
     },
 });
+
+function updateWorldSyncMetrics(message){
+    const scale = Number(message.world?.scale);
+    if( worldScaleValue ) worldScaleValue.textContent = Number.isFinite(scale) && scale > 0 ? scale.toFixed(3).replace(/0+$/, '').replace(/\.$/, '') : '—';
+    const diagnostics = message.syncDiagnostics;
+    if( diagnostics && Number.isInteger(diagnostics.cycle) && Number.isInteger(diagnostics.cellX) && Number.isInteger(diagnostics.cellY) ){
+        const cycle = diagnostics.cycle;
+        recordDebugSyncCell(cycle, diagnostics.cellX, diagnostics.cellY);
+        const cells = receivedQuadrantsByCycle.get(cycle) || new Set();
+        cells.add(`${diagnostics.cellX}:${diagnostics.cellY}`);
+        receivedQuadrantsByCycle.set(cycle, cells);
+        const previousCycles = [...receivedQuadrantsByCycle.keys()].filter(value => value < cycle).sort((a, b) => a - b);
+        for( const completedCycle of previousCycles ){
+            receivedQuadrantAverages.push(receivedQuadrantsByCycle.get(completedCycle).size);
+            receivedQuadrantsByCycle.delete(completedCycle);
+        }
+        while( receivedQuadrantAverages.length > 20 ) receivedQuadrantAverages.shift();
+    }
+    const cycle = diagnostics?.cycle ?? [...receivedQuadrantsByCycle.keys()].sort((a, b) => b - a)[0];
+    const average = receivedQuadrantAverages.length > 0
+        ? receivedQuadrantAverages.reduce((sum, count) => sum + count, 0) / receivedQuadrantAverages.length
+        : 0;
+    if( worldSyncValue ) worldSyncValue.textContent = `${Number.isInteger(cycle) ? cycle : '—'} · ${average.toFixed(2)}`;
+}
+
+function recordDebugSyncCell(cycle, cellX, cellY){
+    if( debugSyncOpenCycle === null ){
+        debugSyncOpenCycle = cycle;
+    }else if( cycle > debugSyncOpenCycle ){
+        completeDebugSyncCycle(debugSyncOpenCycle, debugSyncOpenCells);
+        for( let missedCycle = debugSyncOpenCycle + 1; missedCycle < cycle; missedCycle++ ){
+            completeDebugSyncCycle(missedCycle, new Set());
+        }
+        debugSyncOpenCycle = cycle;
+        debugSyncOpenCells = new Set();
+    }else if( cycle < debugSyncOpenCycle ){
+        return;
+    }
+    debugSyncOpenCells.add(`${cellX}:${cellY}`);
+}
+
+function completeDebugSyncCycle(cycle, receivedCells){
+    const windowSize = Math.max(1, DEBUG.cellSyncWindowCycles);
+    for( const [key, history] of debugSyncCellHistories ){
+        history.push(receivedCells.has(key) ? 1 : 0);
+        while( history.length > windowSize ) history.shift();
+    }
+    for( const key of receivedCells ){
+        if( debugSyncCellHistories.has(key) ) continue;
+        const history = Array(Math.max(0, windowSize - 1)).fill(0);
+        history.push(1);
+        debugSyncCellHistories.set(key, history);
+    }
+}
+
+function debugSyncCellAverages(){
+    return [...debugSyncCellHistories].map(([key, history]) => {
+        const [cellX, cellY] = key.split(':').map(Number);
+        return {
+            cellX,
+            cellY,
+            ratio: history.reduce((sum, received) => sum + received, 0) / Math.max(1, DEBUG.cellSyncWindowCycles),
+        };
+    });
+}
 
 function currentUserFish(world = state.world, currentUserFishId = state.currentUserFishId){
     const id = currentUserFishId ?? net?.currentUserFishId;
@@ -358,7 +440,13 @@ function frame(now){
         viewportFishCapacity,
         clientBubbles,
         sizeDeltaLabels: sizeDeltaLabelState.labels,
-        debug: { enabled: debugMode, positionTraces: debugPositionTraces, now },
+        debug: {
+            enabled: debugMode,
+            positionTraces: debugPositionTraces,
+            receivedQuadrants: [...debugReceivedQuadrants.values()],
+            cellSyncAverages: debugSyncCellAverages(),
+            now,
+        },
         worldMapVisible,
         worldMapTop: getWorldMapTop(),
     });
@@ -488,7 +576,7 @@ function updateWorldSnapshotInfo(world){
 
 function sumFishArea(fishItems){
     return fishItems.reduce((sum, fish) =>{
-        const radius = Number.isFinite(fish?.radius) ? fish.radius : FISH.baseRadius * Math.sqrt(Math.max(0, fish?.size || 0));
+        const radius = Number.isFinite(fish?.radius) ? fish.radius : technicalRadiusOf(fish?.size || 0);
         return Number.isFinite(radius) ? sum + Math.PI * radius * radius : sum;
     }, 0);
 }

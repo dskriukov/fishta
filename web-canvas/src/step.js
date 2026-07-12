@@ -48,7 +48,7 @@ export function step(state, input, dt, rng){
         triggerExhaleOnAccelStart(p, accel, p.prevAccel);
         p.prevAccel = { ...accel };
         integrate(p, accel, state.world, dt);
-        capPreySpeed(p, previousSpeed);
+        capPreySpeed(p, previousSpeed, state.world?.scale);
     }
 
     // ds:e9fb3705 ds:d867989f
@@ -77,7 +77,7 @@ export function stepAuthoritativeWorld(state, inputsByClient, dt, rng){
     for( const fish of allFish ){
         let accel = { x: 0, y: 0 };
         if( fish.ownerKind === 'user' ){
-            const inFryStage = advanceUserFryStage(fish, dt);
+            const inFryStage = advanceUserFryStage(fish, dt, world.scale);
             if( !inFryStage ) fish.playerActiveAge = (fish.playerActiveAge || 0) + dt;
             const input = inputsByClient.get(fish.clientId) || {};
             fish.speedLevel = normalizeSpeedLevel(input.speedLevel);
@@ -85,7 +85,7 @@ export function stepAuthoritativeWorld(state, inputsByClient, dt, rng){
             fish.mode = fish.speedLevel >= REGIME.burstStartSpeedLevel ? 'burst' : 'cruise';
             accel = input.accel ? scale(normalize(input.accel), FISH.accel) : accel;
         }else{
-            advanceFryGrowth(fish, dt);
+            advanceFryGrowth(fish, dt, world.scale);
             fish.cruiseControl = null;
             const steer = chooseNpcIntent(fish, world, rng, dt);
             accel = steer.accel ?? accel;
@@ -97,7 +97,7 @@ export function stepAuthoritativeWorld(state, inputsByClient, dt, rng){
         triggerExhaleOnAccelStart(fish, accel, fish.prevAccel);
         fish.prevAccel = { ...accel };
         integrate(fish, accel, world, dt);
-        if( fish.ownerKind === 'npc' ) capPreySpeed(fish, previousSpeed);
+        if( fish.ownerKind === 'npc' ) capPreySpeed(fish, previousSpeed, world.scale);
         advanceFeedingState(fish, dt);
     }
 
@@ -119,6 +119,6 @@ function expireOldUserFish(world, rng){
         const origin = { ...fish.pos };
         const shreds = spawnShredsFromFish(world, fish, rng);
         const position = placeUserSpawn(world, 'oldAge', rng, { origin, shreds });
-        startUserFryStage(fish, position, 'oldAge');
+        startUserFryStage(fish, position, 'oldAge', world.scale);
     }
 }

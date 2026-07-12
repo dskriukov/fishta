@@ -30,8 +30,11 @@ spawn:
     rule: >
       on fish old-age death, compute total shred geometric area as
       fish canonical circular area * configurable shred area ratio (target 0.5).
-      Split that total area into randomized individual shred sizes within
-      configurable min/max size and fragmentation tuning. Place each shred at a
+      Split that total area into randomized individual shred sizes. The
+      configurable minimum and maximum visual diameters are fractions of the
+      nominal start-fish diameter, independent of prey variety; convert that
+      visual diameter once to technical units using pixelsPerWorldUnit and the
+      current world scale, then apply fragmentation tuning. Place each shred at a
       random offset inside the dead fish canonical circle. Give each shred a
       small random velocity and individual drag. sourceColor is the fish userColor
       when present, formerUserColor for abandoned former user NPC fish, otherwise
