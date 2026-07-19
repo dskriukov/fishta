@@ -15,6 +15,8 @@ ds/fix/prey-predictive-danger.fix#5e1a7c42 - 7b4d9f20
 ds/fix/danger-direction-accumulation.fix#8c4e1a72 - 6d2f9b40
 ds/fix/danger-raster-motion-sweep.fix#7f3c9a21 - 7f3c9a21
 ds/fix/prey-hunt-inertia-strategies.fix#9d4e7b21 - 9d4e7b21
+ds/fix/world-info-compact.fix#b8c4d9e2 - b8c4d9e2
+ds/fix/canvas-orientation-resize.fix#c7e2a914 - c7e2a914
 ds/fix/responsive-ui.fix#412c746b - fa07d905
 ds/fix/predation.fix#f95ca67f - 7b2f6d88
 ds/sense/fish/fish.ds#9f0866ff - 0e1af7e8
@@ -59,6 +61,8 @@ fix:prey.predictive-danger - 5e1a7c42 7b4d9f20
 fix:world.danger-direction-accumulation - 8c4e1a72 6d2f9b40
 fix:world.danger-raster-motion-sweep - 7f3c9a21 7f3c9a21
 fix:npc.hunt-inertia-strategies - 9d4e7b21 9d4e7b21
+fix:ui.world-info-compact - b8c4d9e2 b8c4d9e2
+fix:ui.canvas-orientation-resize - c7e2a914 c7e2a914
 fix:predation.fish-contact-only - 3e7a9c21 7b2f6d88
 ds:controls.join-after-leave - 9772e9ac 323e0d97
 ds:controls.join-presentation - 277a51d7 323e0d97

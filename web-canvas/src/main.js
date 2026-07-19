@@ -72,6 +72,7 @@ let joystickRenderedAvailabilityLevel = null;
 const appVersion = document.getElementById('app-version');
 
 let state = { world: makeWorld(), currentUserFishId: null };
+let resizeFrame = 0;
 const snapshotBuffer = [];
 const clientBubbles = [];
 const clientBubbleEmitters = new Map();
@@ -123,10 +124,26 @@ async function init(){
     await loadShredGeometry();
 }
 
-// ds:b28b7af6
+// ds:b28b7af6 @fix:c7e2a914
 function resize(){
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    const rect = canvas.getBoundingClientRect();
+    const width = Math.max(1, Math.round(rect.width || window.innerWidth));
+    const height = Math.max(1, Math.round(rect.height || window.innerHeight));
+    if( canvas.width === width && canvas.height === height ) return;
+    canvas.width = width;
+    canvas.height = height;
+}
+
+// @fix:c7e2a914
+function scheduleResize(){
+    if( resizeFrame ) cancelAnimationFrame(resizeFrame);
+    resizeFrame = requestAnimationFrame(() => {
+        resizeFrame = 0;
+        resize();
+        // Mobile browsers can commit the new visual viewport one frame after
+        // the orientation event; sample the final CSS box as well.
+        requestAnimationFrame(resize);
+    });
 }
 
 // @ds:3a980720
@@ -313,7 +330,9 @@ canvas.addEventListener('click', e =>{
     const fish = projectedFish ? (state.world.fish || []).find(candidate => candidate.id === projectedFish.id) : null;
     if( fish ) console.log(serializeFish(fish)); // ds:2e1570ed
 });
-window.addEventListener('resize', resize);
+window.addEventListener('resize', scheduleResize);
+window.addEventListener('orientationchange', scheduleResize);
+window.visualViewport?.addEventListener('resize', scheduleResize);
 
 // @ds:c9f4b821 @ia:d2c6a901
 const JOIN_PROFILE_STORAGE_KEY = 'fish.joinProfile';

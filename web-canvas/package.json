@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "load-test": "export CLIENTS=100; node tools/load-test.mjs",
-    "fishta-test": "export CLIENTS=20; export URL=http://fishta.staging.globalqb.com/; node tools/load-test.mjs"
+    "fishta-test": "export CLIENTS=50; export URL=http://fishta.staging.globalqb.com/; node tools/load-test.mjs"
   },
   "dependencies": {
     "ws": "^8.18.0"

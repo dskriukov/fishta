@@ -137,7 +137,7 @@ contract_map:
   debug.drawPositionTraces:                 render.js#drawDebugPositionTraces  # @ds:727e9afe
   debug.drawFishCollisionRadius:            render.js#drawDebugFishCollisionRadius  # @ds:6b4e90d2 @ds:a3e394a8
   ui.showAppVersion:                         server.js#appVersion main.js#showAppVersion index.html#app-version  # @ds:8d13f6a2
-  ui.worldSnapshotInfo:                      main.js#updateWorldSnapshotInfo main.js#updateWorldSyncMetrics index.html#world-info style.css#world-info  # @ds:e42a7c19 @ds:world.status-sync-metrics
+  ui.worldSnapshotInfo:                      main.js#updateWorldSnapshotInfo main.js#updateWorldSyncMetrics index.html#world-info style.css#world-info  # @ds:e42a7c19 @ds:world.status-sync-metrics @fix:b8c4d9e2
   multiplayer.syncRateFeedback:              client-net.js#connect main.js#updateSyncRate index.html#world-sync-rate style.css#world-info  # @ds:e7c2a901
   multiplayer.clientEventRates:              protocol.js#applyWorldFragment client-net.js#connect client-net.js#input client-net.js#recordEvents client-net.js#getEventRates main.js#updateEventRates index.html#world-dynamic-rate index.html#world-control-rate style.css#world-info  # @ds:7c2d91e4
   multiplayer.performanceMetrics:            server.js#broadcastWorldSync server.js#performanceStatistics client-net.js#connect main.js#updateWorldPerformanceMetrics main.js#updateWorldSyncMetrics index.html#world-calc-ms index.html#world-sync-cycle-ms style.css#world-info  # @ds:4d8c2f1a @ds:6e3b91c7
@@ -1190,7 +1190,11 @@ implementation_instructions:
     advanceBubbles owns bubble motion and birth/fade animation: increment `age`, decrement `life`, move by velocity, compute `birth = clamp(age / BUBBLE.birthDuration, 0..1)`, compute `fade = clamp(life / BUBBLE.life, 0..1)`, set `radius = targetRadius * easeOut(birth)` and `alpha = min(birth, fade)`. Bounds removal must use the larger of current radius and targetRadius so a just-born zero-radius bubble is not removed incorrectly.
     render(ctx,state) reads bubbles from state.clientBubbles first, then state.world.bubbles only for legacy single-process mode. render.js#drawBubble uses the ordinary white/blue style when bubble.color is absent and a red fill/stroke style when bubble.color is `red`.
     Camera viewport follows current client user fish via worldToViewport(world, followed, canvas, options).
+    main.js#resize derives the canvas bitmap dimensions from canvas.getBoundingClientRect(),
+    and main.js#scheduleResize coalesces resize, orientationchange, and visualViewport resize
+    events with a second-frame sample so the bitmap and CSS viewport keep the same aspect ratio.
     Rendering projects game-world units to canvas pixels. render.js#viewportScaleForFishCapacity(world, canvas, value) computes nominalStartDiameter = FISH.baseRadius * sqrt(PLAYER.startSize) * 2, numericScale = min(canvas.width, canvas.height) / (Number(value) * nominalStartDiameter) for 10/20/30, and maxScale = max(canvas.width / world.width, canvas.height / world.height). This maxScale uses the cover scale: at least one complete world axis fits the corresponding screen axis, while the other axis may extend beyond the viewport. The function then returns max(numericScale, maxScale). For value max it returns maxScale. worldToViewport uses that scale and keeps the followed fish centered. The scale is display-only and must not write to world, fish, protocol rows, or server state.  # @ds:e559831a @ds:7b9a7984 @ds:e001d967 @ds:d6cebf86 @ia:3c4d5e6f @ia:5a6b7c8d
+    # @fix:c7e2a914
   toroidal_viewport_projection: |
     render.js owns viewport projection only; it must not mutate state.world, fish.pos, protocol rows, or snapshotBuffer.
     worldToViewport(world, followed, canvas, options) keeps the followed fish's canonical position as the viewport focus.

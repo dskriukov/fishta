@@ -1030,7 +1030,7 @@ body::after {
     font-variant-numeric: tabular-nums;
 }
 
-/* @ds:e42a7c19 */
+/* @ds:e42a7c19 @fix:b8c4d9e2 */
 #world-info {
     position: fixed;
     z-index: 3;
@@ -1041,10 +1041,10 @@ body::after {
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: clamp(18px, 5vw, 48px);
-    padding: 7px 18px calc(7px + env(safe-area-inset-bottom));
+    gap: clamp(5px, 1.25vw, 12px);
+    padding: 3px 8px calc(3px + env(safe-area-inset-bottom));
     color: #d9f5ff;
-    font-size: 12px;
+    font-size: 8px;
     line-height: 1.25;
     letter-spacing: 0;
     background: rgba(4, 38, 59, 0.26);
@@ -1058,10 +1058,10 @@ body::after {
 #world-info .world-info-item {
     display: grid;
     grid-template-columns: auto;
-    gap: 2px;
+    gap: 1px;
     align-items: center;
     justify-items: center;
-    min-width: 48px;
+    min-width: 24px;
 }
 
 #world-info .world-info-item span {
@@ -1438,9 +1438,9 @@ body::after {
     align-items: stretch;
     justify-content: stretch;
     justify-items: stretch;
-    padding: 17px 22px;
+    padding: 5px 7px;
     border: 0;
-    border-radius: 20px;
+    border-radius: 8px;
     background: rgba(3, 35, 58, 0.25);
     box-shadow: none;
     backdrop-filter: blur(3px);
@@ -1453,11 +1453,11 @@ body::after {
     align-items: baseline;
     justify-content: space-between;
     justify-items: initial;
-    gap: 12px;
+    gap: 4px;
     min-width: 0;
-    min-height: 55px;
-    padding: 11px 0;
-    border-bottom: 2px solid rgba(217, 245, 255, 0.13);
+    min-height: 22px;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(217, 245, 255, 0.13);
 }
 
 #world-info .world-info-item > span {
@@ -1477,7 +1477,7 @@ body::after {
 
 #world-info .world-info-item span {
     color: rgba(181, 222, 236, 0.58);
-    font-size: 18px;
+    font-size: 7px;
     font-weight: 740;
     letter-spacing: 0.12em;
     text-transform: uppercase;
@@ -1486,7 +1486,7 @@ body::after {
 #world-info strong,
 #world-info em {
     color: #edf8ff;
-    font-size: 30px;
+    font-size: 12px;
     font-weight: 740;
     letter-spacing: -0.04em;
     text-align: right;
@@ -1625,25 +1625,25 @@ body::after {
     #world-info {
         left: 10px;
         bottom: calc(15px + env(safe-area-inset-bottom));
-        width: min(220px, calc(100vw - 12px));
-        min-width: min(190px, calc(100vw - 12px));
-        padding: 7px 11px;
-        border-radius: 12px;
+        width: min(170px, calc(100vw - 12px));
+        min-width: min(150px, calc(100vw - 12px));
+        padding: 4px 7px;
+        border-radius: 8px;
     }
 
     #world-info .world-info-item {
-        min-height: 24px;
-        padding: 5px 0;
+        min-height: 18px;
+        padding: 3px 0;
         border-bottom-width: 1px;
     }
 
     #world-info .world-info-item span {
-        font-size: 9px;
+        font-size: 7px;
     }
 
     #world-info strong,
     #world-info em {
-        font-size: 15px;
+        font-size: 12px;
     }
 
     #world-info .world-info-area {
@@ -1666,7 +1666,7 @@ body::after {
     }
 
     #world-info {
-        width: min(130px, calc(100vw - 12px));
+        width: min(110px, calc(100vw - 12px));
     }
 }
 
@@ -1806,10 +1806,10 @@ body::after {
         min-width: 0;
         height: auto;
         display: grid;
-        grid-template-columns: repeat(6, minmax(0, 1fr));
-        gap: clamp(6px, 1.8vw, 22px);
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        gap: clamp(2px, 0.45vw, 6px);
         align-items: stretch;
-        padding: 5px 14px max(5px, env(safe-area-inset-bottom));
+        padding: 1px 4px max(1px, env(safe-area-inset-bottom));
         border-top: 1px solid rgba(205, 238, 255, 0.24);
         border-radius: 0;
         background: rgba(4, 38, 59, 0.82);
@@ -1821,9 +1821,9 @@ body::after {
         grid-template-columns: auto;
         justify-items: center;
         align-content: center;
-        gap: 2px;
+        gap: 1px;
         min-height: 0;
-        padding: 3px 6px;
+        padding: 0 1px;
         border-bottom: 0;
         border-right: 1px solid rgba(217, 245, 255, 0.13);
     }
@@ -1838,12 +1838,12 @@ body::after {
     }
 
     #world-info .world-info-item span {
-        font-size: clamp(8px, 1.1vw, 12px);
-        letter-spacing: 0.08em;
+        font-size: clamp(4px, 0.4vw, 5px);
+        letter-spacing: 0.03em;
     }
 
     #world-info strong,
     #world-info em {
-        font-size: clamp(15px, 2.3vw, 24px);
+        font-size: clamp(6px, 0.7vw, 8px);
     }
 }
