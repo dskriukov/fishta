@@ -14,18 +14,40 @@ import {
     parseIdentity,
 } from './protocol.js';
 import { makeWorld } from './world.js';
-import { WORLD } from './constants.js';
+import { SYNC, WORLD } from './constants.js';
 import { technicalRadiusOf } from './fish.js';
 
-export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onInitialCommunication }){
+// @ds b9e5d274 e6d3b9a1
+export function createDangerMapSocket(onFrame){
+    let socket = null;
+    return {
+        open(){
+            if( socket && socket.readyState <= WebSocket.OPEN ) return;
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            socket = new WebSocket(`${protocol}//${window.location.host}/danger-map`);
+            socket.binaryType = 'blob';
+            socket.addEventListener('message', async event => {
+                const bitmap = await createImageBitmap(event.data);
+                onFrame(bitmap);
+            });
+        },
+        close(){ if( socket && socket.readyState < WebSocket.CLOSING ) socket.close(); socket = null; },
+    };
+}
+
+// @ds:a14c7e52 @ds:b6e39d14 @ia:4a8d0f72
+export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onInitialCommunication, onSyncRate, onEventRates, onPerformanceMetrics, initialConnectionCode = '' }){
     let socket = null;
     let currentUserFishId = null;
-    let temporaryConnectionCode = window.sessionStorage.getItem('fish.connectionCode') || '';
+    let temporaryConnectionCode = String(initialConnectionCode || '');
+    let pendingJoinProfile = null;
     let joined = false;
     let pingCounter = 0;
     let lastSyncAt = null;
     let initialCommunicationSettled = false;
     const acknowledgedCycles = new Set();
+    const eventTimes = { dynamic: [], control: [] };
+    window.setInterval(() => publishEventRates(performance.now()), 250);
     const world = makeWorld();
     const transportState = { currentCycle: null, cycleStartedAt: null, tombstones: new Map() };
 
@@ -41,29 +63,37 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onI
     }
 
     function connect(){
+        if( socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) ) return;
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        socket = new WebSocket(`${protocol}//${window.location.host}`);
+        const connection = new WebSocket(`${protocol}//${window.location.host}`);
+        socket = connection;
         status('connecting');
-        socket.addEventListener('open', () =>{
+        connection.addEventListener('open', () =>{
+            if( socket !== connection ) return;
             status('connected');
             if( temporaryConnectionCode ){
                 sendRaw(encodeClientReconnect(temporaryConnectionCode));
+            }else if( pendingJoinProfile ){
+                sendRaw(encodeClientJoin(pendingJoinProfile));
             }else{
                 settleInitialCommunication('new');
             }
         });
-        socket.addEventListener('close', () =>{
+        connection.addEventListener('close', () =>{
+            if( socket !== connection ) return;
+            socket = null;
             status('disconnected');
-            window.setTimeout(connect, 600);
+            if( temporaryConnectionCode || pendingJoinProfile ) window.setTimeout(connect, 600);
         });
-        socket.addEventListener('message', event =>{
+        connection.addEventListener('message', event =>{
+            if( socket !== connection ) return;
             const text = String(event.data || '');
             if( text[0] === 'i' ){
                 const message = parseIdentity(text);
                 joined = true;
                 currentUserFishId = message.currentUserFishId;
                 temporaryConnectionCode = message.temporaryConnectionCode;
-                window.sessionStorage.setItem('fish.connectionCode', temporaryConnectionCode);
+                pendingJoinProfile = null;
                 settleInitialCommunication('restored');
                 if( onIdentity ) onIdentity(message);
                 return;
@@ -94,6 +124,19 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onI
                 publishSnapshot(performance.now(), null);
                 return;
             }
+            // @ds:4d8c2f1a
+            if( text.startsWith('m:') ){
+                const worldCalculationMs = Number(text.slice(2));
+                if( Number.isFinite(worldCalculationMs) && worldCalculationMs >= 0 && onPerformanceMetrics ) onPerformanceMetrics({ worldCalculationMs });
+                return;
+            }
+            if( text.startsWith('v:') ){
+                const [, cycleText, rateText] = text.split(':');
+                const cycle = Number(cycleText);
+                const rate = Number(rateText);
+                if( Number.isInteger(cycle) && Number.isFinite(rate) && rate >= 0 && onSyncRate ) onSyncRate({ cycle, rate });
+                return;
+            }
             if( text[0] === 'x' ){
                 const receivedAt = performance.now();
                 const removal = applyObjectRemoval(world, text, transportState, receivedAt);
@@ -112,8 +155,9 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onI
                 const elapsedSeconds = lastSyncAt === null ? 0 : (receivedAt - lastSyncAt) / 1000;
                 const syncDiagnostics = applyWorldFragment(world, text, transportState, receivedAt);
                 if( !syncDiagnostics ) return;
+                recordEvents('dynamic', syncDiagnostics.dynamicEvents || 0, receivedAt);
                 applyTechnicalScale();
-                acknowledgeCycle(syncDiagnostics.cycle);
+                acknowledgeGlobalAbsoluteCentralCell(syncDiagnostics);
                 logAbsolutePositionDrift(syncDiagnostics, elapsedSeconds);
                 lastSyncAt = receivedAt;
                 publishSnapshot(syncDiagnostics.cycleStartedAt, syncDiagnostics);
@@ -127,12 +171,12 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onI
         for( const shred of world.shreds || [] ) shred.radius = (shred.size || 0) / 2;
     }
 
-    function acknowledgeCycle(cycle){
+    // @ds:77faf734
+    function acknowledgeGlobalAbsoluteCentralCell(syncDiagnostics){
+        const cycle = syncDiagnostics?.cycle;
+        if( !syncDiagnostics?.absolute || !Number.isInteger(cycle) || cycle % SYNC.globalAbsoluteEvery !== 0 ) return;
+        if( !(syncDiagnostics.fish || []).some(fish => fish.id === currentUserFishId) ) return;
         if( acknowledgedCycles.has(cycle) ) return;
-        const received = transportState.receivedFragmentsByCycle ||= new Map();
-        const count = (received.get(cycle) || 0) + 1;
-        received.set(cycle, count);
-        if( count < 3 ) return;
         acknowledgedCycles.add(cycle);
         sendRaw(encodeClientSyncAck(cycle));
         while( acknowledgedCycles.size > 12 ) acknowledgedCycles.delete(acknowledgedCycles.values().next().value);
@@ -216,12 +260,41 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onI
         return true;
     }
 
+    function recordEvents(kind, count = 1, now = performance.now()){
+        const events = eventTimes[kind];
+        if( !events || !Number.isFinite(count) || count <= 0 ) return;
+        for( let index = 0; index < count; index++ ) events.push(now);
+        publishEventRates(now);
+    }
+
+    function getEventRates(now = performance.now()){
+        const cutoff = now - 1000;
+        for( const events of Object.values(eventTimes) ){
+            while( events.length > 0 && events[0] < cutoff ) events.shift();
+        }
+        return {
+            dynamic: eventTimes.dynamic.length,
+            control: eventTimes.control.length,
+        };
+    }
+
+    function publishEventRates(now){
+        if( onEventRates ) onEventRates(getEventRates(now));
+    }
+
     // @ds:93a64773 @ds:eba75588
     function clearSessionBinding(){
-        window.sessionStorage.removeItem('fish.connectionCode');
         temporaryConnectionCode = '';
         currentUserFishId = null;
         joined = false;
+        pendingJoinProfile = null;
+        closeIdleSocket();
+    }
+
+    function closeIdleSocket(){
+        const connection = socket;
+        socket = null;
+        if( connection && connection.readyState < WebSocket.CLOSING ) connection.close();
     }
 
     // @ds:9772e9ac
@@ -231,18 +304,23 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onI
         return true;
     }
 
-    connect();
+    if( temporaryConnectionCode ) connect();
 
     return {
         get currentUserFishId(){ return currentUserFishId; },
         get temporaryConnectionCode(){ return temporaryConnectionCode; },
+        get hasRestoreCode(){ return Boolean(temporaryConnectionCode); },
         get isJoined(){ return joined; },
         join(profile){
-            sendRaw(encodeClientJoin(profile));
+            pendingJoinProfile = profile;
+            connect();
+            if( socket?.readyState === WebSocket.OPEN ){
+                sendRaw(encodeClientJoin(profile));
+            }
         },
         input(payload){
             if( !joined ) return;
-            sendRaw(encodeClientControl(payload));
+            if( sendRaw(encodeClientControl(payload)) ) recordEvents('control');
         },
         // @ds:671e9773
         idle(){

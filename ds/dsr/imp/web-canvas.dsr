@@ -50,6 +50,7 @@ file_plan:
   web-canvas/src/constants.js:      "world, fish, regime, density, sync, visual tunables"
   web-canvas/src/vec.js:            "vec2 helpers"
   web-canvas/src/world.js:          "wrap bounds, drag, resize, density field, bubbles"
+  web-canvas/src/perception.js:     "toroidal interaction segments and server danger raster"
   web-canvas/src/fish.js:           "fish data, identity fields, swim/grow/facing/decor/serialize"
   web-canvas/src/player.js:         "player fry-stage, active lifetime, old-age respawn"
   web-canvas/src/shred.js:          "server-owned shred spawn, drift, contact, layer nutrition, row helpers"
@@ -72,6 +73,7 @@ contract_map:
   multiplayer.convertDisconnectedUserFishToNpc: server.js#convertUserFishToNpc  # @ds:eba75588 @ds:a6c9e8b4
   multiplayer.leaveGame:                    server.js#handleLeaveGame  # @ds:704ab317
   multiplayer.syncWorld:                    server.js#broadcastWorldSync server.js#runSyncPhases server.js#sendPlanFragment  # @ds:e559831a @ds:e4d375ed @ds:0a2b6379 @fix:7c4d2e91 @fix:91ab6e30
+  multiplayer.emptyCellFragments:           server.js#makeSyncPlan server.js#runSyncPhases  # @fix:a8f3c2d1
   multiplayer.serverPerformanceStatistics:  server.js#performanceStatistics server.js#reportPerformanceStatistics  # @ds:61245206 @ds:0a2b6379 @ds:77faf734
   wsProtocol.encoding:                       protocol.js#encodeName protocol.js#decodeName  # @ds:839f8cd0
   wsProtocol.clientMessages:                 protocol.js#encodeClientJoin protocol.js#parseClientMessage  # @ds:5a4d3d6d
@@ -79,20 +81,26 @@ contract_map:
   wsProtocol.handshakeState:                 client-net.js#connect server.js#handleMessage  # @ds:4fad33f8
   wsProtocol.serverSync:                     protocol.js#encodeWorldCycle protocol.js#parseWorldFragment client-net.js#connect  # @ds:682570c7 @ds:915ab0e4
   wsProtocol.spatialFragments:                server.js#broadcastWorldSync server.js#runSyncPhases protocol.js#encodeWorldCycle  # @ds:c39827ed @ds:0a2b6379
-  wsProtocol.syncAckThroughput:               client-net.js#connect server.js#handleSyncAck  # @ds:77faf734
+  wsProtocol.syncOrderMatrix7x7:               server.js#makeSyncPlan  # @ds:c1f4a9e2
+  wsProtocol.syncAckThroughput:               client-net.js#connect client-net.js#acknowledgeGlobalAbsoluteCentralCell server.js#sendPlanFragment server.js#handleSyncAck protocol.js#encodeClientSyncAck  # @ds:77faf734
   wsProtocol.cellLocalPosition:               protocol.js#encodeFishRow protocol.js#encodeShredRow protocol.js#applyWorldFragment  # @ds:e047bbdf
   wsProtocol.newObjectRow:                    protocol.js#encodeWorldCycle protocol.js#applyWorldFragment  # @ds:6c8c56e7
   wsProtocol.sharedWorldSnapshot:            server.js#broadcastWorldSync protocol.js#encodeWorldCycle  # @ds:2afd71a0
   wsProtocol.fishRow:                        protocol.js#encodeFishRow protocol.js#parseFishRow  # @ds:ea18a088 @ds:2e91f6d4
   wsProtocol.shredRow:                       protocol.js#encodeShredRow protocol.js#encodeShredDeltaRow protocol.js#parseShredRow protocol.js#applyWorldFragment  # @ds:9f50b1be
   wsProtocol.stateMods:                      protocol.js#stateMods  # @ds:f51a5030
-  wsProtocol.objectRemoval:                   server.js#broadcastRemovedObjects protocol.js#encodeObjectRemoval protocol.js#applyObjectRemoval client-net.js#connect  # @ds:0aaccaf8
+  wsProtocol.objectRemoval:                   server.js#broadcastRemovedObjects protocol.js#encodeObjectRemoval protocol.js#applyObjectRemoval client-net.js#connect  # @ds:0aaccaf8 @ds:8c663384
   wsProtocol.clientFragmentValidity:          protocol.js#applyWorldFragment  # @ds:28d9098a
   wsProtocol.clientTimingVisibility:          protocol.js#applyWorldFragment protocol.js#applyObjectRemoval main.js#extrapolateWorld render.js#drawFish render.js#drawShred  # @ds:8c663384
   wsProtocol.events:                         protocol.js#encodeEvent protocol.js#parseEvent  # @ds:a16328a6
+  wsProtocol.dangerMapStream:                server.js#broadcastDangerMap src/danger-map.js#encodeDangerMapPng src/danger-map.js#drawDirectionDangerOverlay src/danger-map.js#nearestToroidalTarget prey.js#pursueIntent prey.js#fleeFromThreat prey.js#chooseDangerAwareDirection  # @ds:e6d3b9a1 @ds:9a6e4c31 @fix:b5c7d9e1 @fix:7f4a2c19 @fix:6d2f9a41 @fix:84b1c6d2 @fix:8c4e1a72 @fix:9d4e7b21
   controls.joinWorldForm:                   controls.js#createJoinFormState  # @ds:34ba255b @ds:58050922
   controls.joinPresentation:                index.html#join-form style.css##join style.css##join-form main.js#syncJoinFishPreview  # @ds:277a51d7
   controls.startBackground:                 style.css##join  # @ds:58200142 @ia:3983084a
+  controls.startupSplash:                   style.css##startup-splash main.js#startEntryFlow  # @ds:7f1a2c63 @ds:b6e39d14 @ia:4a8d0f72
+  controls.startupSessionRouting:           main.js#startEntryFlow main.js#setJoinedUiState client-net.js#createClientNet client-net.js#connect  # @ds:b6e39d14 @ia:4a8d0f72
+  multiplayer.tabSessionBinding:            client-net.js#createClientNet client-net.js#clearSessionBinding  # @ds:a14c7e52
+  multiplayer.joinProfilePreferences:       main.js#loadJoinProfilePreferences main.js#saveJoinProfilePreferences main.js#saveJoinProfileDraft  # @ds:c9f4b821 @ia:d2c6a901 @fix:7d3e91a4
   controls.noVulnerabilityControl:          controls.js#createJoinFormState controls.js#createInput  # @ds:5377d065
   controls.deviceType:                      controls.js#detectControlDevice  # @ds:cf6ad7d6
   controls.modeSelect:                      controls.js#createControlModeState  # @ds:70871bc5
@@ -112,7 +120,7 @@ contract_map:
   controls.burstEnduranceJoystickUi:        main.js#updateJoystickBurstAvailability main.js#renderJoystickBurstRings main.js#updateJoystickCurrentBurstRing style.css##joystick-base  # @ds:0eef2d19 @ds:e41821af
   controls.primaryKeyboardAndJoystick:      controls.js#createControlModeState main.js#buildInputPayload main.js#updateJoystickPanelVisibility main.js#setControlMode  # @ds:93b8abba @ds:10baf178 @ds:b43d2f95
   controls.burstEnduranceMenuTable:         main.js#updateBurstEnduranceTable index.html#burst-endurance-table style.css#burst-endurance-table  # @ds:cff27cd5
-  controls.viewportFishCapacity:            constants.js#VIEWPORT_FISH_CAPACITY main.js#viewportFishCapacity main.js#setViewportFishCapacity render.js#viewportScaleForFishCapacity render.js#worldToViewport index.html#viewport-fish-capacity style.css#viewport-fish-capacity  # @ds:e001d967 @ds:7b9a7984
+  controls.viewportFishCapacity:            constants.js#VIEWPORT_FISH_CAPACITY main.js#viewportFishCapacity main.js#loadViewportFishCapacity main.js#setViewportFishCapacity render.js#viewportScaleForFishCapacity render.js#worldToViewport index.html#viewport-fish-capacity style.css#viewport-fish-capacity  # @ds:e001d967 @fix:a64e9b31 @ds:7b9a7984
   controls.inspectClick:                    main.js#handleInspectClick  # @ds:2e1570ed
   controls.camera:                          render.js#worldToViewport  # @ds:7b9a7984 @ds:e001d967
   world.backgroundTileParallax:             style.css#body::before render.js#updateWorldBackgroundCss render.js#backgroundCameraDelta render.js#render  # @ds:2b3e71e0 @fix:4bbc0692 @ia:3983084a
@@ -121,6 +129,8 @@ contract_map:
   client.decorState:                         main.js#applyClientFishDecor main.js#updateClientDecorState  # @ds:975ca168 @ds:bd354b7a @ds:3ddf8f67 @ds:a44b9d2c @fn:a9a3ed12 @ia:9c0d1e2f @ia:3a4b5c6e
   ui.gameMenu:                              main.js#toggleGameMenu main.js#updateGameMenu index.html#game-menu-toggle index.html#game-menu style.css#game-menu-toggle style.css#game-menu  # @ds:ab1e4f02 @ds:8d13f6a2 @ds:59c118f5 @ds:70871bc5 @ds:fb11044e @ds:e001d967
   ui.worldMap:                              main.js#toggleWorldMap main.js#updateWorldMapUi main.js#worldMapVisible index.html#world-map-toggle index.html#world-map style.css#world-map-toggle style.css#world-map render.js#drawWorldMap  # @ds:3a980720 @ds:8f2c91ad
+  ui.worldInspectionControls:               main.js#toggleSyncSegments main.js#toggleDangerMapUnderlay index.html#hud .hud-row index.html#world-map-toggle index.html#sync-segments-toggle index.html#danger-map-toggle style.css#.hud-row style.css#world-map-toggle style.css#sync-segments-toggle style.css#danger-map-toggle render.js#drawGameplaySyncGrid render.js#drawDebugReceivedQuadrants render.js#drawDebugPositionTraces render.js#drawDangerMapUnderlay  # @ds:f3a1c7d9 @fix:c2e1a7b4
+  ui.dangerMapUnderlay:                     client-net.js#createDangerMapSocket main.js#dangerMapVisible main.js#dangerMapNet main.js#syncDangerMapTransport render.js#drawDangerMapUnderlay render.js#drawDangerMapGameplayGrid render.js#drawWorldMap  # @ds:b9e5d274 @ds:e6d3b9a1 @fix:1f5d8c42 @fix:c2e1a7b4
   debug.toggleMode:                         main.js#toggleDebugMode index.html#debug-mode-toggle  # @ds:59c118f5
   debug.drawWorldRepeatBounds:              render.js#drawDebugWorldRepeatBounds  # @ds:7435b6ce
   debug.recordPositionTraces:               main.js#recordDebugPositionTraces protocol.js#applyWorldSync  # @ds:727e9afe
@@ -128,9 +138,16 @@ contract_map:
   debug.drawFishCollisionRadius:            render.js#drawDebugFishCollisionRadius  # @ds:6b4e90d2 @ds:a3e394a8
   ui.showAppVersion:                         server.js#appVersion main.js#showAppVersion index.html#app-version  # @ds:8d13f6a2
   ui.worldSnapshotInfo:                      main.js#updateWorldSnapshotInfo main.js#updateWorldSyncMetrics index.html#world-info style.css#world-info  # @ds:e42a7c19 @ds:world.status-sync-metrics
+  multiplayer.syncRateFeedback:              client-net.js#connect main.js#updateSyncRate index.html#world-sync-rate style.css#world-info  # @ds:e7c2a901
+  multiplayer.clientEventRates:              protocol.js#applyWorldFragment client-net.js#connect client-net.js#input client-net.js#recordEvents client-net.js#getEventRates main.js#updateEventRates index.html#world-dynamic-rate index.html#world-control-rate style.css#world-info  # @ds:7c2d91e4
+  multiplayer.performanceMetrics:            server.js#broadcastWorldSync server.js#performanceStatistics client-net.js#connect main.js#updateWorldPerformanceMetrics main.js#updateWorldSyncMetrics index.html#world-calc-ms index.html#world-sync-cycle-ms style.css#world-info  # @ds:4d8c2f1a @ds:6e3b91c7
+  multiplayer.controlHeartbeat:              main.js#sendInputIfChanged client-net.js#input server.js#normalizeInput server.js#tick constants.js#SERVER.controlTimeoutMs  # @ds:4e6f8a12
   world.wrapPosition:                       world.js#wrapPosition  # @ds:c83f4c1e @ia:dd909d1a
   world.applyDrag:                          world.js#applyDrag  # @ds:ca07d970
   world.fixedCoordinateGrid:                world.js#makeWorld constants.js#WORLD  # @ds:10dc892b
+  world.interactionSegments:                 perception.js#buildInteractionSegments perception.js#queryInteractionCandidates  # @ds:c94d2a8f
+  world.dangerRaster:                       perception.js#buildDangerRaster perception.js#sampleDangerRaster perception.js#recordDirectionDanger  # @ds:9a6e4c31 @ds:d5c8b740 @fix:3a7c9e21 @fix:8c4e1a72 @fix:7f3c9a21
+  world.syncGridConfiguration:              constants.js#WORLD protocol.js#cellOf server.js#makeSyncPlan render.js#drawWorldMapGrid  # @ds:d4e8b731
   world.virtualAreaPerUser:                 world.js#worldScale world.js#effectiveWorldArea  # @ds:8b998807 @ds:915ab0e4
   world.scaleDensity:                       world.js#targetNpcCount  # @ds:6ca3cb74 @ds:53db39eb
   world.scaleProjection:                    render.js#worldToViewport render.js#viewportToWorld  # @ds:915ab0e4 @ds:7b9a7984
@@ -179,8 +196,8 @@ contract_map:
   prey.wanderSteer:                         prey.js#wanderSteer  # @ds:31cb7a0d
   prey.continuousMotionIntent:               prey.js#wanderSteer prey.js#chooseNpcIntent  # @ds:b47c2d91
   prey.fleeSteer:                           prey.js#fleeSteer  # @ds:579e4888 @ds:e699c42d
-  prey.chooseNpcIntent:                     prey.js#chooseNpcIntent prey.js#assignNpcCourage  # @ds:d0ef4576 @ds:e29aeb93
-  prey.dangerAwareSteering:                 prey.js#chooseDangerAwareDirection prey.js#dangerScoreForDirection prey.js#smoothNpcSteering  # @ds:92d5b0c1 @ds:7cb92a44 @ds:4f58a1cd @ds:c6d7e8f9 @ia:8a4b2f19
+  prey.chooseNpcIntent:                     prey.js#chooseNpcIntent prey.js#tryCompromiseHunt prey.js#pursueIntent prey.js#huntTargetKey prey.js#huntBaseDirection prey.js#huntMotionForStrategy prey.js#assignNpcCourage prey.js#findSelectedFood prey.js#groupShredTargets prey.js#shouldContinueFleeFear prey.js#findNearestThreatWithin  # @ds:d0ef4576 @ds:e29aeb93 @ds:8f1a2c3d @ds:9b4e6d7f @ds:4e7a9c2d @ia:7a6b5c4d @ia:5b8d1f6a @fix:2a7e5c19 @fix:9d4e7b21
+  prey.dangerAwareSteering:                 prey.js#chooseDangerAwareDirection prey.js#dangerScoreForDirection prey.js#immediateDangerForDirection prey.js#dangerPredictionPositions prey.js#dangerSampleAtPosition prey.js#smoothNpcSteering  # @ds:92d5b0c1 @ds:7cb92a44 @ds:4f58a1cd @ds:c6d7e8f9 @ia:8a4b2f19 @fix:5e1a7c42 @fix:8c4e1a72
   prey.maintainPopulation:                  prey.js#maintainPopulation  # @ds:e6ecfbdd @ds:53db39eb @ds:7ba4084c
   prey.growSpawnedFryToNominalSize:         prey.js#advanceFryGrowth  # @ds:e6ecfbdd
   prey.expireOldNpcFish:                     prey.js#expireOldNpcFish step.js#stepAuthoritativeWorld  # @ds:a6c9e8b4 @ds:d140effd
@@ -217,7 +234,7 @@ data_model:
       latestAbsoluteServerPositions: "Map fishId -> absolute server pos captured from absolute sync diagnostics"
       lastDebugTraceAt: "timestamp of last debug trace sample, used to cap trace density"
       lastSentInputKey: "encoded comparison key for immediate input flush"
-      lastInputFlushAt: "timestamp for unchanged-input idle cadence"
+      lastInputFlushAt: "timestamp for unchanged-input control-heartbeat cadence"
   fish:
     common_fields:
       - id
@@ -284,6 +301,13 @@ data_model:
       phaseTotalMs: "sum of common delivery phase durations"
       phaseCount: "completed common delivery phases"
       syncAckCount: "received v:N confirmations in the current window"
+      activeClientRateMin: "minimum latest bytes/sec rate among active clients at report time"
+      activeClientRateMax: "maximum latest bytes/sec rate among active clients at report time"
+      worldCalculationMs: "current-window average of stepAuthoritativeWorld elapsed durations, sent to clients with each sync broadcast"
+    client_performance_metrics:
+      worldCalculationMs: "latest finite server-provided worldCalculationMs value"
+      syncCycleIntervalsMs: "bounded list of client monotonic intervals between first accepted fragments of increasing cycle N"
+      syncCycleMs: "average of syncCycleIntervalsMs, or null before two cycles are observed"
       - render interpolation and prediction cache
       - decorative bubble emission, advancement, and rendering
       - size delta label accumulation, lifetime, current user size metric, and rendering for the current user fish only
@@ -291,6 +315,118 @@ data_model:
       - background asset loading and client-only background rendering
 
 implementation_instructions:
+  interaction_segments_and_danger_raster: |
+    Add src/perception.js as the server-owned broad-phase module. Export
+    buildInteractionSegments(world) and queryInteractionCandidates(index, observer).
+    Derive the interaction segment side in technical units from a configurable
+    game-space side divided by world.scale. Insert each fish and shred into every
+    wrapped segment overlapped by its contact circle; query the center segment plus
+    its eight neighbours and deduplicate candidates by transport kind and id.
+    Export buildDangerRaster(world, motionHorizonSeconds) and sampleDangerRaster(raster, pos). The raster
+    cell side is FISH.nominalStartDiameter / 4. Clear and rebuild a typed array from
+    current fish positions each authoritative step. A fish stamps a swept sequence of
+    filled disks from fish.position through fish.position + fish.velocity * motionHorizonSeconds,
+    wrapping each sample across toroidal world edges. Each disk has radius
+    fish.radius * 1.50 with one size-derived intensity; use max assignment for overlaps
+    and nearest-cell sampling. Build a perception snapshot before NPC
+    intent selection and rebuild the local interaction index after movement before
+    feeding and shred wake checks. Store only the current snapshot on world and
+    keep the raster/server index out of world-sync serialization.
+    # @ds:c94d2a8f @ds:9a6e4c31 @ds:d5c8b740 @fix:7f3c9a21
+    npc_motivated_navigation: |
+    Replace the all-world predator scans in prey.js#chooseNpcIntent with local
+    candidates from world.perception. For every edible fish and shred in the 3x3
+    query, calculate expected net nutrition from current nutrition, toroidal
+    distance, and hunt-energy cost. Apply NPC.foodFishSuccessFactor to fish
+    nutrition to represent evasion/feeding uncertainty. Group edible shreds within
+    NPC.foodClusterRadius around each seed, sum their next-layer nutrition, and
+    target the nutrition-weighted wrapped group center; shreds receive no evasion
+    penalty. Keep only candidates whose nutrition exceeds travel cost multiplied
+    by NPC.foodProfitMargin. Score a candidate route on concentric raster
+    circles centered on self: diameters are 2*selfDiameter, 3*selfDiameter, and so
+    on; choose angular samples whose arc spacing is about selfDiameter. Maintain a
+    blocked-sector set: a dangerous sector remains blocked at every larger circle.
+    Test the first two circles through exact local predator geometry as a hard
+    direction rejection before applying courage. Continue samples at least one ring
+    beyond target contact. When the target is on the first circle and successful
+    feeding is certain by current contact rules, use the predicted post-growth size
+    for outer-ring predator eligibility. For sparse local fish counts use exact
+    coordinate danger scoring; at or above PERCEPTION.dangerRasterThreshold use the
+    raster. Select the greatest courage-weighted motivation and use current heading
+    as the tie-breaker, then pass it through existing smoothNpcSteering.
+    # @ds:e2b91c54 @ds:8f1a2c3d @ds:9b4e6d7f @ds:f4d7a892 @ds:a6c39e71 @ds:c8f2d5a9 @ds:b1e7f463 @ds:d9a4c82e @ia:7a6b5c4d
+  prey_compromise_hunt: |
+    In prey.js#tryCompromiseHunt, evaluate the selected target direction after
+    the existing bounded hunt correction. If immediateDangerForDirection is false
+    for the first two danger circles, keep hunt mode and its huntTarget even when
+    a non-immediate predator is present; otherwise let chooseNpcIntent continue
+    through the existing fear and flee decision path.
+    # @fix:2a7e5c19
+  diagnostic_danger_map_transport: |
+    In server.js route WebSocket upgrade requests by pathname. Preserve the existing
+    gameplay socket on its current path and add /danger-map as a read-only socket
+    set that never creates a client fish or handles game messages. At SYNC.snapshotHz,
+    when that set is non-empty, encode the current danger raster into an RGBA PNG and
+    do not bake segment boundaries into the PNG; the browser draws the black segment
+    grid as a separate layer before compositing this raster. Send one binary
+    PNG frame to each open debug socket whose bufferedAmount is within the sync
+    limit. Implement the PNG encoder in src/danger-map.js with Node built-ins only:
+    raw scanlines, deflateSync, PNG chunks, and CRC32. Keep one direction-danger
+    counter per raster cell for the current authoritative cycle. Each candidate
+    vector rejected by a danger check increments one counter at its first blocking
+    point; reset counters at cycle start and preserve them through the post-movement
+    perception rebuild. Before PNG encoding, normalize counters by the cycle maximum
+    and blend a red overlay over the grayscale raster, leaving zero-count cells
+    unchanged and making the maximum pure red. Keep the output resolution equal to
+    the danger raster resolution and use wrapped fish disks already present in the
+    raster as its source of truth.
+    # @ds:e6d3b9a1 @ds:9a6e4c31 @ds:c94d2a8f @fix:b5c7d9e1 @fix:8c4e1a72
+  performance_metrics_transport: |
+    Keep server_performance_statistics.worldIterationTotalMs and worldIterationCount
+    scoped to the authoritative step only. At every broadcastWorldSync invocation,
+    compute worldCalculationMs = worldIterationTotalMs / worldIterationCount (or 0
+    when the window has no completed iterations) and send one telemetry message
+    `m:<worldCalculationMs>` to each open gameplay socket. Reset the counters only in
+    the existing five-second report window; do not reset them after each broadcast.
+    client-net.js parses `m:<value>` without treating it as a world fragment and calls
+    onPerformanceMetrics({ worldCalculationMs }). In main.js store the latest finite
+    value and format it in #world-calc-ms as `X.XX ms`.
+    In updateWorldSyncMetrics, accept a cycle only when its integer N is greater than
+    the last measured N. Record the monotonic receivedAt difference from the previous
+    accepted cycle start, retain the newest 20 intervals, average them, and render the
+    result in #world-sync-cycle-ms as `X.XX ms`; keep `—` until two cycle starts exist.
+    The cycle timestamp is the first accepted fragment timestamp represented by the
+    existing syncDiagnostics path, not a `v:N` acknowledgment.
+    # @ds:4d8c2f1a @ds:6e3b91c7
+  world_inspection_controls: |
+    Place the three inspection buttons directly in the existing .hud-row grid; do
+    not wrap them in a grid item. Set grid-column-start: 3 on #world-map-toggle,
+    #sync-segments-toggle, and #danger-map-toggle so CSS Grid creates one implicit
+    row per button in the right toolbar track. Retain #world-map-toggle as the first
+    map control, add a grid-icon button for synchronization segments, and add a
+    radar-icon button for the danger-map underlay. main.js owns three independent boolean states
+    and toggles each button's aria-pressed and is-active class. Reuse the existing
+    synchronization-grid geometry and the debug-mode cell update-intensity fill in
+    render.js for the mini-map overlay. The mini-map shows each segment's current
+    update intensity as a translucent fill beneath its synchronization boundaries,
+    using the same values and color scale as debug mode. When danger-map
+    becomes active, client-net.js opens a second WebSocket to /danger-map, uses
+    binaryType='blob', decodes each latest PNG into an ImageBitmap, and closes/revokes
+    it on deactivation. Pass the latest bitmap and the live cellSyncAverages into
+    render.js#drawWorldMap. That function draws both optional inspection layers only
+    after restoring the gameplay viewport: map the danger bitmap to the mini-map
+    rectangle with readable translucency, then draw the debug-mode intensity fills
+    and synchronization boundaries in the same mini-map coordinate transform. The
+    gameplay canvas world layer remains free of these inspection overlays. Make
+    #world-map-toggle use the same dimensions, border, background, radius, icon
+    treatment, and active-state container as #game-menu-toggle; retain its globe
+    glyph. Keep the two new controls compact while leaving all three buttons as direct
+    .hud-row grid items; their dimensions, border, background, and active treatment
+    derive from the established menu/map control style. Because #hud disables pointer
+    events by default, set
+    pointer-events:auto on every inspection button and its control group. The grid
+    and radar controls use their own SVG icons.
+    # @ds:f3a1c7d9 @ds:b9e5d274 @ds:e6d3b9a1
   runtime_background_assets: |
     Publish the canonical PNG backgrounds by keeping runtime copies at
     web-canvas/assets/back.png and web-canvas/assets/start.png. Browser code and
@@ -314,7 +450,7 @@ implementation_instructions:
     other clients or phases. The plan's encoded strings are never rebuilt during delivery, and its
     cycle/state remain independent of input, join, reconnect, or ACK timing.  # @fix:7c4d2e91 @fix:91ab6e30
   server_performance_statistics: |
-    server.js owns one module-level performanceStatistics accumulator and resets it only after reporting. In tick(), time only stepAuthoritativeWorld({ world }, inputsByClient, dt, Math.random), then add its elapsed milliseconds, increment the iteration count, and add world.fish.length + world.shreds.length after the step. broadcastWorldSync() increments preparedSyncCycleCount once, replaces any unsubmitted common phase plan while adding its remaining message count to droppedFragmentCount, and records each completed phase duration. `v:N` records cycle, sent-byte total, first-send timestamp, ACK timestamp, and socket bufferedAmount without gating any phase. The five-second report prints world iteration time, phase time, controlled object count, dropped fragments per cycle, and ACK count.  # @ds:61245206 @ds:0a2b6379 @ds:77faf734
+    server.js owns one module-level performanceStatistics accumulator and resets its window counters only after reporting. In tick(), time only stepAuthoritativeWorld({ world }, inputsByClient, dt, Math.random), then add its elapsed milliseconds, increment the iteration count, and add world.fish.length + world.shreds.length after the step. broadcastWorldSync() increments preparedSyncCycleCount once, replaces any unsubmitted common phase plan while adding its remaining message count to droppedFragmentCount, and records each completed phase duration. sendPlanFragment marks the non-empty central-cell fragment of every global absolute cycle with its sent byte count and send timestamp. client-net.js sends `v:N` exactly once after applying that central absolute fragment; server.js#handleSyncAck computes rate = central fragment bytes / elapsed seconds from send placement to ACK receipt, stores the latest rate on the active client, and sends `v:N:rate` back without gating any phase. The five-second report prints world iteration time, phase time, controlled object count, dropped fragments per cycle, ACK count, and current min/max active-client rate.  # @ds:61245206 @ds:0a2b6379 @ds:77faf734 @ds:e7c2a901
   join_identity: |
     Join form starts with generated name and generated user color.
     It includes a paid/free toggle. The toggle is only a local domain attribute,
@@ -333,18 +469,31 @@ implementation_instructions:
     main.js must hide the join panel after any identity message, not only after a
     manual join submit, so an automatic reconnect cannot leave an active join form
     that creates a duplicate user fish.
-    client-net.js#createClientNet owns first-communication settling for entry UI:
-    when the WebSocket opens with no stored temporaryConnectionCode, call
-    onInitialCommunication({ kind:'new' }); when an identity message is received
-    for a reconnect or join, call onInitialCommunication({ kind:'restored' }) once
-    before/with onIdentity. main.js starts with #join, #control-modes, #control-help,
-    #leave-game, #joystick-panel, and #player-metrics hidden; it shows the join
-    form only after first communication establishes a new session, and shows game
-    controls only after joined=true.
-    style.css#join uses ./assets/start.png as the entry-screen background image,
-    layered under the existing dark water overlay so the form remains readable.
-    This entry background is tied to the visible join panel and is independent of
-    the in-game canvas background.  # @ds:58200142 @ia:3983084a
+    client-net.js#createClientNet owns the in-memory temporaryConnectionCode,
+    socket lifecycle, pending join profile, and first-communication callbacks.
+    Do not read or write sessionStorage for the connection code. If the factory
+    receives an initial restore code, connect() sends r:<code> and waits for an
+    identity message before reporting restored; an rj:expired event clears the
+    in-memory code and reports new. With no restore code, the factory leaves the
+    socket closed until join(profile) is called. join(profile) stores the pending
+    profile, opens the socket, and sends n:<colorHexNoHash>:<base64urlName>:<u|p>
+    on open. Socket close schedules reconnect only when a temporary code or a
+    pending join exists, preventing idle new-entry sockets from reconnecting.
+    main.js owns entrySessionReady and route presentation. It keeps the form and
+    game controls hidden during the startup splash, shows the form after the
+    splash reveal when the route is new, and shows game controls only after
+    onIdentity. An identity received from restore or join starts the game reveal
+    by fading #startup-splash to opacity 0; an expired restore keeps the splash,
+    clears the code, and then reveals the new-join form. # @ds:7f1a2c63 @ds:b6e39d14 @ds:a14c7e52 @ia:4a8d0f72
+    style.css#startup-splash owns the fullscreen start.png layer above the
+    transparent canvas background. Its boot animation goes from opacity 0 to 1
+    and scale 1.05 to 1 around the center. The game reveal transitions opacity
+    from 1 to 0 over 650ms with ease; reduced-motion users receive the final
+    states without animated interpolation. # @ds:7f1a2c63 @ds:b6e39d14
+    main.js#saveJoinProfileDraft is bound to input events on #join-name and
+    #join-color and calls saveJoinProfilePreferences immediately with the current
+    userName/userColor values. The submit handler calls the same persistence
+    function so edited drafts and submitted profiles use one storage format. # @fix:7d3e91a4
   join_presentation: |
     index.html#join-form keeps the existing #join-name text input, #join-color
     native color input, #join-tier paid identity input, and submit event. Build
@@ -379,8 +528,8 @@ implementation_instructions:
     selected border/fill/marker; native radio inputs remain accessible while
     visually hidden.
     Add ./assets/join-corner-decoration.svg as a clipped, pointer-inert,
-    semi-transparent top-right layer inside #join-form. CSS keeps #join as the
-    full-screen start.png scene with a left-side readability overlay, makes one
+    semi-transparent top-right layer inside #join-form. CSS keeps #join as a
+    transparent overlay above #startup-splash, makes one
     translucent 420px maximum-width entry card, and scopes all join styling to
     #join / #join-form so the in-game HUD is unaffected.  # @ds:277a51d7
   reconnect_and_timeout: |
@@ -395,11 +544,11 @@ implementation_instructions:
     If a reconnect message cannot restore an ownerKind='user' fish inside the grace
     window, the server must send an explicit reconnect-failed event for that socket.
     client-net.js must treat reconnect failure as leaving the joined state: clear
-    currentUserFishId, temporaryConnectionCode, and sessionStorage fish.connectionCode,
+    currentUserFishId and the in-memory temporaryConnectionCode,
     stop sending input/idle messages, and notify main.js so the join panel is visible.
     Reconnect failure also settles first communication as kind='new' when the entry
-    UI is still pending, so a page reload with an expired stored code transitions
-    directly from pending to the join form without a transient joined/control UI.
+    UI is still pending, so the current tab transitions directly from pending to the
+    join form without a transient joined/control UI.
     main.js must not choose a followed fish by stale id when currentUserFishId no
     longer points to an ownerKind='user' fish in the latest snapshot.
     Otherwise convert the fish to ownerKind='npc', npcRole='abandoned-user-fish',
@@ -512,15 +661,26 @@ implementation_instructions:
     #debug-mode-toggle toggles only debugMode and does not own menu visibility.
     #leave-game remains the explicit leave/enter command inside the menu and keeps the same joined-state behavior.  # @ds:ab1e4f02 @ds:8d13f6a2 @ds:59c118f5 @ds:70871bc5 @ds:fb11044e @ds:22fd3ab4
   world_map_ui: |
+    Danger-map rendering draws the black segment grid first with DANGER_MAP.gridAlpha, then composites the danger bitmap with DANGER_MAP.bitmapAlpha; the PNG stream contains danger values only and no baked segment boundaries. The server PNG encoder overlays thick bright blue lines whenever an NPC has steerDecision.huntTarget, using the shortest wrapped target direction, red flee lines from steerDecision.fleeDirection with length 2..4 current fish diameters from speedLevel 31..79, and subdued water-colored circles using steerDecision.searchMaxDiameter. prey.js stores huntTarget, fleeDirection, and searchMaxDiameter as server-only diagnostic state. When Debug and the danger-map control are enabled, render.js#drawDangerMapUnderlay repeats the same world-coordinate grid and latest PNG frame under fish, shreds, bubbles, and other gameplay objects while the viewport transform is active; main.js keeps the danger-map transport open while the overview danger-map control is enabled and releases it when disabled.
     index.html contains #world-map-toggle in the top-right of #hud and #world-map as a screen-space 200x200 px overlay. The map button is visible only while an active joined session exists, has the same toolbar button footprint as #game-menu-toggle, and independently toggles worldMapVisible without changing debugMode, world state, input, or socket messages. #world-map is hidden unless worldMapVisible is true. In every responsive breakpoint, #hud .hud-row keeps explicit left-button, shrinkable metrics, and right-button grid tracks; #world-map-toggle uses the same breakpoint-specific width, height, border radius, and visual container as #game-menu-toggle, so neither button can wrap below the toolbar.  # @ds:3a980720
-    constants.js exports WORLD_MAP with the fixed 200px square size, 12px left inset, and 12px overlay gap; do not reuse DEBUG minimap coordinates for player-facing map UI. main.js#getWorldMapTop reads #hud and visible #player-metrics bounding rectangles every animation frame, takes the greater bottom edge, and adds WORLD_MAP.overlayGapPx. Pass this screen-space top coordinate in the render state. render.js#drawWorldMap(ctx, world, currentUserFishId, top) runs after restoring the viewport transform, uses WORLD_MAP.sizePx and WORLD_MAP.leftPx with the supplied top coordinate, validates positive world dimensions, draws the fixed square frame, and maps each canonical fish position into the square using clamped float coordinates without mutating fish.pos. NPC point diameter is derived from linear size sqrt(max(0, fish.size)): nominal PLAYER.startSize maps to 2px, every smaller value also maps to 2px, and the largest current fish maps to 5px; clamp the final diameter to [2, 5] and handle the no-range case without division by zero. Other user fish use a 3px inner point plus a 1px-gap, 1px-stroke outer circle; the current user uses a 5px inner point plus a 1px-gap, 2px-stroke outer circle. Keep the fish color resolution used by the existing minimap.  # @ds:3a980720 @ds:8f2c91ad
+    constants.js exports WORLD_MAP with the fixed 200px square size, 12px left inset, and 12px overlay gap; do not reuse DEBUG minimap coordinates for player-facing map UI. main.js#getWorldMapTop reads #hud and visible #player-metrics bounding rectangles every animation frame, takes the greater bottom edge, and adds WORLD_MAP.overlayGapPx. Pass this screen-space top coordinate, dangerMapBitmap, syncSegmentsVisible, dangerMapVisible, and cellSyncAverages in the render state. render.js#drawWorldMap(ctx, world, currentUserFishId, top, inspection) runs after restoring the viewport transform, uses WORLD_MAP.sizePx and WORLD_MAP.leftPx with the supplied top coordinate, validates positive world dimensions, draws the fixed square frame, maps the danger bitmap to the square when active, fills each synchronization cell from cellSyncAverages with the debug-mode color scale, draws the synchronization boundaries when active, and maps each canonical fish position into the square using clamped float coordinates without mutating fish.pos. NPC point diameter is derived from linear size sqrt(max(0, fish.size)): nominal PLAYER.startSize maps to 2px, every smaller value also maps to 2px, and the largest current fish maps to 5px; clamp the final diameter to [2, 5] and handle the no-range case without division by zero. Other user fish use a 3px inner point plus a 1px-gap, 1px-stroke outer circle; the current user uses a 5px inner point plus a 1px-gap, 2px-stroke outer circle. Keep the fish color resolution used by the existing minimap.  # @ds:3a980720 @ds:8f2c91ad
   world_snapshot_info_ui: |
-    index.html contains #world-info in the bottom-left overlay layer. It has six
+    index.html contains #world-info in the bottom-left overlay layer. It has twelve
     value spans: #world-fish-count, #world-fish-area, #world-nutrient-count,
-    #world-nutrient-area, #world-scale, and #world-sync. The Scale value shows
+    #world-nutrient-area, #world-scale, #world-sync, #world-sync-rate,
+    #world-dynamic-rate, #world-control-rate, #world-calc-ms, and
+    #world-sync-cycle-ms. The Scale value shows
     world.scale. The Sync value shows the latest received sync cycle and the
     rolling average number of distinct received quadrants per iteration over the
     last 20 completed cycles.
+    The Rate value shows the latest server-provided end-to-end synchronization
+    rate in bytes/sec after the global absolute-cycle central-cell ACK; main.js#updateSyncRate
+    formats it as an integer B/s value and keeps the placeholder until the first rate arrives.
+    Dynamic and Control show one-second rolling event rates in Ev/s. protocol.js#applyWorldFragment
+    increments dynamicEvents once for each accepted fish or shred row containing coordinates;
+    client-net.js#recordEvents stores those timestamps, counts successful c... sends as Control,
+    excludes p... ping sends, prunes both windows at one second, and publishes the current rates
+    every 250ms. main.js#updateEventRates formats both values as integer Ev/s values.
     main.js#updateWorldSnapshotInfo(world) reads only the latest world object
     stored from WebSocket synchronization, not extrapolated render-only bubbles
     or server-only state:
@@ -528,6 +688,10 @@ implementation_instructions:
       - fishArea = sum(Math.PI * fish.radius^2) for finite synchronized fish radii;
       - nutrientCount = world.shreds.length;
       - nutrientArea = sum(shred.geometricArea) for finite synchronized shreds.
+    main.js#updateWorldPerformanceMetrics formats the latest server world calculation
+    average and the client sync-cycle average as `X.XX ms`, leaving each placeholder
+    as `—` until a valid value exists. The lower panel keeps both metrics in the same
+    compact responsive layout as the existing status items.
     style.css#world-info anchors the panel at bottom left, uses a compact
     translucent background, and leaves pointer-events disabled.  # @ds:e42a7c19
   join_after_leave: |
@@ -546,20 +710,19 @@ implementation_instructions:
     client-net.js#leave sends the compact leave request but keeps the current
     session binding until the server confirms success. On event npc for the
     currently controlled fish, confirmLeaveSucceeded clears currentUserFishId,
-    temporaryConnectionCode, sessionStorage fish.connectionCode, and joined.
-    main.js then calls setJoinedUiState(false) and shows the join panel. On event
+    the in-memory temporaryConnectionCode, and joined, then closes the idle socket.
+    main.js then reveals the new-join route and shows the join panel. On event
     wrn, keep the joined state and leave button label unchanged because the
     server denied the explicit leave.  # @ds:9772e9ac @ds:fb11044e @ds:704ab317 @ds:8917ad63
   world_scale: |
-    WORLD has fixed technical width=500, height=500, cellSize=100, pixelsPerWorldUnit=4, and userAreaSideDiameters=10. FISH owns nominalStartDiameter=8 normalized units; size=1 is dimensionless and changes diameter by sqrt(size). world.js#makeWorld always uses the fixed technical dimensions. world.js#effectiveWorldArea(userCount) returns (500*4)^2 + userCount*(10*8*4)^2 in player-facing pixel area. world.js#worldScale(userCount) returns sqrt(effectiveWorldArea/(2000*2000)), rounded to three decimals. Convert a player-facing pixel length to technical coordinates as pixelLength / pixelsPerWorldUnit / world.scale. Do not rescale canonical pos values when the count changes.
+    WORLD owns initialWidth, initialHeight, cellSize, pixelsPerWorldUnit, and userAreaSideDiameters. world.js#makeWorld uses WORLD.initialWidth and WORLD.initialHeight; protocol.js#cellOf and server.js#makeSyncPlan derive grid columns and rows from world dimensions divided by the configured cell size. world.js#effectiveWorldArea(userCount) uses the configured world width/height in player-facing pixels plus user area; world.js#worldScale(userCount) returns sqrt(effectiveWorldArea/baseArea), rounded to three decimals. Convert a player-facing pixel length to technical coordinates as pixelLength / pixelsPerWorldUnit / world.scale. Do not rescale canonical pos values when the count changes.
     fish.js#radiusOf returns the base pixel radius and fish.js#technicalRadiusOf applies both conversion layers for server/client collision geometry. Keep speed and acceleration tuning in px/s and px/s² and convert at the simulation boundary; keep time, probabilities, damping rates, and dimensionless size values unchanged. targetNpcCount(world) uses effectiveWorldArea(world.userCount) rather than width*height. server.js sends `s:<formatted scale>` after identity/reconnect and broadcasts it whenever user count changes. The formatter removes insignificant trailing zeroes. render.js changes only the projection factor, uses the same factor in both viewport transforms, and never recreates the Canvas.  # @ds:10dc892b @ds:8b998807 @ds:6ca3cb74 @ds:915ab0e4 @ds:2595a2d
   client_pixel_decor: |
     main.js owns clientBubbles and clientBubbleEmitters. world.js#makeBubble and fish.js#makeExhaleBubble create decor records with only `posPx`, `velPx`, `radiusPx`, `targetRadiusPx`, age, lifetime, alpha and phase; derive fish size exclusively from `FISH.nominalStartDiameter * WORLD.pixelsPerWorldUnit * sqrt(size) / 2`, never from technical `fish.radius`. world.js#advanceBubbles mutates only pixel positions, pixel velocities and pixel radii; it uses pixel world bounds and does not read or apply world.scale. fish.js exhale displacement uses `posPx` and pixel mouth coordinates. render.js#buildToroidalRenderWorld must not contain or project decor; render.js#drawPixelBubbles may map pixel decor to screen coordinates only for the current draw call and must style it with screen-pixel values such as `BUBBLE.strokeWidthPx`, never with technical radii or a technical-unit minimum line width. A worldScale message therefore changes only the transient render projection, not any existing decor radius, speed, position, trajectory or styling values.  # @ds:d6cebf86 @ia:3c4d5e6f @fn:a9a3ed12
   visual_layer_matrix: |
     render.js owns a client-only `renderLayer` assignment cache and never writes layers into synchronized fish, shred or world state. `assignFishRenderLayers(fish)` sorts visible fish deterministically and assigns even layers: NPC fish use 100..9000 and user fish use 10002..29000, with user layers always higher. `renderLayerForBubble(bubble, fishLayers)` resolves `bubble.sourceFishId` to the source fish layer and returns `fishLayer - 1`; makeBubble and makeExhaleBubble must preserve that source id. `assignShredRenderLayers(shreds, occupiedFishLayers)` creates only odd candidates derived from occupied fish layers, distributes shreds deterministically and evenly across those candidates, and may use at most five extra fish slots; it must not use empty layer ranges. render.js builds one render-item list for fish, shreds and bubbles, sorts ascending by renderLayer and draws it in that order, so a bubble is under its source fish while shreds can cover any fish. `drawPixelBubbles` is folded into this ordered pass; its radius and stroke remain screen-pixel styling and only its transient position is projected. CSS background/parallax remains outside the gameplay canvas and below all gameplay items; lower `BACKGROUND.parallaxFactor` remains farther back. Layer values never enter physics, collision, protocol or synchronized state.  # @ds:7c2f91ad @ds:e13d7a52 @ds:d6cebf86
   phased_spatial_sync: |
-    protocol.js#encodeWorldCycle serializes only non-empty cell rows and indexes only those ranges. It also returns an empty-cell boolean lookup for all 25 coordinates. Prebuild coordinate-specific empty payload templates with the one-byte delta marker for horizontal neighbors only; at send time interpolate only the current cycle number and choose the absolute or relative header. The central cell is sent when non-empty, and empty placeholders are sent only for the left and right phases. Empty cells in vertical, diagonal, and remaining phases are omitted from the common plan.
-    server.js#broadcastWorldSync creates one common plan for cycle N. For every live user socket, resolve its wrapped cell and add messages in phases: own; left and right; top and bottom; then top-left, bottom-left, top-right, bottom-right. Run each phase across all sockets before scheduling the next phase with setImmediate. A socket send only skips that socket when it is closed; it never blocks phase advancement. Starting N+1 cancels the remaining scheduled plan and counts its unsent entries. Do not allocate per-client queues or sort cells by distance. client-net.js sends `v:N` once after receiving any three fragments of N; server.js#handleSyncAck logs it with recorded sent bytes and timestamps only.  # @ds:e559831a @ds:c39827ed @ds:682570c7 @ds:77faf734 @ds:0a2b6379
+    protocol.js#encodeWorldCycle serializes only non-empty cell rows, indexes only those ranges, and returns the empty-cell lookup for every coordinate in the computed grid. server.js#makeSyncPlan derives columns and rows from world dimensions and SYNC.cellSize, selects the registered synchronization-order matrix by those dimensions, and creates entries by adding each matrix `(dx,dy)` to the client's own cell with toroidal modulo wrapping. The 7x7 registry entry is the complete 49-delta sequence; it includes the outer distance-three ring, so no cell is silently omitted when the grid is 7x7. Run the selected non-empty matrix entries in common asynchronous phases across sockets; a socket send only skips that socket when it is closed or over its buffered-byte limit, and it never blocks phase advancement. Starting N+1 cancels the remaining scheduled plan and counts its unsent entries. Do not allocate per-client queues or sort cells by distance. On global absolute cycles, the client's central non-empty cell is the first matrix entry and is sent with an absolute header; client-net.js acknowledges that fragment once with `v:N`, and server.js#handleSyncAck replies with `v:N:rate` after computing bytes/sec from the recorded central-fragment send timestamp and byte length.  # @ds:e559831a @ds:c39827ed @ds:682570c7 @ds:77faf734 @ds:0a2b6379 @ds:d4e8b731 @ds:c1f4a9e2 @ds:77faf734
   wrap_position: |
     function wrapPosition(fish, world){
       fish.pos.x = ((fish.pos.x % world.width) + world.width) % world.width
@@ -648,23 +811,53 @@ implementation_instructions:
         samples candidate directions and returns the lowest-danger normalized vector.
         For mode='hunt', candidate directions span +/- NPC.huntDangerCorrectionDeg
         around baseDirection toward the selected prey. For mode='flee', candidate
-        directions cover the full circle.
+        directions cover the full circle. For flee candidates, classify the first
+        two danger-circle samples as immediateDanger. When any immediate danger is
+        present, find circular contiguous runs of clear candidates and choose the
+        midpoint of the widest run; if all candidates are immediate-danger, keep the
+        minimum-danger fallback. Merge the first and last runs when the safe sector
+        crosses the -PI/PI boundary.
       - dangerScoreForDirection(self, direction, threats, world) projects self along
         direction by NPC.dangerProjectionDistancePx and scores each threat by the
         projected path's distance to contact and attack reach. Use self.radius and
         threat.radius in every contact/reach calculation; never score only centers.
+        The first two circle samples use radii self.diameter and 1.5*self.diameter,
+        matching route-safety circle diameters 2D and 3D. Expose their result as
+        immediateDanger without changing the outer-ring score.
       - smoothNpcSteering(self, targetDirection, targetAccel, dt) stores
         self.steerDecision and applies NPC.maxTurnRateDegPerSecond and
         NPC.accelResponsePerSecond so direction and acceleration change gradually.
+      - while mode='flee', store fleeUrgency, fleeImmediateDanger, and
+        fleeBurstLevel in self.steerDecision. Update urgency only after a fresh
+        decision interval: keep urgency at zero for the first immediate-danger
+        decision but target REGIME.burstStartSpeedLevel + NPC.fleeBurstLevelStep;
+        add NPC.fleeBurstLevelStep per subsequent fresh decision while immediate
+        danger remains, and clamp fleeBurstLevel to REGIME.npcMaxBurstLevel.
+        Clear the urgency when both first circles are clear or the intent leaves
+        flee. Also store fleeFearActive and fleeFearRemaining. Start/restart the
+        recovery timer when flee begins or immediate danger clears, reduce
+        fleeBurstLevel toward REGIME.burstStartSpeedLevel while the timer runs,
+        and leave flee only after the timer expires and every predator is beyond
+        NPC.fleeFearReleaseDistance. A renewed predator threat keeps the flee
+        intent active and restores the burst target. Keep target acceleration
+        separate: apply only NPC.fleeAccelFearFactor as a bounded fear modifier,
+        then pass it through NPC.accelResponsePerSecond smoothing.
     chooseNpcIntent calls chooseDangerAwareDirection in pursuit and flee branches:
       - pursuit uses the direction toward selected prey as baseDirection and limits
         correction to the hunt angle;
       - flee passes no baseDirection and may select any direction around the NPC.
-    The ordinary wander branch also passes its desired heading through
+    During pursuit, persist a random braking or inertia-compensated hunt strategy per
+    selected target. Braking derives target speed from the remaining contact gap and
+    stopping acceleration while preserving a positive attack-speed floor. Inertia
+    pursuit subtracts relative velocity times NPC.huntInertiaLeadSeconds from the
+    target delta before applying the bounded danger correction. The ordinary wander branch also passes its desired heading through
     smoothNpcSteering so random wander turns do not snap direction or acceleration.
     The final acceleration returned to stepAuthoritativeWorld comes from
-    smoothNpcSteering and uses the branch magnitude: PREY.wanderAccel for wander,
-    PREY.fleeAccel for hunt and flee.  # @ds:92d5b0c1 @ds:7cb92a44 @ds:4f58a1cd @ds:c6d7e8f9 @ia:8a4b2f19
+    smoothNpcSteering and remains a physical response signal: use PREY.wanderAccel
+    for wander, PREY.fleeAccel for hunt, and only the bounded fear modifier for
+    flee. Return a separate speedLevel for burst target selection: pursuit uses
+    REGIME.npcMaxBurstLevel, while flee raises and recovers its stored level.
+    # @ds:92d5b0c1 @ds:7cb92a44 @ds:4f58a1cd @ds:c6d7e8f9 @ds:7d9f5b31 @ds:4e7a9c2d @ia:8a4b2f19 @ia:6c5e4b2a @ia:5b8d1f6a @fix:9d4e7b21
   npc_continuous_motion_and_lifetime: |
     chooseNpcIntent must return an active movement intent for every live NPC on
     every authoritative tick. If no threat and no prey target is selected, use
@@ -816,15 +1009,19 @@ implementation_instructions:
   movement_and_energy: |
     integrate treats fish.speedLevel as a target thrust level, not as an instant actual-speed assignment. speedLevel 0 applies no active thrust and lets current velocity decay through drag. speedLevel 1..30 uses maxSpeedOf(size, ownerKind) * speedLevel/100 * REGIME.cruiseFactor, where REGIME.cruiseFactor is 0.61. speedLevel 31..99 uses maxSpeedOf(size, ownerKind) * speedLevel/100. mode is derived from speedLevel: burst for >=31, cruise otherwise.
     In fish.js#integrate, record previous actual speed before adding acceleration. When active thrust is present, add acceleration, then clamp only upward acceleration: if actual speed exceeds the current target cap because the target speed decreased, preserve that higher previous speed and let applyDrag reduce it. If active thrust would raise speed beyond max(previousActualSpeed,currentTargetCap), clamp to that allowed speed. This gives all fish inertial burst ramp-up and drag-only braking without adding protocol fields.
-    fish.js builds BURST_ENDURANCE_SIZE_THRESHOLDS at module initialization for speed levels 31..99; levels 1..30 are always available and have threshold 0. For each burst level, simulate continuous burst movement in REGIME.enduranceSimulationStepSeconds increments for REGIME.enduranceReserveSeconds using the same speed cap and size-loss formula as runtime spendEnergy, with speed recomputed after each size decrease. availableSpeedLevelForSize(size, desiredLevel) returns desired levels 0..30 unchanged, returns level 31 for any requested burst level when no higher threshold is available, and otherwise the nearest available level not greater than desiredLevel.
+    fish.js builds BURST_ENDURANCE_SIZE_THRESHOLDS at module initialization for user-requested speed levels 31..99; levels 1..30 are always available and have threshold 0. For each burst level, simulate continuous burst movement in REGIME.enduranceSimulationStepSeconds increments for REGIME.enduranceReserveSeconds using the same speed cap and size-loss formula as runtime spendEnergy, with speed recomputed after each size decrease. availableSpeedLevelForSize(size, desiredLevel) remains the user-input endurance selector; NPC intent uses its explicit burst level and the NPC minimum-size energy floor.
     applyDrag is linear damping.
     maxSpeedOf(size, ownerKind) computes a water-drag speed cap from fish area, then applies a predator hunt floor, not a fleeing-prey floor:
       - treat fish.size as area and derive linearSize=max(FISH.minLinearSpeedSize, sqrt(size));
       - compute the raw cap as FISH.baseNoDragSpeed / (1 + FISH.waterDragByLinearSize * (linearSize - 1));
       - for ownerKind==='user', the returned burst cap must be at least FISH.minBurstSpeed;
       - FISH.minBurstSpeed must be greater than PREY.maxSpeed + PREY.speedMargin, so even the largest depleted user fish in burst has a speed advantage over the smallest ordinary NPC prey while that prey is fleeing/accelerating;
-      - ordinary NPC prey uses PREY.maxSpeed as an active-acceleration ceiling in prey.js#capPreySpeed even when mode==='burst'; if an NPC is already above PREY.maxSpeed from a previous higher target, capPreySpeed preserves the previous actual speed and lets drag brake it;
-      - capPreySpeed must not raise fleeing prey to FISH.minBurstSpeed; that floor belongs to hunter/predator burst movement, not prey escape movement.
+      - ordinary NPC prey uses speedCapOf(size,'npc',speedLevel) as its burst
+        target cap; prey.js#capPreySpeed applies only to cruise movement, so fear
+        can raise the actual flee target through burst level without a second
+        PREY.maxSpeed ceiling;
+      - capPreySpeed must not raise fleeing prey to FISH.minBurstSpeed; that floor
+        belongs to hunter/predator burst movement, not prey escape movement.
     spendEnergy runs only for active burst thrust: speedLevel >= 31 and a non-zero acceleration vector in the current tick. speedLevel 0..30 and inertial braking after burst thrust stops preserve size, even while actual velocity is still above the cruise range. In burst, multiply the base size loss by burstEnergyFactorOf(fish.speedLevel): 1 + ENERGY.burstExtraSpendFactor*(speedLevel-31)/68 for levels 31..99. Level 31 remains available at the minimum size and does not reduce size below the owner-specific minimum.
     spendEnergy clamps NPC fish to ENERGY.minSize and user fish to ENERGY.userMinSize.
     ENERGY.userMinSize must be greater than PREY.minSize * PREDATION.eatRatio, with a small margin, so the smallest fully grown ordinary NPC remains edible by a maximally depleted user fish.  # @ds:f51831f5 @ds:6aa7c828 @ds:d4f6a1c2 @ds:9ce87fee
@@ -854,7 +1051,8 @@ implementation_instructions:
       - compute payload = buildInputPayload();
       - compute key = signed-thousand x/y plus speedLevel, using the same quantization as protocol.encodeClientControl;
       - if key differs from lastSentInputKey, call net.input(payload) immediately and update lastSentInputKey/lastInputFlushAt;
-      - otherwise call net.idle() only when now-lastInputFlushAt >= 1000ms.
+      - otherwise call net.input(payload) when now-lastInputFlushAt >= CONTROL_HEARTBEAT_MS (900ms), keeping every c... confirmation within the one-second client cadence;
+      - keep ping cadence independent if connection keepalive requires it, but do not count p... messages as Control events.
     Implement controls.js key state cleanup:
       - keydown adds normalized movement keys, Space, and keys 1/2/3 to input.keys, and prevents default browser scrolling/action for those controls;
       - keyup removes normalized keys;
@@ -890,7 +1088,7 @@ implementation_instructions:
     Joystick speed comes from pointer displacement from the visible joystick base center in the same radial control that owns steering.
     setupJoystickControls stores input.joystick.rawVector as the normalized actual displacement with magnitude 0..1, and stores input.joystick.vector as the same direction clamped to the current available speed radius for internal consistency. controls.js#joystickSteer uses rawVector so steering strength follows the held pointer position; controls.js#speedLevel maps rawVector magnitude to desired speedLevel 0..99 with the expanded cruise radius before buildInputPayload clamps it through availableSpeedLevelForSize. main.js#updateJoystickBurstAvailability computes the current available speedLevel for the user fish and redraws rings for v=30 cruise boundary plus selected burst availability levels. If the current user fish has applied speedLevel 1..99, main.js#updateJoystickCurrentBurstRing shows #joystick-current-burst-ring at speedLevelToControlMagnitude(fish.speedLevel), uses a 2px border, and colors it through main.js#joystickCurrentSpeedColor: levels 1..30 return the blue cruise color, and levels 31..99 return the existing pink burstSpeedColor scale. speedLevel 0 hides that ring.  # @ds:cd1c5776 @ds:0eef2d19 @ds:e41821af
     index.html#game-menu contains #burst-endurance-table with rows for speedLevel v=1..99. main.js#updateBurstEnduranceTable reads BURST_ENDURANCE_SIZE_THRESHOLDS and currentUserFish.size, writes mode, minimum size threshold, current availability, energy factor, expected size loss, and the time window for each speed. updateGameMenu refreshes the table while the menu is open and whenever current fish state changes.  # @ds:cff27cd5
-    index.html#game-menu contains #viewport-fish-capacity with option values 10, 20, 30, and max. constants.js exports VIEWPORT_FISH_CAPACITY with options ['10','20','30','max'] and defaultValue '20'. main.js owns viewportFishCapacity as client display state, initializes the select to the default, updates that state from change events through setViewportFishCapacity(value), and passes viewportFishCapacity into render(), viewportToWorld(), and worldToViewport() calls that convert current pointer/touch positions.  # @ds:e001d967
+    constants.js exports VIEWPORT_FISH_CAPACITY with the UI option values and defaultValue. main.js owns viewportFishCapacity as client display state and a dedicated localStorage key. loadViewportFishCapacity reads the key before setupViewportFishCapacity: it accepts only a value contained in VIEWPORT_FISH_CAPACITY.options and otherwise returns the default. setViewportFishCapacity(value) validates the incoming value, updates state and the select, then stores the resolved value; storage read/write failures leave the resolved in-memory value usable. Pass viewportFishCapacity into render(), viewportToWorld(), and worldToViewport() calls that convert current pointer/touch positions.  # @ds:e001d967 @fix:a64e9b31
     The visible joystick layout remains independent from the current user fish screen position.  # @ds:b43d2f95 @ds:cd1c5776 @ds:6896cdc6
   responsive_join_and_status_layout: |
     style.css owns the responsive repair. #join must use overflow-y:auto, align-items:center, and viewport-relative block padding so #join-form is vertically centered whenever it fits, and otherwise is never clipped when its content height exceeds a short viewport; at landscape/short-height breakpoints reduce only spacing and typography while retaining every required form control and exact text. The form itself may scroll within the entry layer and must remain keyboard/touch operable.
@@ -1026,11 +1224,11 @@ implementation_instructions:
       - for each fish in visibleWorld.fish, append `{ kind:'relative', fishId: fish.id, pos: { ...fish.pos }, createdAt: now, fadeStartAt: now + 3000 }`;
       - for each latestAbsoluteServerPositions entry, append `{ kind:'absolute', fishId, pos, createdAt: now, fadeStartAt: now + 3000 }`;
       - prune traces after fade completes; alpha remains 1 until fadeStartAt, then decreases smoothly to 0 over DEBUG.traceFadeMs.
-    render.js#render passes the active viewport transform to debug drawing after bubbles/fish so overlays are visible.
+    render.js#render passes the active viewport transform to debug drawing after bubbles/fish so overlays are visible. The synchronization-grid control gates the gameplay synchronization grid, received-quadrant cells, and relative/absolute trace points while Debug is active.
     drawDebugWorldRepeatBounds(ctx, world) draws a rectangular stroke from (0,0) to (world.width,world.height).
     drawDebugFishCollisionRadius(ctx, renderWorld.fish) runs while the viewport transform is active, after fish are drawn and before position traces; it iterates every displayed fish in the projected render world and draws a translucent circular halo centered on fish.pos with radius fish.radius. Use the unscaled collision/contact radius, not fish.radius * visualScale, because predation contact uses fish.radius. The overlay is read-only and must not mutate fish, world, protocol, or server state.
     drawDebugPositionTraces(ctx, traces, now) draws relative traces as yellow dots and absolute traces as green dots using each trace alpha.
-    Debug does not draw a map. The map is drawn by world_map_ui only when worldMapVisible is true.
+    Debug draws the latest danger-map frame directly on the gameplay canvas under all game objects when the danger-map control is active; the screen-space overview map remains controlled independently by worldMapVisible. When the synchronization-grid control is active, Debug also draws the synchronization grid, received cells, and relative/absolute fish synchronization traces on the gameplay canvas.
     These overlays are render-only diagnostics and must not mutate world, fish, protocol rows, or server state.  # @ds:59c1185f @ds:7435b6ce @ds:727e9afe
   compact_protocol: |
     Protocol payloads are ASCII strings over WebSocket with first-character dispatch.
@@ -1043,21 +1241,23 @@ implementation_instructions:
     Implement server message codecs:
       - encodeIdentity(id,token) => i:${id}:${token}
       - encodeEvent(type,data) => e:${type}:${data}
-      encodeObjectRemoval(kind,id) returns x:${kind==='shred' ? 's' : ''}${id}.
+      encodeObjectRemoval(kind,id,removalCycle) returns x:${removalCycle}:${kind==='shred' ? 's' : ''}${id}; removalCycle is the latest prepared authoritative sync cycle when the object was removed.
       encodeWorldCycle(world, previousState, cycle) returns { absoluteText, relativeText, cells, state }.
     encodeWorldCycle algorithm:
-      - use SYNC.cellSize=100 and assign every fish/shred to floor(pos.x/100),floor(pos.y/100) by its center;
+      - use SYNC.cellSize and assign every fish/shred to floor(pos.x/SYNC.cellSize),floor(pos.y/SYNC.cellSize) by its center;
       - maintain server birthCycle maps by transport identifier; a row is new while cycle-birthCycle < 10;
       - generate an absolute row and relative row for every object exactly once; a new object's relative-set row is its full absolute row prefixed with n;
-      - absolute row positions are localX=pos.x-cellX*100/localY=pos.y-cellY*100; ordinary relative positions are deltas from the immediately preceding server cycle;
+      - absolute row positions are localX=pos.x-cellX*SYNC.cellSize/localY=pos.y-cellY*SYNC.cellSize; ordinary relative positions are deltas from the immediately preceding server cycle;
       - group both row sets in the same deterministic cell order, join each into one shared string, and store per non-empty cell {key,cellX,cellY,absoluteStart,absoluteEnd,relativeStart,relativeEnd}; ranges exclude message headers and delimit complete joined rows;
       - return next snapshot maps for the next cycle baseline; do not emit deletion rows.
-    server.js#queueWorldFragments:
-      - sort non-empty cells by shortest toroidal squared distance from cell center to the client's current fish, forcing its containing cell first;
-      - build `a:N:X:Y|ROWS` from absolute ranges for the first four cells, and `|N:X:Y|ROWS` from relative ranges for the rest;
+    server.js#makeSyncPlan and server.js#sendPlanFragment:
+      - require world.width and world.height to be divisible by SYNC.cellSize, then resolve integer grid columns and rows from those values;
+      - select a complete synchronization-order matrix by `${columns}x${rows}`; for each client add every matrix delta to its own cell with toroidal modulo wrapping, preserving matrix order and not sorting by distance;
+      - reject an unregistered matrix or a matrix whose entry count is not columns*rows;
+      - build `a:N:X:Y|ROWS` for the own-cell phase and the configured absolute recovery phases, and `|N:X:Y|ROWS` for relative phases;
       - when N%20===0, use absolute ranges and a-prefix for every cell;
       - replace any unsent per-socket queue when a newer cycle is prepared; send one queued fragment per setImmediate turn while checking the queue generation so an old callback cannot continue an replaced queue;
-      - empty cells have no ranges and never enter a queue.
+      - before creating a plan entry, resolve the matrix coordinate through the encoded non-empty-cell lookup; skip empty coordinates entirely, so runSyncPhases and sendPlanFragment consume only entries with a row range and never construct or send a `~` fragment.
     Fish row shape:
       ID:TYPE EATEN_OPT:SIZE_ABS:COLOR1_OPT:COLOR2_OPT:NAME_OPT POS_X_OPT:POS_Y_OPT MOVING_ANG:MOVING_SPEED STATE_MODS
     Full shred row shape:
@@ -1076,21 +1276,21 @@ implementation_instructions:
     parseFishRow decodes `vN` into fish.speedLevel=N and derives mode from that value; rows with no v mod decode as fish.mode='cruise' and speedLevel=0.
     applyWorldFragment(world,message,transportState,receivedAt):
       - parse absolute/header N/cellX/cellY; ignore N lower than transportState.currentCycle;
-      - on first fragment of a greater N, evaluate the completed previous cycle: objects whose last received cycle equals N-2 start temporary fade-out only now; store receivedAt as the new cycle clock;
+      - on first fragment of a greater N, evaluate the completed previous cycles: objects whose last received cycle is less than or equal to N-2 start temporary fade-out only now, so skipped cycle numbers cannot leave stale extrapolated objects alive; store receivedAt as the new cycle clock;
       - parse an optional leading n before each existing object identifier; n makes that row full/absolute even under a relative fragment;
       - reconstruct absolute positions from cell origin; apply an ordinary relative row only when object.lastSyncCycle===N-1; otherwise ignore the row and leave the object hidden until a full row;
-      - full rows create unknown objects and set fade-in 0->1 for 0.2s; full rows for fading/hidden objects reverse from their current alpha to 1 over 0.2s; all accepted rows set lastSyncCycle=N;
+      - full rows create unknown objects and set fade-in 0->1 for 0.2s; full rows for fading/hidden objects reverse from their current alpha to 1 over 0.2s; all accepted rows set lastSyncCycle=N and increment syncDiagnostics.dynamicEvents once;
       - never remove an object because a cell or row is absent; preserve fish/shred arrays across fragments.
     applyObjectRemoval(world,message,transportState,receivedAt):
-      - resolve fish numeric identifiers and shred s-prefixed identifiers;
-      - tombstone the transport identifier with its current cycle so queued rows from that cycle cannot revive it; a full absolute row from a later cycle creates the deliberately reused ID as a new object;
+      - parse x:${removalCycle}:${TRANSPORT_ID}, then resolve fish numeric identifiers and shred s-prefixed identifiers;
+      - tombstone the transport identifier with removalCycle, not the client's current cycle, so queued rows from that cycle or any older cycle cannot revive it; a full absolute row from a later cycle creates the deliberately reused ID as a new object;
       - freeze the object at its current extrapolated display position, zero velocity, and start ease-out opacity from current alpha to zero over 0.1s; remove it from local cache after completion.
     client-net.js logs absolute-position drift diagnostics after absolute syncs:
       - select the current user fish plus the first two NPC fish from the diagnostic rows;
       - use the elapsed time since the previous sync and the previous client velocity to predict the client-side current position at receive time;
       - print a compact console table with id, role, previous client position, predicted client position, absolute server position, elapsed ms, error dx/dy, and error distance;
       - skip rows with no previous client position.
-    server.js#tick compares transport identifiers before and after the authoritative step and immediately broadcasts x:${TRANSPORT_ID} for every removed fish or shred. `broadcastWorldSync` calls encodeWorldCycle exactly once per sync interval, stores its shared strings/ranges and state, then only slices ranges into per-client ordered queues. State mods include a, bN, f, sN, gN, and
+    server.js#tick compares transport identifiers before and after the authoritative step and immediately broadcasts x:${removalCycle}:${TRANSPORT_ID} for every removed fish or shred, where removalCycle is the latest prepared syncCycle. `broadcastWorldSync` calls encodeWorldCycle exactly once per sync interval, stores its shared strings/ranges and state, then only slices ranges into per-client ordered queues. State mods include a, bN, f, sN, gN, and
     lN. Names use base64url; colors use hex without #; type is u/p/n. State mods
     are domain/network facts only. Do not add protocol fields or mods for visual-
     only mouth, teeth, fin, swim phase, burst kick, or mouth hold state. main.js computes each object's sync opacity and cycle-clock extrapolation per frame; render.js applies syncOpacity around the complete fish or shred draw.  # @ds:839f8cd0 @ds:5a4d3d6d @ds:671e9773 @ds:4fad33f8 @ds:682570c7 @ds:c39827ed @ds:e047bbdf @ds:6c8c56e7 @ds:ea18a088 @ds:f51a5030 @ds:a16328a6 @ds:2afd71a0 @ds:9f50b1be @ds:0aaccaf8 @ds:28d9098a @ds:8c663384
@@ -1099,11 +1299,11 @@ implementation_instructions:
     client-net exposes:
       - input(payload): sends encodeClientControl(payload) immediately when joined;
       - idle(): sends encodeClientPing(++pingCounter) when joined.
-    client-net must not run a separate ping setInterval while main.js owns the idle cadence.
+    client-net must not run a separate control-heartbeat setInterval while main.js owns the input cadence.
     main.js owns throttling:
       - changed key/control state sends input() on the same animation frame;
-      - unchanged state sends idle() at 1000ms cadence.
-    Reset lastSentInputKey after identity i:${ID}:${token}.  # @ds:10baf178 @ds:22fd3ab4 @ds:671e9773
+      - unchanged state sends input(payload) at 1000ms cadence so the server receives a current c... confirmation;
+    Reset lastSentInputKey after identity i:${ID}:${token}. server.js#normalizeInput stores lastControlAt=Date.now() with every accepted c... message. server.js#tick deletes inputs whose age exceeds SERVER.controlTimeoutMs=1500; stepAuthoritativeWorld then receives no user input, sets speedLevel=0 and zero acceleration, and integrate applies only normal inertial drag.  # @ds:10baf178 @ds:22fd3ab4 @ds:671e9773 @ds:4e6f8a12
   fish_body_color_visual: |
     render.js#drawFish resolves the base body fill before drawing any user fish decoration.
     For ownerKind='user':
@@ -1165,6 +1365,11 @@ implementation_instructions:
 
 new_or_changed_constants:
   SERVER.tickRate: 30                 # @ds:e4d375ed
+  PERCEPTION.segmentGameSide: "configured stable game-space side" # @ds:c94d2a8f
+  PERCEPTION.dangerRasterCellSide: "FISH.nominalStartDiameter / 4" # @ds:9a6e4c31
+  PERCEPTION.dangerRasterThreshold: "profiled local fish-count threshold" # @ds:d9a4c82e
+  PERCEPTION.dangerStampRadiusFactor: 1.50 # @ds:9a6e4c31 @fix:3a7c9e21
+  PERCEPTION.dangerRasterMotionTicks: 3 # current tick plus two extrapolated ticks — @fix:7f3c9a21
   SYNC.snapshotHz: 10                 # @ds:e559831a @ds:682570c7
   SYNC.maxExtrapolationMs: 180        # @ds:e559831a @ds:7b9a7984
   RECONNECT.graceSeconds: 3           # @ds:93a64773
@@ -1174,7 +1379,7 @@ new_or_changed_constants:
   REGIME.cruiseMaxSpeedLevel: 30      # @ds:8869f043
   REGIME.burstStartSpeedLevel: 31     # @ds:8869f043
   REGIME.enduranceReserveSeconds: 5   # @ds:07320d39
-  REGIME.npcMaxBurstLevel: 70         # @ds:703efd43
+  REGIME.npcMaxBurstLevel: 79         # @ds:703efd43
   REGIME.burstSpeedExtraFactor: 0.2   # @ds:8869f043
   FISH.baseNoDragSpeed: 650           # @ds:8869f043
   FISH.waterDragByLinearSize: 0.32    # @ds:8869f043
@@ -1182,7 +1387,7 @@ new_or_changed_constants:
   ENERGY.burstExtraSpendFactor: 20    # @ds:f51831f5
   WORLD.initialViewportScale: 1.5     # @ds:19c14fea
   VIEWPORT_FISH_CAPACITY.options: [10,20,30,max] # @ds:e001d967
-  VIEWPORT_FISH_CAPACITY.defaultValue: "20"       # @ds:e001d967
+  VIEWPORT_FISH_CAPACITY.defaultValue: "10"       # @ds:e001d967 @fix:a64e9b31
   WORLD.resizeHysteresisUsers: 1      # @ds:19c14fea
   WORLD.npcDensity: "tunable per area" # @ds:53db39eb
   FRY.startSize: "below nominal spawn size" # @ds:e6ecfbdd
@@ -1194,12 +1399,25 @@ new_or_changed_constants:
   NPC.dangerDirectionSamples: "number of full-circle flee candidate directions" # @ds:4f58a1cd @ia:8a4b2f19
   NPC.huntDangerCorrectionDeg: 20       # @ds:7cb92a44 @ia:8a4b2f19
   NPC.dangerProjectionDistancePx: "forward path length used for danger scoring" # @ds:92d5b0c1 @ia:8a4b2f19
+  NPC.dangerPredictionSeconds: 0.32 # @fix:5e1a7c42
+  NPC.dangerPredictionSamples: 1 # current position plus one extrapolated position — @fix:5e1a7c42
   NPC.dangerRadiusWeight: "weight for threat/self radius in danger scoring" # @ds:92d5b0c1 @ia:8a4b2f19
   NPC.dangerContactWeight: "weight for projected contact-zone proximity" # @ds:92d5b0c1 @ia:8a4b2f19
   NPC.dangerAttackReachWeight: "weight for projected attack-zone proximity" # @ds:92d5b0c1 @ia:8a4b2f19
   NPC.decisionIntervalSeconds: "minimum interval before resampling a new desired direction" # @ds:c6d7e8f9 @ia:8a4b2f19
   NPC.maxTurnRateDegPerSecond: "maximum smoothed desired-direction turn rate" # @ds:c6d7e8f9 @ia:8a4b2f19
   NPC.accelResponsePerSecond: "acceleration smoothing response rate" # @ds:c6d7e8f9 @ia:8a4b2f19
+  NPC.huntInertiaLeadSeconds: 0.42 # @fix:9d4e7b21
+  NPC.huntApproachSpeed: 38 # @fix:9d4e7b21
+  NPC.foodClusterRadius: "maximum distance from a shred-group seed for local nutrition aggregation" # @ds:9b4e6d7f @ia:7a6b5c4d
+  NPC.foodProfitMargin: "required nutrition-to-travel-cost safety margin" # @ds:8f1a2c3d @ia:7a6b5c4d
+  NPC.foodFishSuccessFactor: "expected successful-feeding factor applied to moving fish targets" # @ds:8f1a2c3d @ia:7a6b5c4d
+  NPC.fleeFearRecoverySeconds: "fear acceleration recovery duration after immediate danger clears" # @ds:4e7a9c2d @ia:5b8d1f6a
+  NPC.fleeFearReleaseDistance: "predator separation required before fear recovery ends" # @ds:4e7a9c2d @ia:5b8d1f6a
+  NPC.fleeFearMinAccelFactor: "minimum flee acceleration factor during fear recovery" # @ds:4e7a9c2d @ia:5b8d1f6a
+  NPC.fleeBurstLevelStep: "burst-level increment per fresh immediate-danger decision" # @ds:7d9f5b31 @ia:6c5e4b2a
+  NPC.fleeBurstRecoveryPerSecond: "burst-level recovery rate after immediate danger" # @ds:4e7a9c2d @ia:5b8d1f6a
+  NPC.fleeAccelFearFactor: "bounded fear modifier for physical acceleration" # @ds:c6d7e8f9 @ia:5b8d1f6a
   NPC.maxLifetimeSeconds: 300          # @ds:a6c9e8b4
   SHRED.areaRatio: 0.5                 # @ds:e13d7a52
   SHRED.nutritionMultiplier: 3         # @ds:0b8e71d4 @ds:f0a6c5d8
@@ -1224,7 +1442,7 @@ new_or_changed_constants:
   SHRED.layerDriftPx: "small visual drift amplitude" # @ds:73b91e4c
   REGIME.cruiseFactor: 0.61           # @ia:5e6f7a8b
   PLAYER.startSize: 1                 # @ds:39305789
-  FISH.minBurstSpeed: "greater than PREY.maxSpeed + PREY.speedMargin; predator/user hunt floor, not fleeing-prey cap" # @ds:8869f043 @ds:d4f6a1c2 @ia:2d3e4f5a
+  FISH.minBurstSpeed: "user hunt floor above the NPC burst-speed envelope; not a fleeing-prey cap" # @ds:8869f043 @ds:d4f6a1c2 @ia:2d3e4f5a
   GROWTH.fishAreaGainRatio: 0.7       # @ds:d867989f
   PREDATION.feedingCooldownSeconds: 0.35 # @ds:a8f03d2e @ds:4e2a91f0
   PREDATION.feedingRecoverySeconds: 1 # @ds:4e2a91f0 @ds:6c80e3b4
@@ -1265,6 +1483,7 @@ verification_checks:
   - "Join form allows generated/overridden name and color plus paid/free toggle."
   - "web-canvas/assets/back.png and web-canvas/assets/start.png exist and are the runtime paths used by render.js/style.css."
   - "After joining, the CSS background layer repeats back.png beneath the transparent gameplay canvas and shifts weakly on both axes as the followed fish moves."
+  - "After a global absolute-cycle central-cell ACK, the client lower information panel shows the server-provided rate in bytes/sec."
   - "Crossing a wrapped world edge does not make the CSS background tile jump; the accumulated parallax phase remains visually continuous across the edge."
   - "The CSS in-game background haze is lighter at the top and darker at the bottom."
   - "When the join panel is visible, start.png is visible as the entry background while the join form remains readable."
@@ -1316,7 +1535,7 @@ verification_checks:
   - "The top-left menu contains control mode selection, version, debug activation, leave command, and help text for the active control mode."
   - "In joystick mode, the steering joystick is on the right side of the screen and radial distance selects cruise or burst target speed 1..99."
   - "Losing focus clears local key and pointer/touch pressed state so movement and burst cannot remain stuck."
-  - "Unchanged input sends p:${N} at one-second cadence, with no faster ping heartbeat."
+  - "Unchanged input repeats c... at one-second cadence and may send p:${N} alongside it; p... is not a Control event, and the server expires control after 1.5 seconds without c... confirmation."
   - "User fish body decoration preserves the selected user color across the full body through transparent overlays."
   - "Fish rendering uses the published web-canvas/assets/fish2.svg runtime copy of canonical ds/assets/fish2.svg semantic ids for canonical collision_area, cruise/burst shape groups, and animated fin_* parts."
   - "An open mouth uses the legacy curved snout cavity and small predator teeth."
@@ -1330,7 +1549,7 @@ verification_checks:
   - "Debug position traces show client-computed points in yellow and absolute server points in green; each point stays visible for 3 seconds and then fades out."
   - "Fish visual facing is derived from movement, while toothed chase mouth opens only for burst/hunt, not ordinary steering or cruise movement."
   - "Remote fish tail/fin animation continues during server-authoritative rendering at cruise speed and during burst."
-  - "A large user fish in hunt/burst can reach at least FISH.minBurstSpeed, which is greater than PREY.maxSpeed + PREY.speedMargin, while ordinary NPC prey remains capped by PREY.maxSpeed even during flee acceleration."
+  - "A large user fish in hunt/burst can reach at least FISH.minBurstSpeed; NPC prey uses its fear-selected burst level and NPC speed cap, while current velocity changes through acceleration and drag."
   - "A user fish depleted by burst remains larger than PREY.minSize by the predation margin and can still eat the smallest fully grown ordinary NPC."
 
 preferred_agent: "strong coding model for IMP; server/client split is non-trivial"

@@ -34,7 +34,7 @@ client_messages:
       N: { type: integer, rule: "increments for each sent ping" }
   sync_ack:
     format: "v:${N}"
-    rule: "statistical acknowledgment of a received fragment set for cycle N; never gates sending"
+    rule: "acknowledges the central cell of global absolute cycle N exactly once; never gates sending"
   control:
     format: "c${x}${y}${mods}"
     fields:
@@ -53,11 +53,16 @@ client_delta_input:
   idle:
     message: "p:${N}"
     period_seconds: 1
-    rule: "when control does not change, client sends only ping and does not repeat zero/control messages"
+    rule: "ping is an independent connection-keepalive message and is excluded from Control metrics"
   changed_control:
     message: "c${x}${y}${mods}"
     trigger: "direction, control buttons, or burst level change"
-    rule: "send only changed control state"
+    rule: "send immediately on change and repeat the current control state at least once per second"
+  control_timeout:
+    authority: server
+    timeout_seconds: 1.5
+    field: "lastControlAt"
+    rule: "delete stale client input after timeout so the authoritative step applies zero acceleration and zero speed level while drag preserves inertial braking"
 
 handshake:
   from: ds:ws-protocol.handshake-state
@@ -97,8 +102,10 @@ server_sync:
       rule: "one common cycle number strictly increases and never repeats or decreases"
       global_absolute_period: 20
       global_absolute_rule: "every twentieth cycle sends every delivered non-empty cell from the absolute row set regardless of distance"
-    empty_fragment:
-      rule: "use the prebuilt coordinate-specific empty template with a one-byte delta marker; empty cells are not serialized into shared row strings"
+    rate_message:
+      format: "v:N:rate"
+      rate_unit: bytes_per_second
+      rule: "server sends the measured end-to-end rate after receiving the matching central-cell acknowledgment"
     fragment:
       fields: [N, CELL_X, CELL_Y, ROWS]
       row_separator: "|"
@@ -106,7 +113,7 @@ server_sync:
 
 spatial_fragments:
   from: ds:ws-protocol.spatial-fragments
-  cell_size_wu: { width: 100, height: 100 }
+  cell_size_wu: { width: SYNC.cellSize, height: SYNC.cellSize }
   membership: "cell containing the object position center"
   object_kinds: [fish, shred]
   source_sets:
@@ -114,23 +121,98 @@ spatial_fragments:
     relative: "one shared serialized row set per completed server cycle"
   indexing:
     rule: "record start and end row indices in both shared sets only for non-empty cells"
-    empty_cells: "hold only an empty flag and use one of 25 prebuilt empty-fragment templates"
+    empty_cells: "are omitted from shared strings, ranges, and delivery entries"
   delivery:
-    template: [own, left, right, top, bottom, top_left, bottom_left, top_right, bottom_right]
-    phases: ["all own", "all left/right", "all top/bottom", "all remaining"]
+    template: "synchronization-order matrix selected by grid columns and rows"
+    phases: "common asynchronous phases consume the selected matrix order"
     wrap: toroidal
     rule: "no per-client distance sorting; all clients advance through the same phase before the next phase"
   reset:
     trigger: "next completed shared cycle exists before common phase plan is exhausted"
     action: "drop unsent plan entries and start the newer N"
 
+empty_cell_fragment_fix:
+  from: fix:multiplayer.empty-cell-fragments
+  contract:
+    name: nonEmptyCellDeliveryOnly
+    rule: "filter matrix coordinates through the current non-empty cell index before adding plan entries; empty coordinates remain ordering positions and produce no WebSocket message"
+
+sync_ack_throughput:
+  from: ds:ws-protocol.sync-ack-throughput
+  trigger: "client receives the central cell fragment of a global absolute cycle"
+  client_message: "v:N once per global absolute cycle"
+  server_measurement:
+    sample: "the sent central-cell absolute fragment"
+    elapsed: "from socket.send() placement to receipt of matching v:N"
+    rate: "sent message bytes / elapsed seconds"
+  server_message:
+    format: "v:N:rate"
+    unit: bytes_per_second
+  effect: "does not gate or alter synchronization delivery"
+
 cell_local_position:
   from: ds:ws-protocol.cell-local-position
   absolute_decode:
-    x: "CELL_X * 100 + localX"
-    y: "CELL_Y * 100 + localY"
+    x: "CELL_X * SYNC.cellSize + localX"
+    y: "CELL_Y * SYNC.cellSize + localY"
   relative_decode:
     rule: "add the row delta to the same object's state from the immediately preceding server cycle"
+
+sync_order_matrix_7x7:
+  from: ds:ws-protocol.sync-order-matrix-7x7
+  dimensions: { columns: 7, rows: 7 }
+  origin: user_cell
+  coordinate_system: "dx is horizontal with right positive; dy is vertical with down positive"
+  entries:
+    - [0, 0]
+    - [-1, 0]
+    - [1, 0]
+    - [0, -1]
+    - [0, 1]
+    - [-1, -1]
+    - [1, 1]
+    - [-1, 1]
+    - [1, -1]
+    - [-2, 0]
+    - [2, 0]
+    - [0, -2]
+    - [0, 2]
+    - [-2, -1]
+    - [2, 1]
+    - [-2, 1]
+    - [2, -1]
+    - [-1, -2]
+    - [1, 2]
+    - [-1, 2]
+    - [1, -2]
+    - [-3, 0]
+    - [3, 0]
+    - [0, -3]
+    - [0, 3]
+    - [-2, -2]
+    - [2, 2]
+    - [-2, 2]
+    - [2, -2]
+    - [-3, 1]
+    - [3, -1]
+    - [-3, -1]
+    - [3, 1]
+    - [-1, -3]
+    - [1, 3]
+    - [1, -3]
+    - [-1, 3]
+    - [-3, -2]
+    - [3, 2]
+    - [-3, 2]
+    - [3, -2]
+    - [-2, -3]
+    - [2, 3]
+    - [-2, 3]
+    - [2, -3]
+    - [-3, 3]
+    - [-3, -3]
+    - [3, -3]
+    - [3, 3]
 
 new_object_row:
   from: ds:ws-protocol.new-object-row
@@ -259,3 +341,15 @@ events:
     npc:
       format: "e:npc:${ID}"
       meaning: "fish ID converted to NPC"
+
+diagnostic_danger_map_stream:
+  from: [ds:ws-protocol.danger-map-stream, ds:world.danger-raster, ds:world.interaction-segments]
+  endpoint: "/danger-map"
+  transport: WebSocket
+  direction: server_to_client
+  payload: "binary PNG frame"
+  frequency_hz: 10
+  frame:
+    layers: [monochrome_danger_raster, interaction_segment_grid]
+    coordinate_space: world
+  client_role: "read-only diagnostic consumer"

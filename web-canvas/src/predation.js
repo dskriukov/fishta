@@ -8,6 +8,7 @@ import { normalize } from './vec.js';
 import { grow, growFromNutrient, makeFish } from './fish.js';
 import { isUserFryProtected, placeUserSpawn, startUserFryStage } from './player.js';
 import { canEatShred, consumeShredLayer, refreshShredDecay, shredCandidateNutrition } from './shred.js';
+import { queryInteractionCandidates } from './perception.js';
 
 // @ds:a3e394a8 @ds:b024b514
 export function overlaps(a, b, world = null){
@@ -182,10 +183,13 @@ export function resolveFeedingBatches(world, rng){
     return eatenByUsers;
 }
 
+// @ds c94d2a8f
 export function collectFeedingCandidates(feeder, world){
     const candidates = [];
     let order = 0;
-    for( const victim of world.fish || [] ){
+    const localCandidates = world.perception ? queryInteractionCandidates(world, feeder) : [...(world.fish || []), ...(world.shreds || [])];
+    for( const victim of localCandidates ){
+        if( victim.ownerKind === undefined ) continue;
         if( victim === feeder ) continue;
         if( isUserFryProtected(feeder) && victim.ownerKind === 'user' ) continue; // @ds:9d62f0a7
         const attackContact = isAttackContact(feeder, victim, world);
@@ -198,7 +202,8 @@ export function collectFeedingCandidates(feeder, world){
             order: order++,
         });
     }
-    for( const shred of world.shreds || [] ){
+    for( const shred of localCandidates ){
+        if( shred.ownerKind !== undefined ) continue;
         if( !canEatShred(feeder, shred, world) ) continue;
         const nutrition = shredCandidateNutrition(feeder, shred);
         if( !nutrition ) continue;

@@ -139,8 +139,9 @@ export function encodeWorldCycle(world, previousState = new Map(), cycle = 1, bi
 }
 
 // @ds:0aaccaf8
-export function encodeObjectRemoval(kind, id){
-    return `x:${kind === 'shred' ? 's' : ''}${id}`;
+export function encodeObjectRemoval(kind, id, removalCycle = 0){
+    const cycle = Number.isInteger(removalCycle) && removalCycle >= 0 ? removalCycle : 0;
+    return `x:${cycle}:${kind === 'shred' ? 's' : ''}${id}`;
 }
 
 function cellOf(pos, world){
@@ -257,7 +258,7 @@ export function applyWorldFragment(world, message, transportState, receivedAt){
     const rows = text.slice(separator + 1).split('|').filter(Boolean);
     const byId = new Map((world.fish || []).map(fish => [fish.id, fish]));
     const shredById = new Map((world.shreds || []).map(shred => [shred.id, shred]));
-    const syncDiagnostics = { absolute: absoluteFragment, cycle, cellX, cellY, fish: [] };
+    const syncDiagnostics = { absolute: absoluteFragment, cycle, cellX, cellY, fish: [], dynamicEvents: 0 };
 
     for( const sourceRow of rows ){
         if( sourceRow === '~' ) continue;
@@ -282,6 +283,7 @@ export function applyWorldFragment(world, message, transportState, receivedAt){
             acceptTransportObject(shred, previous, cycle, receivedAt, transportState, key, newObject);
             if( previous ) Object.assign(previous, shred);
             else world.shreds.push(shred);
+            syncDiagnostics.dynamicEvents++;
             continue;
         }
         const id = fishIdOfRow(row);
@@ -315,6 +317,7 @@ export function applyWorldFragment(world, message, transportState, receivedAt){
         }else{
             world.fish.push(parsed);
         }
+        syncDiagnostics.dynamicEvents++;
     }
     syncDiagnostics.cycleStartedAt = transportState.cycleStartedAt;
     return syncDiagnostics;
@@ -322,12 +325,15 @@ export function applyWorldFragment(world, message, transportState, receivedAt){
 
 // @ds:0aaccaf8 @ds:8c663384
 export function applyObjectRemoval(world, message, transportState, receivedAt){
-    const identifier = String(message || '').slice(2);
+    const payload = String(message || '').slice(2);
+    const separator = payload.indexOf(':');
+    const removalCycle = separator >= 0 ? Number(payload.slice(0, separator)) : transportState.currentCycle ?? -1;
+    const identifier = separator >= 0 ? payload.slice(separator + 1) : payload;
     const shred = identifier.startsWith('s');
     const id = Number(shred ? identifier.slice(1) : identifier);
     if( !Number.isFinite(id) ) return null;
     const key = transportId(shred ? 'shred' : 'fish', id);
-    transportState.tombstones.set(key, transportState.currentCycle ?? -1);
+    transportState.tombstones.set(key, Number.isInteger(removalCycle) ? removalCycle : transportState.currentCycle ?? -1);
     const collection = shred ? world.shreds : world.fish;
     const object = collection.find(candidate => candidate.id === id);
     if( !object ) return { key, object: null, collection };
@@ -356,7 +362,7 @@ export function syncOpacityAt(object, now){
 
 function beginTransportCycle(world, transportState, cycle, receivedAt){
     for( const object of [...(world.fish || []), ...(world.shreds || [])] ){
-        if( object._syncCycle === cycle - 2 && object._syncVisibility?.phase !== 'removing' ){
+        if( object._syncCycle <= cycle - 2 && object._syncVisibility?.phase !== 'removing' ){
             startVisibilityTransition(object, 'fading', receivedAt, SYNC.temporaryFadeSeconds, syncOpacityAt(object, receivedAt));
         }
     }

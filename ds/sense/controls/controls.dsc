@@ -210,7 +210,7 @@ input:
       output: menuBurstEnduranceRows
       rule: "game menu renders a compact scrollable table for speedLevel v=1..99 with mode, minimum size threshold, availability, energy factor, expected size loss, and the time window used for that loss; v=1..30 has zero energy factor and zero expected loss"
   viewport_fish_capacity:
-    from: ds:controls.viewport-fish-capacity
+    from: [ds:controls.viewport-fish-capacity, fix:controls.viewport-fish-capacity-persistence]
     contract:
       name: selectViewportFishCapacity
       inputs: [selectedCapacity, viewportWidthPx, viewportHeightPx, world.width, world.height, playerNominalStartDiameterPx]
@@ -221,6 +221,7 @@ input:
       max_rule: "compute maxScale = max(viewportWidthPx, viewportHeightPx) / min(world.width, world.height), so the smaller world side fits the larger screen side without empty margins"
       effective_rule: "viewportScale = max(numericScale, maxScale) for numeric selected values; viewportScale = maxScale for selected value max"
       locality: "the setting belongs to client display only; world state, fish size, movement, predation, server authority, and socket rows keep their existing owners"
+      persistence: "the browser client stores a selected allowed value in localStorage after a selection change; initialization restores that value when valid and otherwise uses default 10"
   inspect_click:
     from: ds:controls.inspect-click
     contract:

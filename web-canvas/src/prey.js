@@ -1,12 +1,14 @@
 // imp/web-canvas/src/prey.js
 // Implements: prey.dsc (wanderSteer, fleeSteer[status:added], maintainPopulation, variety)
-// @ds 31cb7a0d 579e4888 e699c42d e6ecfbdd 1e66d817 ad8d81d8 92d5b0c1 7cb92a44 4f58a1cd c6d7e8f9
+// @ds 31cb7a0d 579e4888 e699c42d e6ecfbdd 1e66d817 ad8d81d8 92d5b0c1 7cb92a44 4f58a1cd c6d7e8f9 7d9f5b31 8f1a2c3d 9b4e6d7f 4e7a9c2d
+// @ia 6c5e4b2a 7a6b5c4d 5b8d1f6a
 
-import { FISH, FRY, NPC, PREDATION, PREY, WORLD } from './constants.js';
+import { ENERGY, FISH, FRY, GROWTH, NPC, PERCEPTION, PREDATION, PREY, REGIME, SHRED, WORLD } from './constants.js';
 import { v, add, sub, scale, normalize, dist, clampLen } from './vec.js';
-import { growSizeFromAreas, makeFish, technicalRadiusOf } from './fish.js';
+import { burstEnergyFactorOf, growSizeFromAreas, makeFish, speedCapOf, technicalRadiusOf } from './fish.js';
 import { canBeVictimOf, estimatedAttackContactTime, isAttackContact, isEdibleBySize, nearestToroidalDelta } from './predation.js';
-import { spawnShredsFromFish } from './shred.js';
+import { shredCandidateNutrition, spawnShredsFromFish } from './shred.js';
+import { queryInteractionCandidates, recordDirectionDanger, sampleDangerRaster } from './perception.js';
 import { findLowestDensitySpawn, isOldAgeSuspended, targetNpcCount } from './world.js';
 
 // @ia 7f8a9b0c
@@ -220,15 +222,21 @@ export function assignNpcCourage(world, rng){
     return clamp(average + (rng() * 2 - 1) * NPC.courageJitter, 0, 100);
 }
 
-// @ds:d0ef4576 @ds:e29aeb93 @ds:d867989f @ds:98224ab9
+// @ds:d0ef4576 @ds:e29aeb93 @ds:d867989f @ds:98224ab9 @ds:8f1a2c3d @ds:9b4e6d7f @ds:4e7a9c2d @ia:7a6b5c4d @ia:5b8d1f6a
 export function chooseNpcIntent(self, world, rng, dt){
     const nearestThreat = findNearestThreat(self, world);
-    const selectedPrey = findSelectedPrey(self, world);
-    if( !nearestThreat && selectedPrey ) return pursueIntent(self, selectedPrey, world, dt, rng);
+    const selectedFood = findSelectedFood(self, world);
+    if( selectedFood && nearestThreat ){
+        const compromise = tryCompromiseHunt(self, selectedFood.target, world, dt, rng);
+        if( compromise ) return compromise;
+    }
+    if( shouldContinueFleeFear(self, world, dt) ) return fleeFromThreat(self, world, dt, rng);
+    if( !nearestThreat && selectedFood ) return pursueIntent(self, selectedFood.target, world, dt, rng);
     if( !nearestThreat ) return wanderIntent(self, dt, rng);
 
     const incomingTime = estimatedAttackContactTime(burstCapablePredator(nearestThreat, self, world), self, world);
-    if( selectedPrey ){
+    if( selectedFood?.kind === 'fish' ){
+        const selectedPrey = selectedFood.target;
         const ownTime = estimatedAttackContactTime(burstCapablePredator(self, selectedPrey, world), selectedPrey, world);
         const postEatSize = growSizeFromAreas(self.size, selectedPrey.size);
         const postEatSelf = { ...self, size: postEatSize, radius: technicalRadiusOf(postEatSize, world.scale) };
@@ -238,10 +246,20 @@ export function chooseNpcIntent(self, world, rng, dt){
     }
 
     const courageRoll = rng() * 100;
-    if( selectedPrey && (self.courage ?? NPC.courageBase) >= courageRoll && incomingTime > 0.25 ){
-        return pursueIntent(self, selectedPrey, world, dt, rng);
+    if( selectedFood && (self.courage ?? NPC.courageBase) >= courageRoll && incomingTime > 0.25 ){
+        return pursueIntent(self, selectedFood.target, world, dt, rng);
     }
     return fleeFromThreat(self, world, dt, rng);
+}
+
+// @fix:2a7e5c19
+function tryCompromiseHunt(self, target, world, dt, rng){
+    const intent = pursueIntent(self, target, world, dt, rng);
+    const state = self.steerDecision || {};
+    const threats = potentialThreatsFor(self, world);
+    const direction = state.desired || currentDirection(self);
+    if( !immediateDangerForDirection(self, direction, threats, world) ) return intent;
+    return null;
 }
 
 // @ds:a6c9e8b4 @ds:e13d7a52 @ds:d140effd
@@ -257,11 +275,60 @@ export function expireOldNpcFish(world, rng){
 }
 
 function wanderIntent(self, dt, rng){
+    resetFleeUrgency(self);
+    if( self.steerDecision ){
+        self.steerDecision.huntTarget = null;
+        self.steerDecision.huntTargetKey = null;
+    }
     const accel = wanderSteer(self, dt, rng);
     return {
         accel: smoothNpcSteering(self, normalize(accel), Math.hypot(accel.x, accel.y), dt),
         mode: 'cruise',
     };
+}
+
+function resetFleeUrgency(self){
+    const state = self.steerDecision || {};
+    state.mode = 'cruise';
+    state.nextIn = 0;
+    state.fleeUrgency = 0;
+    state.fleeImmediateDanger = false;
+    state.fleeFearActive = false;
+    state.fleeFearRemaining = 0;
+    state.fleeBurstLevel = REGIME.burstStartSpeedLevel;
+    self.steerDecision = state;
+}
+
+function clearFleeFear(self){
+    const state = self.steerDecision || {};
+    state.fleeFearActive = false;
+    state.fleeFearRemaining = 0;
+    state.fleeBurstLevel = REGIME.burstStartSpeedLevel;
+    self.steerDecision = state;
+}
+
+// @ds:4e7a9c2d @ia:5b8d1f6a
+function shouldContinueFleeFear(self, world, dt){
+    const state = self.steerDecision || {};
+    if( !state.fleeFearActive ) return false;
+    const remaining = Math.max(0, (state.fleeFearRemaining || 0) - dt);
+    const nearbyThreat = findNearestThreatWithin(self, world, NPC.fleeFearReleaseDistance);
+    if( remaining <= 0 && !nearbyThreat ){
+        clearFleeFear(self);
+        return false;
+    }
+    return true;
+}
+
+// @ds:4e7a9c2d
+function findNearestThreatWithin(self, world, distanceLimit){
+    const limit = Math.max(0, distanceLimit || 0);
+    for( const threat of potentialThreatsFor(self, world) ){
+        const delta = nearestToroidalDelta(self.pos, threat.pos, world);
+        const distance = Math.max(0, Math.hypot(delta.x, delta.y) - (self.radius || 0) - (threat.radius || 0));
+        if( distance <= limit ) return threat;
+    }
+    return null;
 }
 
 function findNearestThreat(self, world){
@@ -278,36 +345,203 @@ function findNearestThreat(self, world){
     return nearest;
 }
 
-function findSelectedPrey(self, world){
-    let selected = null;
-    let selectedDistance = PREY.fleeRadius;
-    for( const candidate of world.fish || [] ){
-        if( candidate === self ) continue;
-        if( !isEdibleBySize(self, candidate) || !canBeVictimOf(self, candidate) ) continue;
+// @ds:8f1a2c3d @ds:9b4e6d7f @ia:7a6b5c4d
+function findSelectedFood(self, world){
+    const localCandidates = world.perception
+        ? queryInteractionCandidates(world, self)
+        : [...(world.fish || []), ...(world.shreds || [])];
+    const fishTargets = [];
+    const shredTargets = [];
+    for( const candidate of localCandidates ){
         const delta = nearestToroidalDelta(self.pos, candidate.pos, world);
         const distance = Math.hypot(delta.x, delta.y);
-        if( distance < selectedDistance ){
-            selected = candidate;
-            selectedDistance = distance;
+        if( distance > NPC.threatSenseRadius ) continue;
+        if( candidate.ownerKind !== undefined ){
+            if( candidate === self || !isEdibleBySize(self, candidate) || !canBeVictimOf(self, candidate) ) continue;
+            const nutrition = Math.max(0, candidate.size || 0) * GROWTH.fishAreaGainRatio;
+            const cost = foodTravelEnergyCost(self, distance, world);
+            const score = nutrition * NPC.foodFishSuccessFactor - cost * NPC.foodProfitMargin;
+            if( score > 0 ) fishTargets.push({ kind: 'fish', target: candidate, score, distance });
+            continue;
         }
+        if( !isShredSizeAvailable(self, candidate) ) continue;
+        const nutrition = shredCandidateNutrition(self, candidate);
+        if( !nutrition ) continue;
+        shredTargets.push({ shred: candidate, nutrition: nutrition.nutrition, distance });
+    }
+
+    const candidates = fishTargets.concat(groupShredTargets(self, shredTargets, world));
+    let selected = null;
+    for( const candidate of candidates ){
+        if( !selected || candidate.score > selected.score || (candidate.score === selected.score && candidate.distance < selected.distance) ) selected = candidate;
     }
     return selected;
 }
 
+function groupShredTargets(self, entries, world){
+    const remaining = entries.slice();
+    const groups = [];
+    while( remaining.length ){
+        const seed = remaining.shift();
+        const members = [seed];
+        for( let i = remaining.length - 1; i >= 0; i-- ){
+            const delta = nearestToroidalDelta(seed.shred.pos, remaining[i].shred.pos, world);
+            if( Math.hypot(delta.x, delta.y) <= NPC.foodClusterRadius ) members.push(remaining.splice(i, 1)[0]);
+        }
+        let nutrition = 0;
+        let weight = 0;
+        let offsetX = 0;
+        let offsetY = 0;
+        for( const member of members ){
+            nutrition += member.nutrition;
+            const delta = nearestToroidalDelta(seed.shred.pos, member.shred.pos, world);
+            offsetX += member.nutrition * delta.x;
+            offsetY += member.nutrition * delta.y;
+            weight += member.nutrition;
+        }
+        const center = {
+            x: seed.shred.pos.x + offsetX / Math.max(1e-6, weight),
+            y: seed.shred.pos.y + offsetY / Math.max(1e-6, weight),
+        };
+        const distance = Math.hypot(nearestToroidalDelta(self.pos, center, world).x, nearestToroidalDelta(self.pos, center, world).y);
+        const cost = foodTravelEnergyCost(self, distance, world);
+        const score = nutrition - cost * NPC.foodProfitMargin;
+        if( score > 0 ) groups.push({ kind: 'shred', target: { pos: center, foodGroup: members.map(member => member.shred) }, score, distance });
+    }
+    return groups;
+}
+
+function isShredSizeAvailable(self, shred){
+    return (self.radius || 0) * 2 >= (shred.radius || 0) * 2 * SHRED.eatSizeRatio;
+}
+
+function foodTravelEnergyCost(self, distance, world){
+    const level = Math.max(REGIME.burstStartSpeedLevel, REGIME.npcMaxBurstLevel);
+    const speed = Math.max(1, speedCapOf(self.size, 'npc', level));
+    const travelSeconds = distance * Math.max(1, world.scale || 1) / speed;
+    const travelledDistance = speed * travelSeconds;
+    const referenceDistance = ENERGY.refSizes * Math.max(ENERGY.minSize, self.size || 0);
+    return ENERGY.lossPerRef * burstEnergyFactorOf(level) * travelledDistance / Math.max(1e-6, referenceDistance);
+}
+
+// @fix:9d4e7b21
 function pursueIntent(self, target, world, dt, rng){
-    const toward = normalize(nearestToroidalDelta(self.pos, target.pos, world));
+    clearFleeFear(self);
+    const state = self.steerDecision || {};
+    const targetKey = huntTargetKey(target);
+    const targetChanged = state.huntTargetKey !== targetKey;
+    if( targetChanged || !['brake', 'inertia'].includes(state.huntStrategy) ){
+        state.huntStrategy = rng() < 0.5 ? 'brake' : 'inertia';
+    }
+    if( targetChanged ) state.nextIn = 0;
+    state.huntTargetKey = targetKey;
+    state.huntTarget = target;
+    self.steerDecision = state;
+    const toward = huntBaseDirection(self, target, world, state.huntStrategy);
     const steering = chooseDangerAwareDirection(self, world, toward, 'hunt', dt, rng);
+    const motion = huntMotionForStrategy(self, target, world, steering.direction, state.huntStrategy, dt);
+    state.fleeDirection = null;
+    self.steerDecision = state;
     return {
-        accel: smoothNpcSteering(self, steering.direction, PREY.fleeAccel, dt),
+        accel: motion.acceleration,
         mode: 'burst',
+        speedLevel: REGIME.npcMaxBurstLevel,
     };
 }
 
+function huntTargetKey(target){
+    if( target?.ownerKind !== undefined ) return `fish:${target.id}`;
+    if( target?.foodGroup ) return `shred:${target.foodGroup.map(shred => shred.id).sort((a, b) => a - b).join(',')}`;
+    return target?.id === undefined ? null : `object:${target.id}`;
+}
+
+function huntBaseDirection(self, target, world, strategy){
+    const delta = nearestToroidalDelta(self.pos, target.pos, world);
+    if( strategy !== 'inertia' ) return normalize(delta);
+    const targetVelocity = target.vel || { x: 0, y: 0 };
+    const relativeVelocity = {
+        x: (self.vel?.x || 0) - targetVelocity.x,
+        y: (self.vel?.y || 0) - targetVelocity.y,
+    };
+    return normalize({
+        x: delta.x - relativeVelocity.x * NPC.huntInertiaLeadSeconds,
+        y: delta.y - relativeVelocity.y * NPC.huntInertiaLeadSeconds,
+    });
+}
+
+function huntMotionForStrategy(self, target, world, direction, strategy, dt){
+    if( strategy !== 'brake' ) return { acceleration: smoothNpcSteering(self, direction, PREY.fleeAccel, dt) };
+    const targetVelocity = target.vel || { x: 0, y: 0 };
+    const targetDelta = nearestToroidalDelta(self.pos, target.pos, world);
+    const distance = Math.hypot(targetDelta.x, targetDelta.y);
+    const contactDistance = Math.max(1, (self.radius || 0) + (target.radius || 0));
+    const gap = Math.max(0, distance - contactDistance);
+    const worldScale = Math.max(1e-6, world.scale || 1);
+    const maxAcceleration = Math.max(1, PREY.fleeAccel / worldScale);
+    const approachSpeed = Math.max(1, NPC.huntApproachSpeed / worldScale);
+    const speedCap = speedCapOf(self.size, 'npc', REGIME.npcMaxBurstLevel) / worldScale;
+    const desiredSpeed = Math.max(
+        approachSpeed,
+        Math.min(speedCap, Math.sqrt(2 * maxAcceleration * gap)),
+    );
+    const desiredVelocity = {
+        x: targetVelocity.x + direction.x * desiredSpeed,
+        y: targetVelocity.y + direction.y * desiredSpeed,
+    };
+    const velocityError = sub(desiredVelocity, self.vel || { x: 0, y: 0 });
+    const responseSeconds = Math.max(0.12, 1 / Math.max(1, NPC.accelResponsePerSecond));
+    const requestedAcceleration = clampLen(
+        scale(velocityError, worldScale / responseSeconds),
+        PREY.fleeAccel,
+    );
+    const accelerationDirection = normalize(requestedAcceleration);
+    return {
+        acceleration: smoothNpcSteering(
+            self,
+            accelerationDirection.x || accelerationDirection.y ? accelerationDirection : direction,
+            Math.hypot(requestedAcceleration.x, requestedAcceleration.y),
+            dt,
+        ),
+    };
+}
+
+// @ds:7d9f5b31 @ds:4e7a9c2d @ia:6c5e4b2a @ia:5b8d1f6a
 function fleeFromThreat(self, world, dt, rng){
     const steering = chooseDangerAwareDirection(self, world, null, 'flee', dt, rng);
+    const state = self.steerDecision || {};
+    state.huntTarget = null;
+    state.huntTargetKey = null;
+    state.fleeDirection = steering.direction;
+    const threats = potentialThreatsFor(self, world);
+    const immediateDanger = Boolean(steering.immediateDanger && threats.length > 0);
+    const urgency = Math.max(0, steering.fleeUrgency || 0);
+    const burstMin = REGIME.burstStartSpeedLevel;
+    const burstMax = REGIME.npcMaxBurstLevel;
+    const burstTarget = Math.min(burstMax, burstMin + (urgency + 1) * NPC.fleeBurstLevelStep);
+    if( !Number.isFinite(state.fleeBurstLevel) ) state.fleeBurstLevel = burstMin;
+    if( immediateDanger ){
+        state.fleeBurstLevel = Math.max(state.fleeBurstLevel, burstTarget);
+    }else if( state.fleeFearActive ){
+        state.fleeBurstLevel = Math.max(
+            burstMin,
+            state.fleeBurstLevel - NPC.fleeBurstRecoveryPerSecond * dt,
+        );
+    }else{
+        state.fleeBurstLevel = burstMin;
+    }
+    self.steerDecision = state;
+    const recovery = Math.max(1e-6, NPC.fleeFearRecoverySeconds);
+    const fearFactor = state.fleeFearActive
+        ? clamp((state.fleeFearRemaining || 0) / recovery, NPC.fleeFearMinAccelFactor, 1)
+        : 1;
+    const accelFearFactor = immediateDanger
+        ? 1 + Math.min(NPC.fleeAccelFearFactor, urgency * NPC.fleeAccelFearFactor)
+        : fearFactor;
+    const targetAccel = Math.min(NPC.fleeAccelMax, PREY.fleeAccel * accelFearFactor);
     return {
-        accel: smoothNpcSteering(self, steering.direction, PREY.fleeAccel, dt),
+        accel: smoothNpcSteering(self, steering.direction, targetAccel, dt),
         mode: 'burst',
+        speedLevel: Math.min(burstMax, Math.max(burstMin, Math.round(state.fleeBurstLevel))),
     };
 }
 
@@ -319,33 +553,240 @@ export function chooseDangerAwareDirection(self, world, baseDirection, mode, dt,
     state.nextIn = Math.max(0, (state.nextIn ?? 0) - dt);
     if( sameMode && state.desired && state.nextIn > 0 ){
         self.steerDecision = state;
-        return { direction: state.desired, dangerScore: state.dangerScore ?? 0 };
+        return {
+            direction: state.desired,
+            dangerScore: state.dangerScore ?? 0,
+            immediateDanger: Boolean(state.fleeImmediateDanger),
+            fleeUrgency: state.fleeUrgency || 0,
+            recalculated: false,
+        };
     }
 
     const threats = potentialThreatsFor(self, world);
+    const directions = candidateDirections(bestDirectionForMode(normalizedBase, mode), mode);
     let bestDirection = normalizedBase.x || normalizedBase.y ? normalizedBase : v(1, 0);
     let bestScore = dangerScoreForDirection(self, bestDirection, threats, world);
-    for( const direction of candidateDirections(bestDirection, mode) ){
-        const score = dangerScoreForDirection(self, direction, threats, world);
-        if( score < bestScore ){
-            bestScore = score;
-            bestDirection = direction;
+    const baseScore = bestScore;
+
+    let immediateDanger = false;
+    if( mode === 'flee' ){
+        const profiles = directions.map(direction => dangerProfileForDirection(self, direction, threats, world));
+        immediateDanger = profiles.some(profile => profile.immediateDanger);
+        const selected = chooseWidestSafeDirection(self, directions, profiles, threats, world, bestDirection);
+        bestDirection = selected.direction;
+        bestScore = selected.score;
+        for( let index = 0; index < directions.length; index++ ){
+            if( profiles[index].immediateDanger || profiles[index].score > bestScore ){
+                recordRejectedDirection(self, directions[index], threats, world, profiles[index].score);
+            }
+        }
+    }else{
+        const scores = [];
+        for( const direction of directions ){
+            const score = dangerScoreForDirection(self, direction, threats, world);
+            scores.push(score);
+            if( score < bestScore ){
+                bestScore = score;
+                bestDirection = direction;
+            }
+        }
+        if( baseScore > bestScore ) recordRejectedDirection(self, normalizedBase, threats, world, baseScore);
+        for( let index = 0; index < directions.length; index++ ){
+            if( scores[index] > bestScore ) recordRejectedDirection(self, directions[index], threats, world, scores[index]);
         }
     }
 
     state.mode = mode;
     state.desired = bestDirection;
     state.dangerScore = bestScore;
+    state.searchMaxDiameter = maxDangerSearchDiameter(self);
+    if( mode === 'flee' ){
+        const previousImmediateDanger = Boolean(state.fleeImmediateDanger);
+        const previousFearActive = Boolean(state.fleeFearActive);
+        state.fleeFearActive = true;
+        if( immediateDanger || !previousFearActive || (previousImmediateDanger && !immediateDanger) ){
+            state.fleeFearRemaining = NPC.fleeFearRecoverySeconds;
+        }
+        state.fleeUrgency = immediateDanger
+            ? (sameMode && state.fleeImmediateDanger ? (state.fleeUrgency || 0) + 1 : 0)
+            : 0;
+        state.fleeImmediateDanger = immediateDanger;
+        if( !Number.isFinite(state.fleeBurstLevel) ) state.fleeBurstLevel = REGIME.burstStartSpeedLevel;
+    }else{
+        state.fleeUrgency = 0;
+        state.fleeImmediateDanger = false;
+        state.fleeFearActive = false;
+        state.fleeFearRemaining = 0;
+        state.fleeBurstLevel = REGIME.burstStartSpeedLevel;
+    }
     state.nextIn = NPC.decisionIntervalSeconds * (0.75 + rng() * 0.5);
     self.steerDecision = state;
-    return { direction: bestDirection, dangerScore: bestScore };
+    return {
+        direction: bestDirection,
+        dangerScore: bestScore,
+        immediateDanger,
+        fleeUrgency: state.fleeUrgency,
+        recalculated: true,
+    };
 }
 
+// @fix:8c4e1a72
+function recordRejectedDirection(self, direction, threats, world, score){
+    if( !(score > 0) && score !== Infinity ) return;
+    const normalized = normalize(direction);
+    const point = firstDangerPointForDirection(self, normalized, threats, world);
+    if( point ) recordDirectionDanger(world, [point]);
+}
+
+// @fix:8c4e1a72
+function firstDangerPointForDirection(self, direction, threats, world){
+    const normalized = normalize(direction);
+    for( const position of dangerPredictionPositions(self, normalized, world) ){
+        const point = dangerSampleAtPosition(self, position, normalized, threats, world);
+        if( point ) return point;
+    }
+    const diameter = Math.max(1, (self.radius || 0) * 2);
+    const threshold = (self.size || 0) * PREDATION.eatRatio;
+    for( let ring = 2; ring * diameter <= NPC.dangerProjectionDistancePx; ring++ ){
+        const point = {
+            x: self.pos.x + normalized.x * ring * diameter / 2,
+            y: self.pos.y + normalized.y * ring * diameter / 2,
+        };
+        if( threats.length >= PERCEPTION.dangerRasterThreshold && world.perception?.raster ){
+            if( sampleDangerRaster(world.perception.raster, point) > threshold ) return point;
+            continue;
+        }
+        if( threats.some(threat => {
+            const delta = nearestToroidalDelta(point, threat.pos, world);
+            return Math.hypot(delta.x, delta.y) <= (self.radius || 0) + (threat.radius || 0) * NPC.dangerRadiusWeight;
+        }) ) return point;
+    }
+    return null;
+}
+
+function maxDangerSearchDiameter(self){
+    const diameter = Math.max(1, (self.radius || 0) * 2);
+    const projection = Math.max(diameter * 2, NPC.dangerProjectionDistancePx);
+    return Math.max(diameter * 2, Math.floor(projection / diameter) * diameter);
+}
+
+function bestDirectionForMode(baseDirection, mode){
+    return mode === 'flee' ? v(1, 0) : baseDirection;
+}
+
+function dangerProfileForDirection(self, direction, threats, world){
+    return {
+        score: dangerScoreForDirection(self, direction, threats, world),
+        immediateDanger: immediateDangerForDirection(self, direction, threats, world),
+    };
+}
+
+// @ds:7d9f5b31
+function chooseWidestSafeDirection(self, directions, profiles, threats, world, fallback){
+    const safe = profiles.map(profile => !profile.immediateDanger);
+    const chooseLowestRisk = () => {
+        let bestDirection = fallback;
+        let bestScore = dangerScoreForDirection(self, fallback, threats, world);
+        for( let i = 0; i < profiles.length; i++ ){
+            if( profiles[i].score < bestScore ){
+                bestScore = profiles[i].score;
+                bestDirection = directions[i];
+            }
+        }
+        return { direction: bestDirection, score: bestScore };
+    };
+    if( safe.every(Boolean) ) return chooseLowestRisk();
+
+    let widest = null;
+    for( let start = 0; start < safe.length; start++ ){
+        if( !safe[start] || safe[(start - 1 + safe.length) % safe.length] ) continue;
+        let length = 0;
+        while( length < safe.length && safe[(start + length) % safe.length] ) length++;
+        const centerIndex = start + (length - 1) / 2;
+        const centerDirection = angleVector((Math.PI * 2 * centerIndex) / safe.length);
+        const centerProfile = dangerProfileForDirection(self, centerDirection, threats, world);
+        if( !widest || length > widest.length || (length === widest.length && centerProfile.score < widest.score) ){
+            widest = { length, direction: centerDirection, score: centerProfile.score };
+        }
+    }
+    return widest || chooseLowestRisk();
+}
+
+// @ds:7d9f5b31 @fix:5e1a7c42
+export function immediateDangerForDirection(self, direction, threats, world){
+    const dir = normalize(direction);
+    if( !dir.x && !dir.y ) return true;
+    for( const position of dangerPredictionPositions(self, dir, world) ){
+        if( immediateDangerAtPosition(self, position, dir, threats, world) ) return true;
+    }
+    return false;
+}
+
+// @fix:5e1a7c42
+function dangerPredictionPositions(self, direction, world){
+    const positions = [self.pos];
+    const samples = Math.max(0, Math.floor(NPC.dangerPredictionSamples || 0));
+    const horizon = Math.max(0, Number(NPC.dangerPredictionSeconds) || 0);
+    const velocity = self.vel || { x: 0, y: 0 };
+    for( let index = 1; index <= samples; index++ ){
+        const t = horizon * index / Math.max(1, samples);
+        positions.push({
+            x: self.pos.x + velocity.x * t,
+            y: self.pos.y + velocity.y * t,
+        });
+    }
+    return positions;
+}
+
+// @fix:5e1a7c42
+function immediateDangerAtPosition(self, position, direction, threats, world){
+    return Boolean(dangerSampleAtPosition(self, position, direction, threats, world));
+}
+
+// @fix:8c4e1a72
+function dangerSampleAtPosition(self, position, direction, threats, world){
+    const diameter = Math.max(1, (self.radius || 0) * 2);
+    const firstRadii = [diameter, diameter * 1.5];
+    const threshold = (self.size || 0) * PREDATION.eatRatio;
+    if( threats.length >= PERCEPTION.dangerRasterThreshold && world.perception?.raster ){
+        for( const radius of firstRadii ){
+            const sample = {
+                x: position.x + direction.x * radius,
+                y: position.y + direction.y * radius,
+            };
+            if( sampleDangerRaster(world.perception.raster, sample) > threshold ) return sample;
+        }
+        return null;
+    }
+    for( const threat of threats ){
+        const contactDistance = (self.radius || 0) + (threat.radius || 0) * NPC.dangerRadiusWeight;
+        for( const radius of firstRadii ){
+            const sample = { x: position.x + direction.x * radius, y: position.y + direction.y * radius };
+            const delta = nearestToroidalDelta(sample, threat.pos, world);
+            if( Math.hypot(delta.x, delta.y) <= contactDistance ) return sample;
+        }
+    }
+    return null;
+}
+
+// @ds f4d7a892 a6c39e71 d9a4c82e
 export function dangerScoreForDirection(self, direction, threats, world){
     const dir = normalize(direction);
     if( !dir.x && !dir.y ) return Infinity;
+    if( dangerPredictionPositions(self, dir, world).some(position => immediateDangerAtPosition(self, position, dir, threats, world)) ) return Infinity;
     const projection = NPC.dangerProjectionDistancePx;
     let score = 0;
+    const diameter = Math.max(1, (self.radius || 0) * 2);
+    if( threats.length >= PERCEPTION.dangerRasterThreshold && world.perception?.raster ){
+        for( let ring = 2; ring * diameter <= projection; ring++ ){
+            const size = sampleDangerRaster(world.perception.raster, {
+                x: self.pos.x + dir.x * ring * diameter / 2,
+                y: self.pos.y + dir.y * ring * diameter / 2,
+            });
+            if( size > (self.size || 0) * PREDATION.eatRatio ) score += ring <= 3 ? 1e6 : size / ring;
+        }
+        return score;
+    }
     for( const threat of threats ){
         const toThreat = nearestToroidalDelta(self.pos, threat.pos, world);
         const centerDistance = Math.hypot(toThreat.x, toThreat.y);
@@ -356,6 +797,7 @@ export function dangerScoreForDirection(self, direction, threats, world){
         const contactGap = segmentDistance - contactDistance;
         const attackReach = contactDistance * (1 + PREDATION.attackReachRatio);
         const attackGap = segmentDistance - attackReach;
+        if( segmentDistance <= contactDistance && centerDistance <= diameter * 2.5 ) return Infinity;
         const distanceBias = 1 / Math.max(1, centerDistance - contactDistance);
 
         score += threat.radius * NPC.dangerRadiusWeight * distanceBias;
@@ -383,7 +825,8 @@ export function smoothNpcSteering(self, targetDirection, targetAccel, dt){
 
 function potentialThreatsFor(self, world){
     const threats = [];
-    for( const candidate of world.fish || [] ){
+    for( const candidate of (world.perception ? queryInteractionCandidates(world, self) : world.fish || []) ){
+        if( candidate.ownerKind === undefined ) continue;
         if( candidate === self ) continue;
         if( !isEdibleBySize(candidate, self) || !canBeVictimOf(candidate, self) ) continue;
         const delta = nearestToroidalDelta(self.pos, candidate.pos, world);
@@ -472,6 +915,7 @@ export function advanceFryGrowth(fish, dt, worldScale = 1){
 // @ds:d4f6a1c2
 // @ds:9ce87fee
 export function capPreySpeed(p, previousSpeed = PREY.maxSpeed, worldScale = 1){
+    if( p.mode === 'burst' ) return;
     const scaleFactor = Math.max(1e-6, worldScale || 1);
     p.vel = clampLen(p.vel, Math.max(PREY.maxSpeed / scaleFactor, previousSpeed));
 }

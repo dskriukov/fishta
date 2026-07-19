@@ -28,18 +28,26 @@ bounds:
 
 fixed_coordinate_grid:
   from: ds:world.fixed-coordinate-grid
-  dimensions: { width: 500, height: 500 }
-  game_dimensions: { width: 2000, height: 2000 }
-  pixels_per_world_unit: 4
-  cells: { columns: 5, rows: 5, size: 100 }
+  dimensions: { width: WORLD.initialWidth, height: WORLD.initialHeight }
+  game_dimensions: { width: "WORLD.initialWidth * WORLD.pixelsPerWorldUnit", height: "WORLD.initialHeight * WORLD.pixelsPerWorldUnit" }
+  pixels_per_world_unit: WORLD.pixelsPerWorldUnit
+  cells: { columns: "round(WORLD.initialWidth / WORLD.cellSize)", rows: "round(WORLD.initialHeight / WORLD.cellSize)", size: WORLD.cellSize }
   invariant: "fish and shred canonical positions stay in the fixed wrapped coordinate grid when user count changes"
+
+sync_grid_configuration:
+  from: ds:world.sync-grid-configuration
+  dimensions: [columns, rows]
+  derived_from: [WORLD.initialWidth, WORLD.initialHeight, WORLD.cellSize]
+  registry: "one synchronization-order matrix per supported columns x rows configuration"
+  matrix_entry: { ordinal: integer, dx: integer, dy: integer }
+  invariant: "each supported matrix contains every grid cell exactly once relative to the user's cell; toroidal wrapping resolves out-of-range coordinates"
 
 virtual_area_scale:
   from: [ds:world.virtual-area-per-user, ds:world.scale-visualization]
   nominal_start_diameter_normalized: 8
   user_area_side_diameters: 10
-  effective_area: "(500 * 4) * (500 * 4) + userCount * (10 * 8 * 4)^2"
-  scale: "round(sqrt(effectiveArea / ((500 * 4) * (500 * 4))), 3)"
+  effective_area: "(WORLD.initialWidth * WORLD.pixelsPerWorldUnit) * (WORLD.initialHeight * WORLD.pixelsPerWorldUnit) + userCount * (10 * 8 * WORLD.pixelsPerWorldUnit)^2"
+  scale: "round(sqrt(effectiveArea / ((WORLD.initialWidth * WORLD.pixelsPerWorldUnit) * (WORLD.initialHeight * WORLD.pixelsPerWorldUnit))), 3)"
   scale_wire_format: "decimal without insignificant trailing zeros"
   technical_length: "pixelLength / pixelsPerWorldUnit / scale"
   scales: [collision_diameter, shred_size, velocity, acceleration, search_distance, flee_distance, attack_distance, spawn_margin]
@@ -56,7 +64,7 @@ npc_density:
     name: maintainNpcDensity
     inputs: [effectiveWorldArea, npcFishCount, targetNpcDensity]
     output: targetNpcFishCount
-    rule: "target NPC count follows targetNpcDensity * effective game area; with one user and game area 2000*2000 the current density yields about 40 NPC; targetNpcDensity is four times the previous base density and controlled-object limit remains authoritative"
+    rule: "target NPC count follows targetNpcDensity * effective game area; targetNpcDensity is a configured per-area coefficient and controlled-object limit remains authoritative"
   density_field:
     name: findLowestFishDensityArea
     inputs: [allFish[], worldSize]
@@ -127,7 +135,38 @@ dynamics:
       name: applyDrag
       inputs: [velocity, dragCoefficient, dt]
       output: velocity'
-      invariant: "|velocity'| <= |velocity|"   # сопротивление не разгоняет
+    invariant: "|velocity'| <= |velocity|"   # сопротивление не разгоняет
+
+spatial_perception:
+  interaction_segments:
+    from: ds:world.interaction-segments
+    space: "toroidal grid independent from synchronization delivery cells"
+    size: "derived from worldScale to preserve a stable game-space perception range"
+    membership: "an entity is inserted into every segment intersected by its contact circle"
+    observer_query:
+      origin: "the segment containing the observer center"
+      range: "central segment plus its eight wrapped neighbours"
+      result: "unique local interaction candidates"
+  danger_raster:
+    from: [ds:world.danger-raster, ds:world.danger-raster-synchronous]
+    authority: server
+    grid_cell_size: "nominal start-fish diameter / 4"
+    update: "once in each authoritative world step after current fish positions are available"
+    source: fish
+    stamp:
+      shape: swept_filled_disk
+      path: "from fish.position to fish.position + fish.velocity * dt * PERCEPTION.dangerRasterMotionTicks, sampled continuously and wrapped across world edges"
+      diameter: "fish.contactDiameter * 1.50"
+      edge: hard
+      intensity: "encodes source fish size"
+      overlap: max_intensity
+    sample: "nearest raster cell"
+    use: "long-range NPC route safety; exact local segment geometry remains authoritative for contact and immediate lethal threat"
+    direction_danger:
+      storage: "one counter per raster cell for the current authoritative cycle"
+      increment: "one unit at the first blocking point for each candidate vector rejected by danger checks"
+      lifecycle: "reset at cycle start and preserved through the post-movement perception rebuild"
+      output: "cycle-maximum-normalized 0..100 red overlay in the diagnostic PNG"
 
 decor:
   background_tile_parallax:

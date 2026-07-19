@@ -4,12 +4,22 @@ rationale_notes:
   - "Burst during flee must be proximity-aware and not trigger when escape margin is already sufficient."
   - "Cruise-only wandering preserves population stability by avoiding unnecessary size drain."
   - "Flee awareness must be wide enough for visibly dangerous fish to affect prey before contact range; otherwise NPCs appear insufficiently afraid even though the rule is present."
-  - "NPC prey may use burst while fleeing, but its flee cap must remain below the predator hunt floor so small prey is still catchable by a large user fish in burst."
+  - "NPC prey uses burst level as the fear-controlled speed target; current velocity still changes through ordinary acceleration, drag, and inertia, so changing fear does not teleport speed."
   - "NPC population target follows world-area density, not a fixed count."
   - "New NPC fish appear in low-density areas as fry and grow to nominal start size over 10 seconds."
+  - "Immediate survival has lexical priority over courage: the first two route circles remove lethal sectors before food value and outer-risk trade-offs are compared."
+  - "Flee urgency is a separate response dimension: a persistent first-two-circle threat widens the selected safe sector and raises target burst level once per fresh danger decision, then recovers toward the burst floor after both circles clear."
+  - "Fear recovery prevents an NPC from dropping burst immediately after a predator leaves the first two circles; acceleration changes only slightly and remains a physical smoothing signal while burst level decays over the recovery timer and release distance."
+  - "Food motivation compares expected nutrition with burst travel cost; nearby shreds are grouped by nutrition-weighted center and receive no evasion penalty because they do not flee."
+  - "A post-meal route may use the predicted size only after a practically certain first-circle feeding event; earlier route safety uses the current size."
 
 tunables:
   FLEE_RADIUS: 240     # px, threat awareness range
   FLEE_ACCEL: 760      # px/s^2 at max proximity
+  FLEE_BURST_MIN: 31   # first burst level used by NPC flee
+  FLEE_BURST_MAX: 79   # NPC burst ceiling
+  FLEE_BURST_STEP: 8   # level increment per fresh immediate-danger decision
+  FLEE_BURST_RECOVERY: 18 # level/s recovery after immediate danger
+  FLEE_ACCEL_FEAR_FACTOR: 0.18 # bounded acceleration variation from fear
   SPEED_MARGIN: 35     # px/s surplus over threat before skipping burst
   FRY_GROWTH_DURATION: 10 # s from fry to nominal start size

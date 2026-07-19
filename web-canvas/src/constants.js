@@ -9,8 +9,8 @@ export const WORLD = {
     // size set at runtime to canvas size — world.air#ia:5a6b7c8d, ds:b28b7af6 ds:c83f4c1e
     drag: 1.2,              // linear damping per second — world.air#ia:1c2d3e4f, ds:ca07d970
     sizeDrag: 0.18,         // @ds:ca07d970 @ds:8869f043
-    initialWidth: 500,       // @ds:10dc892b
-    initialHeight: 500,      // @ds:10dc892b
+    initialWidth: 700,       // @ds:10dc892b
+    initialHeight: 700,      // @ds:10dc892b
     cellSize: 100,           // @ds:10dc892b
     pixelsPerWorldUnit: 4, // @ds:10dc892b
     userAreaSideDiameters: 10, // @ds:8b998807
@@ -35,7 +35,7 @@ export const FISH = {
     baseNoDragSpeed: 280,   // px/s before size water-drag penalty — fish.air#ia:3e4f5a6b, ds:8869f043
     waterDragByLinearSize: 0.45, // size is area; drag grows with sqrt(size) — @ds:8869f043
     minLinearSpeedSize: 0.6, // prevents tiny fish from gaining unbounded speed — @ds:8869f043
-    minBurstSpeed: 220,     // > PREY.maxSpeed + PREY.speedMargin; user hunt floor — @ds:8869f043 @ds:d4f6a1c2
+    minBurstSpeed: 220,     // user hunt floor above the NPC burst-speed envelope — @ds:8869f043 @ds:d4f6a1c2
     npcSpeedFactor: 0.6,    // NPC maximum speed multiplier — @ds:8869f043
     accel: 500,            // px/s^2 steering force — ds:55c13a4f ds:10baf178 ds:7ce238da
     facingThreshold: 8,     // velocity.x deadzone to avoid flip jitter — fish.air#ia:9a0b1c2d, ds:8d0ca6a8
@@ -55,8 +55,17 @@ export const VIEWPORT_FISH_CAPACITY = {
 
 export const SERVER = {
     tickRate: 30,           // @ds:e4d375ed
+    controlTimeoutMs: 1500, // @ds:multiplayer.control-heartbeat
     port: 8787,             // local server default — @ds:f359ebf2
     performanceStatisticsIntervalMs: 5000, // @ds:61245206
+};
+
+// @ds c94d2a8f 9a6e4c31 d9a4c82e
+export const PERCEPTION = {
+    segmentGameSide: 100,
+    dangerRasterThreshold: 10,
+    dangerStampRadiusFactor: 1.5, // @fix:3a7c9e21
+    dangerRasterMotionTicks: 3, // current tick plus two extrapolated ticks — @fix:7f3c9a21
 };
 
 export const SYNC = {
@@ -89,6 +98,11 @@ export const WORLD_MAP = {
     overlayGapPx: 12,       // @ds:3a980720
 };
 
+export const DANGER_MAP = {
+    bitmapAlpha: 0.42, // @fix:b5c7d9e1
+    gridAlpha: 0.72,   // @fix:b5c7d9e1
+};
+
 export const SIZE_DELTA_LABEL = {
     step: 0.1,              // @ds:c2d7f4a1
     lifeSeconds: 1.05,      // @ds:c2d7f4a1
@@ -114,7 +128,7 @@ export const REGIME = {
     burstStartSpeedLevel: 31, // v31 is the first burst speed — @ds:8869f043
     enduranceReserveSeconds: 5, // @ds:07320d39
     enduranceSimulationStepSeconds: 0.1, // @ds:07320d39
-    npcMaxBurstLevel: 70,   // NPC target burst percent cap — @ds:703efd43
+    npcMaxBurstLevel: 79,   // NPC target burst percent cap — @ds:703efd43
 };
 
 export const GROWTH = {
@@ -168,13 +182,27 @@ export const NPC = {
     dangerDirectionSamples: 24, // @ds:4f58a1cd @ia:8a4b2f19
     huntDangerCorrectionDeg: 20, // @ds:7cb92a44 @ia:8a4b2f19
     dangerProjectionDistancePx: 190, // @ds:92d5b0c1 @ia:8a4b2f19
+    dangerPredictionSeconds: 0.32, // @fix:5e1a7c42
+    dangerPredictionSamples: 1, // current position plus one extrapolated position — @fix:5e1a7c42
     dangerRadiusWeight: 1.15, // @ds:92d5b0c1 @ia:8a4b2f19
     dangerContactWeight: 1.8, // @ds:92d5b0c1 @ia:8a4b2f19
     dangerAttackReachWeight: 1.2, // @ds:92d5b0c1 @ia:8a4b2f19
     decisionIntervalSeconds: 0.18, // @ds:c6d7e8f9 @ia:8a4b2f19
     maxTurnRateDegPerSecond: 220, // @ds:c6d7e8f9 @ia:8a4b2f19
     accelResponsePerSecond: 7, // @ds:c6d7e8f9 @ia:8a4b2f19
-    maxLifetimeSeconds: 120, // @ds:a6c9e8b4
+    fleeBurstLevelStep: 8, // fear raises burst level per fresh danger decision — @ds:7d9f5b31 @ia:6c5e4b2a
+    fleeBurstRecoveryPerSecond: 18, // burst level recovery after immediate danger — @ds:4e7a9c2d @ia:5b8d1f6a
+    fleeAccelFearFactor: 0.18, // small fear-dependent acceleration variation — @ds:c6d7e8f9 @ia:5b8d1f6a
+    fleeAccelMax: 480, // smooth physical acceleration ceiling — @ds:7d9f5b31 @ia:6c5e4b2a
+    huntInertiaLeadSeconds: 0.42, // @fix:9d4e7b21
+    huntApproachSpeed: 38, // px/s contact speed floor for braking strategy — @fix:9d4e7b21
+    foodClusterRadius: 80, // @ds:9b4e6d7f @ia:7a6b5c4d
+    foodProfitMargin: 1.1, // @ds:8f1a2c3d @ia:7a6b5c4d
+    foodFishSuccessFactor: 0.75, // @ds:8f1a2c3d @ia:7a6b5c4d
+    fleeFearRecoverySeconds: 1.2, // @ds:4e7a9c2d @ia:5b8d1f6a
+    fleeFearReleaseDistance: 260, // @ds:4e7a9c2d @ia:5b8d1f6a
+    fleeFearMinAccelFactor: 0.82, // bounded acceleration variation during fear recovery — @ds:4e7a9c2d @ia:5b8d1f6a
+    maxLifetimeSeconds: 20, // @ds:a6c9e8b4
 };
 
 export const SHRED = {

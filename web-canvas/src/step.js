@@ -1,9 +1,9 @@
 // imp/web-canvas/src/step.js
 // Implements: dsr/use/ecs-loop.dsr — PURE domain step: state' = step(state, input, dt)
 // Composes behaviours from world/fish/prey/predation/controls. No canvas here.
-// @ds b28b7af6 22fd3ab4 e6be3c03 55c13a4f 10baf178 7ce238da 8869f043 07320d39 9ce87fee 703efd43 579e4888 31cb7a0d e9fb3705 e6ecfbdd d6cebf86 0c8d4e2a 6f1b0a3c 4c7a2b91 c18e5b42 b7a4c391
+// @ds b28b7af6 22fd3ab4 e6be3c03 55c13a4f 10baf178 7ce238da 8869f043 07320d39 9ce87fee 703efd43 579e4888 31cb7a0d e9fb3705 e6ecfbdd d6cebf86 0c8d4e2a 6f1b0a3c 4c7a2b91 c18e5b42 b7a4c391 7d9f5b31 4e7a9c2d
 
-import { FISH, PLAYER, REGIME } from './constants.js';
+import { FISH, PERCEPTION, PLAYER, REGIME } from './constants.js';
 import { advanceFeedingState, availableSpeedLevelForSize, integrate, normalizeSpeedLevel, runExhaleCycle, requestExhale } from './fish.js';
 import { chooseNpcIntent, preySteer, capPreySpeed, maintainPopulation, advanceFryGrowth, expireOldNpcFish } from './prey.js';
 import { advanceUserFryStage, placeUserSpawn, startUserFryStage } from './player.js';
@@ -13,6 +13,7 @@ import { resolveEating, resolveFeedingBatches } from './predation.js';
 import { advanceShreds, spawnShredsFromFish } from './shred.js';
 import { emitBubble, advanceBubbles } from './world.js';
 import { normalize, scale } from './vec.js';
+import { rebuildPerception } from './perception.js';
 
 // @fn:a9a3ed12
 export function triggerExhaleOnAccelStart(fish, accel, prevAccel){
@@ -43,7 +44,9 @@ export function step(state, input, dt, rng){
         const steer = hunt.accel ? hunt : preySteer(p, threats, dt, rng);
         const accel = steer.accel ?? { x: 0, y: 0 };
         p.mode = steer.mode;
-        p.speedLevel = p.mode === 'burst' ? availableSpeedLevelForSize(p.size, REGIME.npcMaxBurstLevel) : REGIME.cruiseMaxSpeedLevel;
+        p.speedLevel = p.mode === 'burst'
+            ? npcBurstLevel(steer.speedLevel)
+            : REGIME.cruiseMaxSpeedLevel;
         const previousSpeed = Math.hypot(p.vel.x, p.vel.y);
         triggerExhaleOnAccelStart(p, accel, p.prevAccel);
         p.prevAccel = { ...accel };
@@ -72,6 +75,7 @@ export function step(state, input, dt, rng){
 export function stepAuthoritativeWorld(state, inputsByClient, dt, rng){
     const world = state.world;
     world.tick = (world.tick || 0) + 1;
+    rebuildPerception(world, { resetDirectionDanger: true, motionHorizonSeconds: dt * PERCEPTION.dangerRasterMotionTicks }); // @ds:c94d2a8f @ds:9a6e4c31 @ds:d5c8b740 @fix:8c4e1a72 @fix:7f3c9a21
     const allFish = world.fish;
 
     for( const fish of allFish ){
@@ -90,7 +94,9 @@ export function stepAuthoritativeWorld(state, inputsByClient, dt, rng){
             const steer = chooseNpcIntent(fish, world, rng, dt);
             accel = steer.accel ?? accel;
             fish.mode = steer.mode;
-            fish.speedLevel = fish.mode === 'burst' ? availableSpeedLevelForSize(fish.size, REGIME.npcMaxBurstLevel) : REGIME.cruiseMaxSpeedLevel;
+            fish.speedLevel = fish.mode === 'burst'
+                ? npcBurstLevel(steer.speedLevel)
+                : REGIME.cruiseMaxSpeedLevel;
         }
 
         const previousSpeed = Math.hypot(fish.vel.x, fish.vel.y);
@@ -103,11 +109,22 @@ export function stepAuthoritativeWorld(state, inputsByClient, dt, rng){
 
     expireOldUserFish(world, rng);
     advanceShreds(world, dt); // @ds:8b62d9ce
+    rebuildPerception(world, { resetDirectionDanger: false, motionHorizonSeconds: dt * PERCEPTION.dangerRasterMotionTicks }); // @fix:8c4e1a72 @fix:7f3c9a21
     expireOldNpcFish(world, rng); // @ds:a6c9e8b4
     resolveFeedingBatches(world, rng); // @ds:9b41d2ac @ds:6c80e3b4 @ds:f2ad71c9 @ds:a8f03d2e
     maintainPopulation({ world }, rng);
     world.bubbles = [];
     return state;
+}
+
+function npcBurstLevel(requestedLevel){
+    const requested = Number.isFinite(Number(requestedLevel))
+        ? Number(requestedLevel)
+        : REGIME.npcMaxBurstLevel;
+    return normalizeSpeedLevel(Math.max(
+        REGIME.burstStartSpeedLevel,
+        Math.min(REGIME.npcMaxBurstLevel, requested),
+    ));
 }
 
 // @ds:b7a4c391 @ds:c18e5b42 @ds:e13d7a52

@@ -4,7 +4,7 @@
 // @ia 2f6e7a91 3983084a
 // @fix 4bbc0692
 
-import { BACKGROUND, BUBBLE, DEBUG, FISH, PLAYER, RENDER_LAYERS, SHRED, SIZE_DELTA_LABEL, SWIM, FEAR_EYE, SYNC, WORLD, WORLD_MAP } from './constants.js';
+import { BACKGROUND, BUBBLE, DEBUG, DANGER_MAP, FISH, PERCEPTION, PLAYER, RENDER_LAYERS, SHRED, SIZE_DELTA_LABEL, SWIM, FEAR_EYE, SYNC, WORLD, WORLD_MAP } from './constants.js';
 
 const DEFAULT_SVG_GEOMETRY = {
     width: 494,
@@ -408,6 +408,13 @@ export function render(ctx, state){
     ctx.translate(viewport.offsetX, viewport.offsetY);
     ctx.scale(viewport.scale, viewport.scale);
 
+    if( state.debug?.dangerMapUnderlay && state.dangerMapBitmap ){
+        drawDangerMapUnderlay(ctx, world, renderWorld.anchor, state.dangerMapBitmap);
+    }
+    if( state.debug?.enabled && state.syncSegmentsVisible ){
+        drawGameplaySyncGrid(ctx, world, renderWorld.anchor, viewport);
+    }
+
     const renderItems = buildRenderItems(renderWorld, (state.debug?.now || performance.now()) / 1000);
     for( const item of renderItems ){
         if( item.kind === 'fish' ) drawFish(ctx, item.value, state.currentUserFishId, viewport); // ds:1f3abc43
@@ -421,8 +428,10 @@ export function render(ctx, state){
     if( state.debug?.enabled ){
         drawDebugWorldRepeatBounds(ctx, world, renderWorld.anchor, viewport);
         drawDebugFishCollisionRadius(ctx, renderWorld.fish, viewport);
-        drawDebugReceivedQuadrants(ctx, world, renderWorld.anchor, state.debug.receivedQuadrants || [], state.debug.now || performance.now(), viewport);
-        drawDebugPositionTraces(ctx, renderWorld.debugTraces || [], state.debug.now || performance.now(), viewport);
+        if( state.syncSegmentsVisible ){
+            drawDebugReceivedQuadrants(ctx, world, renderWorld.anchor, state.debug.receivedQuadrants || [], state.debug.now || performance.now(), viewport);
+            drawDebugPositionTraces(ctx, renderWorld.debugTraces || [], state.debug.now || performance.now(), viewport);
+        }
     }
     ctx.restore();
 
@@ -431,7 +440,12 @@ export function render(ctx, state){
         world,
         state.currentUserFishId,
         state.worldMapTop,
-        state.debug?.enabled ? state.debug.cellSyncAverages : [],
+        {
+            dangerMapBitmap: state.dangerMapVisible ? state.dangerMapBitmap : null,
+            dangerMapVisible: state.dangerMapVisible,
+            syncSegmentsVisible: state.syncSegmentsVisible,
+            cellSyncAverages: state.cellSyncAverages || [],
+        },
     );
 }
 
@@ -808,8 +822,8 @@ function traceAlpha(trace, now){
     return Math.max(0, 1 - (now - trace.fadeStartAt) / DEBUG.traceFadeMs);
 }
 
-// @ds:8f2c91ad @ds:3a980720
-function drawWorldMap(ctx, world, currentUserFishId, top, cellSyncAverages = []){
+// @ds:8f2c91ad @ds:3a980720 @ds:f3a1c7d9 @ds:e6d3b9a1 @ds:9a6e4c31
+function drawWorldMap(ctx, world, currentUserFishId, top, inspection = {}){
     const size = WORLD_MAP.sizePx;
     const left = WORLD_MAP.leftPx;
     if( !Number.isFinite(world.width) || !Number.isFinite(world.height) || world.width <= 0 || world.height <= 0 ) return;
@@ -823,8 +837,22 @@ function drawWorldMap(ctx, world, currentUserFishId, top, cellSyncAverages = [])
     ctx.fillRect(left, top, size, size);
     ctx.strokeRect(left + 0.5, top + 0.5, size, size);
 
-    if( cellSyncAverages.length > 0 ){
-        drawDebugCellSyncAveragesOnMap(ctx, world, cellSyncAverages, left, top, size);
+    if( inspection.dangerMapVisible ){
+        drawDangerMapGrid(ctx, world, left, top, size);
+    }
+    if( inspection.dangerMapVisible && inspection.dangerMapBitmap ){
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(left, top, size, size);
+        ctx.clip();
+        ctx.globalAlpha = DANGER_MAP.bitmapAlpha;
+        ctx.drawImage(inspection.dangerMapBitmap, left, top, size, size);
+        ctx.restore();
+    }
+
+    if( inspection.syncSegmentsVisible ){
+        drawDebugCellSyncAveragesOnMap(ctx, world, inspection.cellSyncAverages || [], left, top, size);
+        drawWorldMapSyncGrid(ctx, world, left, top, size);
     }
 
     for( const fish of world.fish || [] ){
@@ -832,6 +860,134 @@ function drawWorldMap(ctx, world, currentUserFishId, top, cellSyncAverages = [])
         const x = left + clamp01(fish.pos.x / world.width) * size;
         const y = top + clamp01(fish.pos.y / world.height) * size;
         drawWorldMapFish(ctx, fish, currentUserFishId, x, y, maxLinearSize, nominalLinearSize);
+    }
+    ctx.restore();
+}
+
+// @fix:b5c7d9e1
+function drawDangerMapGrid(ctx, world, left, top, size){
+    const segmentSize = PERCEPTION.segmentGameSide / Math.max(1e-6, world.scale || 1);
+    const columns = Math.max(1, Math.ceil(world.width / segmentSize));
+    const rows = Math.max(1, Math.ceil(world.height / segmentSize));
+    const cellWidth = size / columns;
+    const cellHeight = size / rows;
+    ctx.save();
+    ctx.globalAlpha = DANGER_MAP.gridAlpha;
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 1;
+    for( let column = 0; column <= columns; column++ ){
+        const x = left + column * cellWidth;
+        ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, top + size); ctx.stroke();
+    }
+    for( let row = 0; row <= rows; row++ ){
+        const y = top + row * cellHeight;
+        ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(left + size, y); ctx.stroke();
+    }
+    ctx.restore();
+}
+
+// @fix:1f5d8c42
+function drawDangerMapUnderlay(ctx, world, anchor, bitmap){
+    const width = Number(world.width);
+    const height = Number(world.height);
+    if( !bitmap || !Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0 ) return;
+    const originX = nearestToroidalCoordinate(0, anchor?.x ?? width / 2, width);
+    const originY = nearestToroidalCoordinate(0, anchor?.y ?? height / 2, height);
+
+    ctx.save();
+    drawDangerMapGameplayGrid(ctx, world, originX, originY);
+    ctx.globalAlpha = DANGER_MAP.bitmapAlpha;
+    for( let column = -1; column <= 1; column++ ){
+        for( let row = -1; row <= 1; row++ ){
+            ctx.drawImage(bitmap, originX + column * width, originY + row * height, width, height);
+        }
+    }
+    ctx.restore();
+}
+
+// @fix:1f5d8c42
+function drawDangerMapGameplayGrid(ctx, world, left, top){
+    const width = Number(world.width);
+    const height = Number(world.height);
+    const segmentSize = PERCEPTION.segmentGameSide / Math.max(1e-6, world.scale || 1);
+    const columns = Math.max(1, Math.ceil(width / segmentSize));
+    const rows = Math.max(1, Math.ceil(height / segmentSize));
+    const cellWidth = width / columns;
+    const cellHeight = height / rows;
+    ctx.save();
+    ctx.globalAlpha = DANGER_MAP.gridAlpha;
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 1 / Math.max(1e-6, ctx.getTransform?.().a || 1);
+    for( let copyX = -1; copyX <= 1; copyX++ ){
+        for( let copyY = -1; copyY <= 1; copyY++ ){
+            const x0 = left + copyX * width;
+            const y0 = top + copyY * height;
+            for( let column = 0; column <= columns; column++ ){
+                const x = x0 + column * cellWidth;
+                ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y0 + height); ctx.stroke();
+            }
+            for( let row = 0; row <= rows; row++ ){
+                const y = y0 + row * cellHeight;
+                ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x0 + width, y); ctx.stroke();
+            }
+        }
+    }
+    ctx.restore();
+}
+
+// @fix:1f5d8c42
+function drawGameplaySyncGrid(ctx, world, anchor, viewport){
+    const width = Number(world.width);
+    const height = Number(world.height);
+    const columns = Math.max(1, Math.ceil(width / SYNC.cellSize));
+    const rows = Math.max(1, Math.ceil(height / SYNC.cellSize));
+    const cellWidth = width / columns;
+    const cellHeight = height / rows;
+    const originX = nearestToroidalCoordinate(0, anchor?.x ?? width / 2, width);
+    const originY = nearestToroidalCoordinate(0, anchor?.y ?? height / 2, height);
+    ctx.save();
+    ctx.globalAlpha = 0.34;
+    ctx.strokeStyle = 'rgba(120, 220, 255, 0.9)';
+    ctx.lineWidth = 1 / Math.max(1e-6, viewport?.scale || 1);
+    for( let copyX = -1; copyX <= 1; copyX++ ){
+        for( let copyY = -1; copyY <= 1; copyY++ ){
+            const left = originX + copyX * width;
+            const top = originY + copyY * height;
+            for( let column = 0; column <= columns; column++ ){
+                const x = left + column * cellWidth;
+                ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, top + height); ctx.stroke();
+            }
+            for( let row = 0; row <= rows; row++ ){
+                const y = top + row * cellHeight;
+                ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(left + width, y); ctx.stroke();
+            }
+        }
+    }
+    ctx.restore();
+}
+
+// @ds:f3a1c7d9
+function drawWorldMapSyncGrid(ctx, world, left, top, size){
+    const columns = Math.max(1, Math.round(world.width / SYNC.cellSize));
+    const rows = Math.max(1, Math.round(world.height / SYNC.cellSize));
+    const cellWidth = size / columns;
+    const cellHeight = size / rows;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(120, 220, 255, .05)';
+    ctx.lineWidth = 1;
+    for( let column = 0; column <= columns; column++ ){
+        const x = left + column * cellWidth;
+        ctx.beginPath();
+        ctx.moveTo(x, top);
+        ctx.lineTo(x, top + size);
+        ctx.stroke();
+    }
+    for( let row = 0; row <= rows; row++ ){
+        const y = top + row * cellHeight;
+        ctx.beginPath();
+        ctx.moveTo(left, y);
+        ctx.lineTo(left + size, y);
+        ctx.stroke();
     }
     ctx.restore();
 }

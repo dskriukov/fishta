@@ -9,3 +9,6 @@ rationale_notes:
   - "Client-side movement simulation is visual prediction only; domain events from the server win on disagreement."
   - "Spatial synchronization changes delivery priority only: the server still advances one complete world and remains authoritative for object existence and coordinates."
   - "Server performance statistics measure local server work and the time until the server submits a client's final fragment to WebSocket; they deliberately do not claim network delivery or client receipt."
+  - "World calculation timing is scoped strictly to stepAuthoritativeWorld; the diagnostic must not silently become a measurement of sync preparation, socket delivery, or the interval between snapshots."
+  - "The client sync-cycle metric uses the first accepted fragment of each cycle N because v:N is an acknowledgment response for global absolute cycles rather than a marker for every regular cycle."
+  - "Removal messages carry the server's prepared sync-cycle number: a client may receive a queued row from the cycle that was encoded before removal, so tombstoning against the client's current cycle is insufficient and can resurrect a stale extrapolated fish."

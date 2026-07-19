@@ -123,3 +123,31 @@
 - [x] **[bug:world-map-toolbar-wrap]**\
   Кнопка карты в верхнем тулбаре не должна переноситься на следующую строку или накладываться на игровую область. Во всех responsive-режимах она остаётся в одной строке с кнопкой меню, имеет те же размеры и визуальный контейнер, а центральная область метрик может сжиматься между двумя кнопками.
   Source: user report 2026-07-11; affected DSR/code: `ds/dsr/imp/web-canvas.dsr#world_map_ui`, `style.css#hud .hud-row`, `style.css#game-menu-toggle`, `style.css#world-map-toggle`.
+
+- [x] **[bug:world-inspection-controls-style-regression]**\
+  Established visual styling of the world-map control is preserved while additional inspection controls use a compact right-aligned layout consistent with the top toolbar.
+  Source: user report 2026-07-19; affected DSR/code: `ds/dsr/imp/web-canvas.dsr#world_inspection_controls`, `index.html#world-inspection-controls`, `style.css#world-inspection-controls`.
+
+- [x] **[bug:world-inspection-controls-pointer-events]**\
+  Each world-inspection control accepts pointer activation and updates its own visible inspector state.
+  Source: user report 2026-07-19; affected DSR/code: `ds/dsr/imp/web-canvas.dsr#world_inspection_controls`, `style.css#world-inspection-controls`, `main.js#toggleSyncSegments`, `main.js#toggleDangerMapUnderlay`.
+
+- [x] **[bug:world-inspection-overlays-leak-to-game-canvas]**\
+  Synchronization segments and the danger raster are rendered inside the mini-map inspection surface, while the gameplay canvas retains its normal world presentation. The mini-map synchronization overlay also carries the debug-mode update-intensity fill for each segment, using the live segment averages and the established debug color scale.
+  Source: user report 2026-07-19; affected DSR/code: `ds/dsr/imp/web-canvas.dsr#world_inspection_controls`, `render.js#render`, `render.js#drawWorldMap`, `index.html#world-map`.
+
+- [x] **[bug:world-map-control-style-mismatch]**\
+  The mini-map control uses the same visual container language, dimensions, icon treatment, and active state as the menu control in the top toolbar.
+  Source: user report 2026-07-19; affected DSR/code: `ds/dsr/imp/web-canvas.dsr#world_map_ui`, `index.html#world-map-toggle`, `style.css#world-map-toggle`, `style.css#game-menu-toggle`.
+
+- [x] **[bug:world-inspection-controls-share-one-grid-cell]**\
+  The three world-inspection buttons are direct items in the HUD grid, and each button starts in grid column 3 so the grid places them in separate implicit rows within the right toolbar track.
+  Source: user report 2026-07-19; affected DSR/code: `ds/dsr/imp/web-canvas.dsr#world_inspection_controls`, `index.html#world-inspection-controls`, `style.css#world-inspection-controls`, `style.css#hud .hud-row`.
+
+- [x] **[bug:client-stale-fish-after-removal]**\
+  A server-removed fish is tombstoned with its authoritative synchronization cycle, and the client ignores any delayed row from that cycle or an older cycle so the removed entity cannot reappear as an extrapolated, non-interactive fish.
+  Source: user report 2026-07-19; affected DSR/code: `ds/dsr/imp/web-canvas.dsr#world_sync_and_removals`, `server.js#broadcastRemovedObjects`, `protocol.js#encodeObjectRemoval`, `protocol.js#applyObjectRemoval`, `client-net.js#connect`.
+
+- [x] **[bug:client-stale-fish-after-missed-cycles]**\
+  A synchronized fish that has not appeared in any received fragment for two or more observed cycles enters the existing fade-out and is removed from the client extrapolation cache, including when one or more cycle numbers were skipped.
+  Source: user report 2026-07-19; affected DSR/code: `ds/dsr/imp/web-canvas.dsr#world_sync_and_removals`, `protocol.js#beginTransportCycle`, `main.js#extrapolateWorld`.

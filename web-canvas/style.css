@@ -114,6 +114,64 @@ body::after {
     -webkit-touch-callout: none;
 }
 
+/* @ds:7f1a2c63 @ds:b6e39d14 */
+#startup-splash {
+    position: fixed;
+    z-index: 9;
+    inset: 0;
+    pointer-events: none;
+    background-color: #04263b;
+    background-image: url("./assets/start.png");
+    background-position: center;
+    background-size: cover;
+    background-repeat: no-repeat;
+    opacity: 0;
+    transform: scale(1.05);
+    transform-origin: center;
+    animation: startupSplashReveal 900ms ease both;
+    will-change: opacity, transform;
+}
+
+#startup-splash.is-game {
+    animation: startupSplashHide 650ms ease forwards;
+}
+
+@keyframes startupSplashReveal {
+    from {
+        opacity: 0;
+        transform: scale(1.05);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes startupSplashHide {
+    from {
+        opacity: 1;
+        transform: scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: scale(1);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #startup-splash {
+        animation: none;
+        opacity: 1;
+        transform: none;
+    }
+
+    #startup-splash.is-game {
+        animation: none;
+        opacity: 0;
+        transform: scale(1);
+    }
+}
+
 #hud {
     z-index: 3;
     position: fixed;
@@ -211,6 +269,10 @@ body::after {
 
 #join[hidden] {
     display: none;
+}
+
+#join {
+    background: transparent;
 }
 
 #leave-game[hidden],
@@ -430,10 +492,7 @@ body::after {
     padding: clamp(28px, 7vw, 120px);
     overflow-y: auto;
     overscroll-behavior: contain;
-    background:
-    linear-gradient(90deg, rgba(2, 36, 53, 0.80), rgba(3, 45, 61, 0.42) 42%, rgba(1, 22, 37, 0.08) 70%),
-    linear-gradient(180deg, rgba(14, 67, 86, 0.12), rgba(1, 18, 32, 0.48)),
-        url("./assets/start.png") center / cover no-repeat;
+    background: transparent;
 }
 
 #join-form {
@@ -836,6 +895,17 @@ body::after {
     background: rgba(110, 215, 239, 0.34);
     border-color: rgba(205, 238, 255, 0.72);
 }
+
+/* @ds:f3a1c7d9 @ds:3a980720 */
+#world-map-toggle,
+#sync-segments-toggle,
+#danger-map-toggle { grid-column-start: 3; }
+#sync-segments-toggle,
+#danger-map-toggle { pointer-events: auto; display: grid; place-items: center; justify-self: end; width: 38px; height: 38px; padding: 7px; border: 1px solid rgba(205, 238, 255, .36); border-radius: 12px; background: rgba(110, 215, 239, .18); color: #edf8ff; cursor: pointer; }
+#sync-segments-toggle svg,
+#danger-map-toggle svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+#sync-segments-toggle[aria-pressed="true"],
+#danger-map-toggle[aria-pressed="true"] { background: rgba(110, 215, 239, .34); border-color: rgba(205, 238, 255, .72); }
 
 #control-modes {
     pointer-events: auto;
@@ -1736,7 +1806,7 @@ body::after {
         min-width: 0;
         height: auto;
         display: grid;
-        grid-template-columns: repeat(7, minmax(0, 1fr));
+        grid-template-columns: repeat(6, minmax(0, 1fr));
         gap: clamp(6px, 1.8vw, 22px);
         align-items: stretch;
         padding: 5px 14px max(5px, env(safe-area-inset-bottom));

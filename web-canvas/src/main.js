@@ -9,7 +9,7 @@ import { BURST_ENDURANCE_SIZE_THRESHOLDS, availableSpeedLevelForSize, burstEnerg
 import { createControlModeState, createInput, keySteer, pointerSteer, joystickSteer, speedLevel, speedLevelToControlMagnitude } from './controls.js';
 import { buildToroidalRenderWorld, loadFishGeometry, loadShredGeometry, render, viewportToWorld, worldToViewport } from './render.js';
 import { dist, normalize, scale, v } from './vec.js';
-import { createClientNet } from './client-net.js';
+import { createClientNet, createDangerMapSocket } from './client-net.js';
 import { syncOpacityAt } from './protocol.js';
 
 const canvas = document.getElementById('game');
@@ -31,6 +31,12 @@ const worldNutrientCount = document.getElementById('world-nutrient-count');
 const worldNutrientArea = document.getElementById('world-nutrient-area');
 const worldScaleValue = document.getElementById('world-scale');
 const worldSyncValue = document.getElementById('world-sync');
+const worldSyncRateValue = document.getElementById('world-sync-rate');
+const worldDynamicRateValue = document.getElementById('world-dynamic-rate');
+const worldControlRateValue = document.getElementById('world-control-rate');
+const worldCalcMsValue = document.getElementById('world-calc-ms');
+const worldSyncCycleMsValue = document.getElementById('world-sync-cycle-ms');
+const startupSplash = document.getElementById('startup-splash');
 const joinPanel = document.getElementById('join');
 const joinForm = document.getElementById('join-form');
 const joinName = document.getElementById('join-name');
@@ -47,6 +53,8 @@ const leaveButton = document.getElementById('leave-game');
 const gameMenuToggle = document.getElementById('game-menu-toggle');
 const gameMenu = document.getElementById('game-menu');
 const worldMapToggle = document.getElementById('world-map-toggle');
+const syncSegmentsToggle = document.getElementById('sync-segments-toggle');
+const dangerMapToggle = document.getElementById('danger-map-toggle');
 const worldMap = document.getElementById('world-map');
 const debugModeToggle = document.getElementById('debug-mode-toggle');
 const controlModes = document.getElementById('control-modes');
@@ -71,9 +79,20 @@ const clientFishDecor = new Map();
 let serializeKeyLatch = false;
 let lastSentInputKey = null;
 let lastInputFlushAt = 0;
+const CONTROL_HEARTBEAT_MS = 900; // @ds:multiplayer.control-heartbeat
+const VIEWPORT_FISH_CAPACITY_STORAGE_KEY = 'selfish-bait.viewport-fish-capacity'; // @fix:a64e9b31
 let gameMenuOpen = false;
 let worldMapVisible = false;
 let debugMode = false;
+let syncSegmentsVisible = false;
+let dangerMapVisible = false;
+let dangerMapBitmap = null;
+const dangerMapNet = createDangerMapSocket(bitmap => { dangerMapBitmap?.close?.(); dangerMapBitmap = bitmap; });
+let worldCalculationMs = null;
+let syncCycleMs = null;
+let lastMeasuredSyncCycle = null;
+let lastMeasuredSyncCycleAt = null;
+const syncCycleIntervalsMs = [];
 let debugPositionTraces = [];
 let debugReceivedQuadrants = new Map();
 const receivedQuadrantsByCycle = new Map();
@@ -85,8 +104,9 @@ let latestAbsoluteServerPositions = new Map();
 let lastDebugTraceAt = 0;
 let lastVisibleState = state;
 let entrySessionReady = false;
+let startupSplashReady = false;
 let burstEnduranceTableKey = '';
-let viewportFishCapacity = VIEWPORT_FISH_CAPACITY.defaultValue;
+let viewportFishCapacity = loadViewportFishCapacity(); // @fix:a64e9b31
 let net = null;
 const controlMode = createControlModeState();
 const sizeDeltaLabelState = {
@@ -143,19 +163,29 @@ net = createClientNet({
         });
         while( snapshotBuffer.length > 6 ) snapshotBuffer.shift();
     },
+    // @ds:e7c2a901
+    onSyncRate(message){
+        updateSyncRate(message.rate);
+    },
+    onEventRates(rates){
+        updateEventRates(rates);
+    },
+    onPerformanceMetrics(metrics){
+        updateWorldPerformanceMetrics(metrics.worldCalculationMs, syncCycleMs);
+    },
     onEvent(message){
         hudStatus.textContent = message.status || message.event || 'event';
         if( message.event === 'rj' ){
             state.currentUserFishId = null;
             lastSentInputKey = null;
             lastInputFlushAt = 0;
-            setJoinedUiState(false, { showJoinForm: true });
+            showNewJoinForm();
         }
         if( message.leaveSucceeded ){
             state.currentUserFishId = null;
             lastSentInputKey = null;
             lastInputFlushAt = 0;
-            setJoinedUiState(false, { showJoinForm: true });
+            showNewJoinForm();
         }
         if( message.event === 'wrn' ){
             setJoinedUiState(true);
@@ -166,13 +196,14 @@ net = createClientNet({
     },
     onInitialCommunication(message){
         if( message.kind === 'new' && !net?.isJoined ){
-            setJoinedUiState(false, { showJoinForm: true, sessionReady: true });
+            showNewJoinForm();
         }
     },
     onIdentity(){
         lastSentInputKey = null;
         lastInputFlushAt = 0;
         setJoinedUiState(true, { sessionReady: true });
+        revealGameSurface();
     },
 });
 
@@ -198,6 +229,31 @@ function updateWorldSyncMetrics(message){
         ? receivedQuadrantAverages.reduce((sum, count) => sum + count, 0) / receivedQuadrantAverages.length
         : 0;
     if( worldSyncValue ) worldSyncValue.textContent = `${Number.isInteger(cycle) ? cycle : '—'} · ${average.toFixed(2)}`;
+    const receivedAt = Number(message.receivedAt);
+    if( Number.isInteger(cycle) && cycle > (lastMeasuredSyncCycle ?? -1) && Number.isFinite(receivedAt) ){
+        if( lastMeasuredSyncCycleAt !== null ){
+            syncCycleIntervalsMs.push(Math.max(0, receivedAt - lastMeasuredSyncCycleAt));
+            while( syncCycleIntervalsMs.length > 20 ) syncCycleIntervalsMs.shift();
+            syncCycleMs = syncCycleIntervalsMs.reduce((sum, interval) => sum + interval, 0) / syncCycleIntervalsMs.length;
+        }
+        lastMeasuredSyncCycle = cycle;
+        lastMeasuredSyncCycleAt = receivedAt;
+        updateWorldPerformanceMetrics(worldCalculationMs, syncCycleMs);
+    }
+}
+
+// @ds:4d8c2f1a @ds:6e3b91c7
+function updateWorldPerformanceMetrics(worldMs, syncMs){
+    const worldValue = worldMs === null || worldMs === undefined ? NaN : Number(worldMs);
+    const syncValue = syncMs === null || syncMs === undefined ? NaN : Number(syncMs);
+    if( Number.isFinite(worldValue) && worldValue >= 0 ){
+        worldCalculationMs = worldValue;
+        if( worldCalcMsValue ) worldCalcMsValue.textContent = `${worldValue.toFixed(2)} ms`;
+    }
+    if( Number.isFinite(syncValue) && syncValue >= 0 ){
+        syncCycleMs = syncValue;
+        if( worldSyncCycleMsValue ) worldSyncCycleMsValue.textContent = `${syncValue.toFixed(2)} ms`;
+    }
 }
 
 function recordDebugSyncCell(cycle, cellX, cellY){
@@ -259,20 +315,32 @@ canvas.addEventListener('click', e =>{
 });
 window.addEventListener('resize', resize);
 
-if( joinName ) joinName.value = `fish-${Math.floor(Math.random() * 900 + 100)}`;
-if( joinColor ) joinColor.value = `#${Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0')}`;
+// @ds:c9f4b821 @ia:d2c6a901
+const JOIN_PROFILE_STORAGE_KEY = 'fish.joinProfile';
+const generatedJoinDefaults = {
+    name: `fish-${Math.floor(Math.random() * 900 + 100)}`,
+    color: `#${Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0')}`,
+};
+const savedJoinProfile = loadJoinProfilePreferences();
+if( joinName ) joinName.value = savedJoinProfile.userName || generatedJoinDefaults.name;
+if( joinColor ) joinColor.value = savedJoinProfile.userColor || generatedJoinDefaults.color;
 syncJoinFishPreview(); // @ds:277a51d7
-if( joinColor ) joinColor.addEventListener('input', syncJoinFishPreview);
+if( joinName ) joinName.addEventListener('input', saveJoinProfileDraft);
+if( joinColor ) joinColor.addEventListener('input', saveJoinProfileDraft);
 if( joinFishPreview ) joinFishPreview.addEventListener('load', syncJoinFishPreview);
 if( joinCornerDecoration ) joinCornerDecoration.addEventListener('load', animateJoinCornerDecoration);
 if( joinLogo ) joinLogo.addEventListener('load', animateJoinLogo);
 setJoinedUiState(false);
+startEntryFlow();
 if( joinForm ){
     joinForm.addEventListener('submit', e =>{
         e.preventDefault();
+        const userName = joinName.value.trim() || 'fish';
+        const userColor = joinColor.value;
+        saveJoinProfilePreferences({ userName, userColor });
         net.join({
-            userName: joinName.value.trim() || 'fish',
-            userColor: joinColor.value,
+            userName,
+            userColor,
             userTier: joinTier.checked ? 'paid' : 'free',
         });
         setJoinedUiState(false, { sessionReady: true });
@@ -345,6 +413,71 @@ function swatchRingFor(color){
     const luminance = 0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5);
     return luminance < 0.42 ? 'rgba(229, 244, 255, 0.92)' : 'rgba(2, 22, 53, 0.82)';
 }
+
+function loadJoinProfilePreferences(){
+    try{
+        const stored = JSON.parse(window.localStorage.getItem(JOIN_PROFILE_STORAGE_KEY) || '{}');
+        return {
+            userName: typeof stored.userName === 'string' ? stored.userName.slice(0, 24) : '',
+            userColor: /^#[0-9a-f]{6}$/i.test(stored.userColor || '') ? stored.userColor : '',
+        };
+    }catch{
+        return { userName: '', userColor: '' };
+    }
+}
+
+function saveJoinProfilePreferences({ userName, userColor }){
+    const preferences = {};
+    if( userName !== generatedJoinDefaults.name ) preferences.userName = userName;
+    if( userColor.toLowerCase() !== generatedJoinDefaults.color.toLowerCase() ) preferences.userColor = userColor;
+    try{
+        window.localStorage.setItem(JOIN_PROFILE_STORAGE_KEY, JSON.stringify(preferences));
+    }catch{
+        // Local preference storage is optional and does not affect joining.
+    }
+}
+
+// @fix:7d3e91a4
+function saveJoinProfileDraft(){
+    saveJoinProfilePreferences({
+        userName: joinName.value.trim() || 'fish',
+        userColor: joinColor.value,
+    });
+    syncJoinFishPreview();
+}
+
+// @ds:7f1a2c63 @ds:b6e39d14 @ia:4a8d0f72
+function startEntryFlow(){
+    const finishSplash = () =>{
+        if( startupSplashReady ) return;
+        startupSplashReady = true;
+        if( net?.temporaryConnectionCode || net?.isJoined ) return;
+        showNewJoinForm();
+    };
+    if( !startupSplash ){
+        finishSplash();
+        return;
+    }
+    startupSplash.addEventListener('animationend', event =>{
+        if( event.animationName === 'startupSplashReveal' ) finishSplash();
+    }, { once: true });
+    const reducedMotion = Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches);
+    window.setTimeout(finishSplash, reducedMotion ? 0 : 1100);
+}
+
+// @ds:b6e39d14 @ia:4a8d0f72
+function showNewJoinForm(){
+    if( !startupSplashReady ) return;
+    startupSplash?.classList.remove('is-game');
+    setJoinedUiState(false, { showJoinForm: true, sessionReady: true });
+    if( joinName ) joinName.focus();
+}
+
+// @ds:b6e39d14 @ia:4a8d0f72
+function revealGameSurface(){
+    startupSplash?.classList.add('is-game');
+}
+
 if( leaveButton ){
     leaveButton.addEventListener('click', handleLeaveGameButton);
 }
@@ -356,6 +489,38 @@ if( worldMapToggle ){
     worldMapToggle.addEventListener('click', toggleWorldMap);
     worldMapToggle.setAttribute('aria-pressed', 'false');
 }
+// @ds:f3a1c7d9 @ds:b9e5d274
+function toggleSyncSegments(){
+    syncSegmentsVisible = !syncSegmentsVisible;
+    if( syncSegmentsToggle ){
+        syncSegmentsToggle.setAttribute('aria-pressed', String(syncSegmentsVisible));
+        syncSegmentsToggle.classList.toggle('is-active', syncSegmentsVisible);
+    }
+}
+
+// @ds:b9e5d274 @ds:e6d3b9a1
+function toggleDangerMapUnderlay(){
+    dangerMapVisible = !dangerMapVisible;
+    if( dangerMapToggle ){
+        dangerMapToggle.setAttribute('aria-pressed', String(dangerMapVisible));
+        dangerMapToggle.classList.toggle('is-active', dangerMapVisible);
+    }
+    syncDangerMapTransport();
+}
+
+// @fix:1f5d8c42
+function syncDangerMapTransport(){
+    if( dangerMapVisible ){
+        dangerMapNet.open();
+        return;
+    }
+    dangerMapNet.close();
+    dangerMapBitmap?.close?.();
+    dangerMapBitmap = null;
+}
+
+if( syncSegmentsToggle ) syncSegmentsToggle.addEventListener('click', toggleSyncSegments);
+if( dangerMapToggle ) dangerMapToggle.addEventListener('click', toggleDangerMapUnderlay);
 if( debugModeToggle ){
     debugModeToggle.addEventListener('click', toggleDebugMode);
     debugModeToggle.setAttribute('aria-pressed', 'false');
@@ -442,11 +607,16 @@ function frame(now){
         sizeDeltaLabels: sizeDeltaLabelState.labels,
         debug: {
             enabled: debugMode,
+            dangerMapUnderlay: debugMode && dangerMapVisible,
             positionTraces: debugPositionTraces,
             receivedQuadrants: [...debugReceivedQuadrants.values()],
             cellSyncAverages: debugSyncCellAverages(),
             now,
         },
+        cellSyncAverages: debugSyncCellAverages(),
+        syncSegmentsVisible,
+        dangerMapVisible,
+        dangerMapBitmap: dangerMapVisible ? dangerMapBitmap : null,
         worldMapVisible,
         worldMapTop: getWorldMapTop(),
     });
@@ -572,6 +742,21 @@ function updateWorldSnapshotInfo(world){
     if( worldFishArea ) worldFishArea.textContent = formatArea(sumFishArea(fishItems));
     if( worldNutrientCount ) worldNutrientCount.textContent = formatCount(nutrientItems.length);
     if( worldNutrientArea ) worldNutrientArea.textContent = formatArea(sumNutrientArea(nutrientItems));
+}
+
+// @ds:e7c2a901
+function updateSyncRate(rate){
+    if( !worldSyncRateValue ) return;
+    const value = Number(rate);
+    worldSyncRateValue.textContent = Number.isFinite(value) && value >= 0 ? `${Math.round(value)} B/s` : '—';
+}
+
+// @ds:e7c2a901
+function updateEventRates(rates = {}){
+    const dynamic = Number(rates.dynamic);
+    const control = Number(rates.control);
+    if( worldDynamicRateValue ) worldDynamicRateValue.textContent = `${Number.isFinite(dynamic) ? Math.max(0, Math.round(dynamic)) : 0} Ev/s`;
+    if( worldControlRateValue ) worldControlRateValue.textContent = `${Number.isFinite(control) ? Math.max(0, Math.round(control)) : 0} Ev/s`;
 }
 
 function sumFishArea(fishItems){
@@ -855,7 +1040,8 @@ function sendInputIfChanged(now){
         lastInputFlushAt = now;
         return;
     }
-    if( now - lastInputFlushAt >= 1000 ){
+    if( now - lastInputFlushAt >= CONTROL_HEARTBEAT_MS ){
+        net.input(payload);
         net.idle();
         lastInputFlushAt = now;
     }
@@ -920,6 +1106,7 @@ function toggleGameMenu(){
 // @ds:59c118f5
 function toggleDebugMode(){
     debugMode = !debugMode;
+    syncDangerMapTransport();
     updateGameMenu();
 }
 
@@ -932,7 +1119,10 @@ function toggleWorldMap(){
 
 // @ds:3a980720
 function updateWorldMapUi(){
-    if( worldMapToggle ) worldMapToggle.setAttribute('aria-pressed', worldMapVisible ? 'true' : 'false');
+    if( worldMapToggle ){
+        worldMapToggle.setAttribute('aria-pressed', worldMapVisible ? 'true' : 'false');
+        worldMapToggle.classList.toggle('is-active', worldMapVisible);
+    }
     if( worldMap ) worldMap.hidden = !worldMapVisible;
 }
 
@@ -945,19 +1135,36 @@ function updateGameMenu(){
     updateBurstEnduranceTable(currentUserFish());
 }
 
-// @ds:e001d967
+// @ds:e001d967 @fix:a64e9b31
 function setupViewportFishCapacity(){
     if( !viewportFishCapacitySelect ) return;
     viewportFishCapacitySelect.value = viewportFishCapacity;
     viewportFishCapacitySelect.addEventListener('change', () => setViewportFishCapacity(viewportFishCapacitySelect.value));
 }
 
-// @ds:e001d967
+// @fix:a64e9b31
+function loadViewportFishCapacity(){
+    try{
+        const stored = window.localStorage.getItem(VIEWPORT_FISH_CAPACITY_STORAGE_KEY);
+        return VIEWPORT_FISH_CAPACITY.options.includes(stored)
+            ? stored
+            : VIEWPORT_FISH_CAPACITY.defaultValue;
+    }catch{
+        return VIEWPORT_FISH_CAPACITY.defaultValue;
+    }
+}
+
+// @ds:e001d967 @fix:a64e9b31
 function setViewportFishCapacity(value){
     viewportFishCapacity = VIEWPORT_FISH_CAPACITY.options.includes(value)
         ? value
         : VIEWPORT_FISH_CAPACITY.defaultValue;
     if( viewportFishCapacitySelect ) viewportFishCapacitySelect.value = viewportFishCapacity;
+    try{
+        window.localStorage.setItem(VIEWPORT_FISH_CAPACITY_STORAGE_KEY, viewportFishCapacity);
+    }catch{
+        // The in-memory display preference remains available when storage is disabled.
+    }
 }
 
 // @ds:70871bc5

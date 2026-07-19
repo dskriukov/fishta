@@ -1,21 +1,35 @@
 ds/sense/controls/controls.ds#e931a342 - 323e0d97
 ds/sense/controls/controls.ia#ea72de17 - 3ab6da12
 ds/fix/background.fix#0778747e - 8bccf725
+ds/fix/profile-preferences.fix#f9db11c9 - 6e4a1c9b
+ds/fix/viewport-preferences.fix#279e2d7d - c6b1d5e9
+ds/fix/danger-map-layering.fix#c6e3e1f2 - d4e6f8a2
+ds/fix/danger-map-steering-overlay.fix#1e8b8ab3 - e7a4c2f1
+ds/fix/danger-map-debug-underlay.fix#1f5d8c42 - 9c4d6e21
+ds/fix/danger-map-debug-controls.fix#c2e1a7b4 - 4d9f6b20
+ds/fix/danger-map-hunt-lines.fix#6d2f9a41 - 8e3c5b17
+ds/fix/danger-map-overlay-contrast.fix#84b1c6d2 - 5e7a9f30
+ds/fix/prey-compromise-hunt.fix#2a7e5c19 - 6f4b8d20
+ds/fix/danger-radius-50.fix#3a7c9e21 - 3a7c9e21
+ds/fix/prey-predictive-danger.fix#5e1a7c42 - 7b4d9f20
+ds/fix/danger-direction-accumulation.fix#8c4e1a72 - 6d2f9b40
+ds/fix/danger-raster-motion-sweep.fix#7f3c9a21 - 7f3c9a21
+ds/fix/prey-hunt-inertia-strategies.fix#9d4e7b21 - 9d4e7b21
 ds/fix/responsive-ui.fix#412c746b - fa07d905
 ds/fix/predation.fix#f95ca67f - 7b2f6d88
 ds/sense/fish/fish.ds#9f0866ff - 0e1af7e8
 ds/sense/fish/fish.ia#54e70523 - 2b751007
-ds/sense/main.ds#3b2e1e12 - d3cd9207
-ds/sense/main.ia#c266c5dc - feab7d75
-ds/sense/multiplayer/multiplayer.ds#82ccc728 - 021f8c6b
-ds/sense/multiplayer/ws-protocol.ds#5a631141 - 9c9a61e3
-ds/fix/sync-delivery.fix#5bdc1000 - 4e7f2a91
+ds/sense/main.ds#21d8c100 - d3cd9207
+ds/sense/main.ia#2c9fa922 - feab7d75
+ds/sense/multiplayer/multiplayer.ds#9f7ec0fd - 021f8c6b
+ds/sense/multiplayer/ws-protocol.ds#1cf1b823 - 9c9a61e3
+ds/fix/sync-delivery.fix#1ceb9d89 - 4e7f2a91
 ds/sense/player/player.ds#fae8d62d - 6f2d8c10
 ds/sense/predation/predation.ds#8b07d043 - c4f0fe31
-ds/sense/prey/prey.ds#3bc922ec - 3fbd0a6d
-ds/sense/prey/prey.ia#54167961 - b73de1c3
+ds/sense/prey/prey.ds#0553664c - 3fbd0a6d
+ds/sense/prey/prey.ia#0000b413 - b73de1c3
 ds/sense/shred/shred.ds#4f884026 - 51ad0f77
-ds/sense/world/world.ds#609ee747 - 0c44252a
+ds/sense/world/world.ds#26c62458 - 0c44252a
 ds/sense/world/world.ia#d1b53549 - a45699db
 
 ds:controls.camera - 7b9a7984 323e0d97
@@ -31,6 +45,20 @@ ds:controls.initial-mode - c2aeb63a 323e0d97
 ds:controls.joystick-current-burst-indicator - e41821af 323e0d97
 ds:controls.joystick-viewport-footprint - 6896cdc6 323e0d97
 fix:controls.responsive-join-and-status-layout - 3196de1d fa07d905
+fix:controls.profile-preferences-save-on-edit - 7d3e91a4 6e4a1c9b
+fix:controls.viewport-fish-capacity-persistence - a64e9b31 c6b1d5e9
+fix:ui.danger-map-grid-layering - b5c7d9e1 d4e6f8a2
+fix:ui.danger-map-steering-overlay - 7f4a2c19 e7a4c2f1
+fix:ui.danger-map-debug-underlay - 1f5d8c42 9c4d6e21
+fix:ui.danger-map-debug-controls - c2e1a7b4 4d9f6b20
+fix:ui.danger-map-hunt-lines - 6d2f9a41 8e3c5b17
+fix:ui.danger-map-overlay-contrast - 84b1c6d2 5e7a9f30
+fix:prey.compromise-hunt - 2a7e5c19 6f4b8d20
+fix:world.danger-radius-50 - 3a7c9e21 3a7c9e21
+fix:prey.predictive-danger - 5e1a7c42 7b4d9f20
+fix:world.danger-direction-accumulation - 8c4e1a72 6d2f9b40
+fix:world.danger-raster-motion-sweep - 7f3c9a21 7f3c9a21
+fix:npc.hunt-inertia-strategies - 9d4e7b21 9d4e7b21
 fix:predation.fish-contact-only - 3e7a9c21 7b2f6d88
 ds:controls.join-after-leave - 9772e9ac 323e0d97
 ds:controls.join-presentation - 277a51d7 323e0d97
@@ -47,6 +75,10 @@ ds:controls.player - 91e32235 323e0d97
 ds:controls.pointer - 55c13a4f 323e0d97
 ds:controls.primary-keyboard-and-joystick - 93b8abba 323e0d97
 ds:controls.start-background - 58200142 323e0d97
+ds:ui.startup-splash - 7f1a2c63 d3cd9207
+ds:ui.startup-session-routing - b6e39d14 d3cd9207
+ia:web-canvas.startup-routing - 4a8d0f72 feab7d75
+ia:web-canvas.profile-preferences - d2c6a901 feab7d75
 ds:domain.modules - ec8cb052 d3cd9207
 ds:debug.mode - 59c118f5 d3cd9207
 ds:debug.fish-minimap - 8f2c91ad d3cd9207
@@ -85,13 +117,18 @@ ds:intent.game - 27fa3caa d3cd9207
 ds:project.mode - dd674a52 d3cd9207
 ds:ui.game-menu - ab1e4f02 d3cd9207
 ds:ui.world-map-toggle - 3a980720 d3cd9207
+ds:ui.world-inspection-controls - f3a1c7d9 d3cd9207
+ds:ui.danger-map-underlay - b9e5d274 d3cd9207
 ds:ui.version-visible - 8d13f6a2 d3cd9207
 ds:ui.world-snapshot-info - e42a7c19 d3cd9207
+ds:ui.world-performance-metrics - 8a4e2d19 d3cd9207
 ds:multiplayer.abandoned-fish-visual - bfd5a97a 021f8c6b
 ds:multiplayer.color-palettes - f883f90c 021f8c6b
 ds:multiplayer.connection-fish - 4bfe0352 021f8c6b
+ds:multiplayer.tab-session-binding - a14c7e52 021f8c6b
 ds:multiplayer.disconnect-to-npc - eba75588 021f8c6b
 ds:multiplayer.identity - 58050922 021f8c6b
+ds:multiplayer.join-profile-preferences - c9f4b821 021f8c6b
 ds:multiplayer.leave-game - 704ab317 021f8c6b
 ds:multiplayer.local-server - f359ebf2 021f8c6b
 ds:multiplayer.name-generation - 0d692a59 021f8c6b
@@ -101,9 +138,15 @@ ds:multiplayer.server-memory - 4c2c7ba3 021f8c6b
 ds:multiplayer.shared-world - 9ed7e713 021f8c6b
 ds:multiplayer.socket-sync - e559831a 021f8c6b
 ds:multiplayer.server-performance-statistics - 61245206 021f8c6b
+ds:multiplayer.server-world-calculation-metric - 4d8c2f1a 021f8c6b
+ds:multiplayer.client-sync-cycle-metric - 6e3b91c7 021f8c6b
 ds:multiplayer.phase-synchronized-delivery - 0a2b6379 021f8c6b
+ds:multiplayer.sync-rate-feedback - e7c2a901 021f8c6b
+ds:multiplayer.client-event-rates - 7c2d91e4 021f8c6b
+ds:multiplayer.control-heartbeat - 4e6f8a12 021f8c6b
 fix:multiplayer.connection-does-not-start-global-sync - 7c4d2e91 4e7f2a91
 fix:multiplayer.sync-delivery-time-budget - 91ab6e30 4e7f2a91
+fix:multiplayer.empty-cell-fragments - a8f3c2d1 4e7f2a91
 ds:predation.contact - a3e394a8 c4f0fe31
 ds:predation.attack-contact - b39c93a5 c4f0fe31
 ds:predation.effect - e9fb3705 c4f0fe31
@@ -127,6 +170,14 @@ ds:player.size-ui - b9136c2e 6f2d8c10
 ds:player.speed-mode-ui - c656f0ec 6f2d8c10
 ds:prey.entity - ad8d81d8 3fbd0a6d
 ds:prey.flee - 579e4888 3fbd0a6d
+ds:npc.local-food-motivation - e2b91c54 3fbd0a6d
+ds:npc.food-profitability - 8f1a2c3d 3fbd0a6d
+ds:npc.shred-foraging - 9b4e6d7f 3fbd0a6d
+ds:npc.ring-route-safety - f4d7a892 3fbd0a6d
+ds:npc.immediate-danger-stop - a6c39e71 3fbd0a6d
+ds:npc.post-meal-safety - c8f2d5a9 3fbd0a6d
+ds:npc.courage-motivation-balance - b1e7f463 3fbd0a6d
+ds:npc.adaptive-danger-evaluation - d9a4c82e 3fbd0a6d
 ds:prey.flee.effort - e699c42d 3fbd0a6d
 ds:prey.burst-endurance - 703efd43 3fbd0a6d
 ds:prey.npc-fish - 534bb18b 3fbd0a6d
@@ -135,6 +186,8 @@ ds:npc.continuous-motion-intent - b47c2d91 3fbd0a6d
 ds:npc.danger-aware-steering - 92d5b0c1 3fbd0a6d
 ds:npc.decision-inertia - c6d7e8f9 3fbd0a6d
 ds:npc.flee-safest-direction - 4f58a1cd 3fbd0a6d
+ds:npc.flee-immediate-danger-response - 7d9f5b31 3fbd0a6d
+ds:npc.flee-fear-recovery - 4e7a9c2d 3fbd0a6d
 ds:npc.hunt-danger-correction - 7cb92a44 3fbd0a6d
 ds:npc.lifetime-aging - a6c9e8b4 3fbd0a6d
 ds:npc.risk-aware-hunt-choice - d0ef4576 3fbd0a6d
@@ -170,6 +223,10 @@ ds:world.coordinates - 459e191b 0c44252a
 ds:world.decor.bubbles - d6cebf86 0c44252a
 ds:world.drag - ca07d970 0c44252a
 ds:world.fixed-coordinate-grid - 10dc892b 0c44252a
+ds:world.interaction-segments - c94d2a8f 0c44252a
+ds:world.danger-raster - 9a6e4c31 0c44252a
+ds:world.danger-raster-synchronous - d5c8b740 0c44252a
+ds:world.sync-grid-configuration - d4e8b731 0c44252a
 ds:world.virtual-area-per-user - 8b998807 0c44252a
 ds:world.scale-density - 6ca3cb74 0c44252a
 ds:world.scale-visualization - 915ab0e4 0c44252a
@@ -189,10 +246,12 @@ ds:ws-protocol.client-delta-input - 671e9773 9c9a61e3
 ds:ws-protocol.client-messages - 5a4d3d6d 9c9a61e3
 ds:ws-protocol.encoding - 839f8cd0 9c9a61e3
 ds:ws-protocol.events - a16328a6 9c9a61e3
+ds:ws-protocol.danger-map-stream - e6d3b9a1 9c9a61e3
 ds:ws-protocol.fish-row - ea18a088 9c9a61e3
 ds:ws-protocol.handshake-state - 4fad33f8 9c9a61e3
 ds:ws-protocol.server-sync - 682570c7 9c9a61e3
 ds:ws-protocol.spatial-fragments - c39827ed 9c9a61e3
+ds:ws-protocol.sync-order-matrix-7x7 - c1f4a9e2 9c9a61e3
 ds:ws-protocol.cell-local-position - e047bbdf 9c9a61e3
 ds:ws-protocol.new-object-row - 6c8c56e7 9c9a61e3
 ds:ws-protocol.shared-world-snapshot - 2afd71a0 9c9a61e3
@@ -228,6 +287,9 @@ ia:prey.spawn-low-density-entry - 2740e55e b73de1c3
 ia:prey.speed-cap - 2d3e4f5a b73de1c3
 ia:prey.wander-cruise - 9d0e1f2a b73de1c3
 ia:npc.steering-tunables - 8a4b2f19 b73de1c3
+ia:npc.food-economics-tunables - 7a6b5c4d b73de1c3
+ia:npc.flee-urgency-state - 6c5e4b2a b73de1c3
+ia:npc.flee-fear-recovery - 5b8d1f6a b73de1c3
 ia:web-canvas.canvas-2d - 3a4b5c6d feab7d75
 ia:web-canvas.background-assets-publication - 3983084a feab7d75
 ia:web-canvas.ecs-arch - e5f60718 feab7d75
