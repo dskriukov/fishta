@@ -88,7 +88,7 @@ contract_map:
   wsProtocol.sharedWorldSnapshot:            server.js#broadcastWorldSync protocol.js#encodeWorldCycle  # @ds:2afd71a0
   wsProtocol.fishRow:                        protocol.js#encodeFishRow protocol.js#parseFishRow  # @ds:ea18a088 @ds:2e91f6d4
   wsProtocol.shredRow:                       protocol.js#encodeShredRow protocol.js#encodeShredDeltaRow protocol.js#parseShredRow protocol.js#applyWorldFragment  # @ds:9f50b1be
-  wsProtocol.stateMods:                      protocol.js#stateMods  # @ds:f51a5030
+  wsProtocol.stateMods:                      protocol.js#stateMods protocol.js#parseFishRow  # @ds:f51a5030 @fix:c13e07b3
   wsProtocol.objectRemoval:                   server.js#broadcastRemovedObjects protocol.js#encodeObjectRemoval protocol.js#applyObjectRemoval client-net.js#connect  # @ds:0aaccaf8 @ds:8c663384
   wsProtocol.clientFragmentValidity:          protocol.js#applyWorldFragment  # @ds:28d9098a
   wsProtocol.clientTimingVisibility:          protocol.js#applyWorldFragment protocol.js#applyObjectRemoval main.js#extrapolateWorld render.js#drawFish render.js#drawShred  # @ds:8c663384
@@ -114,7 +114,7 @@ contract_map:
   controls.touchSteer:                      controls.js#touchSteer  # @ds:3c41aad0
   controls.joystickSteer:                   controls.js#joystickSteer  # @ds:b43d2f95
   controls.speedControl:                    controls.js#huntMode controls.js#speedLevel controls.js#JOYSTICK_LEVEL_BOUNDARIES  # @ds:22fd3ab4 @ds:27129cfa @ds:cd1c5776 @ds:e6be3c03 @ia:6b7c8d9e @fix:8c4f2a71
-  controls.joystickRadialHunt:              controls.js#joystickSteer controls.js#speedLevelToControlMagnitude controls.js#joystickLevelFromUnit main.js#setupJoystickControls main.js#setJoystickCenter main.js#clampJoystickCenter main.js#clampJoystickPositionToViewport main.js#buildInputPayload main.js#renderJoystickBurstRings style.css##joystick-panel style.css##joystick-burst-base style.css##joystick-knob constants.js#JOYSTICK  # @ds:cd1c5776 @fix:8c4f2a71 @fix:5d9e3a71 @fix:f1c6a8d4
+  controls.joystickRadialHunt:              controls.js#joystickSteer controls.js#speedLevelToControlMagnitude controls.js#joystickLevelFromUnit main.js#setupJoystickControls main.js#setJoystickCenter main.js#clampJoystickCenter main.js#clampJoystickPositionToViewport main.js#buildInputPayload main.js#renderJoystickBurstRings style.css##joystick-panel style.css##joystick-burst-base style.css##joystick-knob constants.js#JOYSTICK  # @ds:cd1c5776 @fix:8c4f2a71 @fix:5d9e3a71 @fix:f1c6a8d4 @fix:52cd6e6c
   controls.joystickViewportFootprint:       style.css#:root style.css##joystick-panel style.css##joystick-base  # @ds:6896cdc6
   controls.responsiveJoinAndStatusLayout:   style.css##join style.css##join-form style.css##world-info style.css##joystick-panel  # @fix:3196de1d
   controls.burstEnduranceJoystickUi:        main.js#updateJoystickBurstAvailability main.js#renderJoystickBurstRings main.js#updateJoystickCurrentBurstRing style.css##joystick-base style.css##joystick-burst-base  # @ds:0eef2d19 @ds:e41821af @fix:8c4f2a71
@@ -122,7 +122,7 @@ contract_map:
   controls.burstEnduranceMenuTable:         main.js#updateBurstEnduranceTable index.html#burst-endurance-table style.css#burst-endurance-table  # @ds:cff27cd5
   controls.viewportFishCapacity:            constants.js#VIEWPORT_FISH_CAPACITY main.js#viewportFishCapacity main.js#loadViewportFishCapacity main.js#setViewportFishCapacity render.js#viewportScaleForFishCapacity render.js#worldToViewport index.html#viewport-fish-capacity style.css#viewport-fish-capacity  # @ds:e001d967 @fix:a64e9b31 @ds:7b9a7984
   controls.inspectClick:                    main.js#handleInspectClick  # @ds:2e1570ed
-  controls.camera:                          render.js#worldToViewport  # @ds:7b9a7984 @ds:e001d967
+  controls.camera:                          render.js#worldToViewport render.js#viewportToWorld render.js#render main.js#setupCameraPan main.js#clampCameraPanToSafeArea main.js#currentUserFishViewportPos main.js#buildInputPayload constants.js#CAMERA  # @ds:7b9a7984 @ds:e001d967 @fix:32ef3d51
   world.backgroundTileParallax:             style.css#body::before render.js#updateWorldBackgroundCss render.js#backgroundCameraDelta render.js#render  # @ds:2b3e71e0 @fix:4bbc0692 @ia:3983084a
   world.backgroundDepthHaze:                style.css#body::after  # @ds:a43de7ec
   controls.toroidalViewportProjection:      render.js#buildToroidalRenderWorld render.js#nearestToroidalCoordinate  # @ds:7b9a7984 @ds:c83f4c1e @ia:dd909d1a
@@ -170,7 +170,7 @@ contract_map:
   world.flowFieldMap:                        flow.js#buildFlowField flow.js#sampleFlowField shred.js#advanceShreds danger-map.js#encodeFlowMapPng server.js#/flow-map client-net.js#createFlowMapSocket main.js#toggleFlowMap render.js#drawFlowMapUnderlay render.js#drawWorldMap  # @fix:6a7b8c9d
   world.flowAngularImpulse:                  flow.js#buildFlowField flow.js#stampAngularImpulse danger-map.js#encodeFlowMapPng main.js#decodeFlowMapBitmap main.js#sampleAngularFlow main.js#advanceClientShredRotation render.js#drawShred constants.js#SHRED  # @fix:4e9b2c71
   world.flowVectorOverlay:                   index.html#flow-vectors-toggle main.js#toggleFlowVectors main.js#advanceClientFlowCrosses render.js#drawFlowVectorField constants.js#FLOW_MAP style.css#flow-vectors-toggle  # @fix:5f2a8c71
-  fish.visualHeading:                        render.js#drawFish render.js#visualFishTurnRadians render.js#visualFishVerticality main.js#applyClientFishDecor constants.js#FISH.visualMaxTiltDeg constants.js#SWIM.verticalFinSwingBoost constants.js#SWIM.visualTiltResponse  # @fix:6e2a9c41
+  fish.visualHeading:                        render.js#drawFish render.js#visualFishTurnRadians render.js#visualFishVerticality main.js#applyClientFishDecor main.js#updateClientFishOrientation constants.js#FISH.visualMaxTiltDeg constants.js#SWIM.verticalFinSwingBoost constants.js#SWIM.visualTiltResponse  # @fix:6e2a9c41 @fix:c13e07b3
   ui.debugOverlayParity:                     main.js#toggleDebugMode render.js#drawWorldMap render.js#drawWorldMapDebugTraces render.js#drawFlowVectorFieldOnMap render.js#drawFlowMapUnderlay render.js#drawDangerMapUnderlay  # @fix:9b6d2e41
   shred.decayRefresh:                        shred.js#refreshShredDecay predation.js#collectFeedingCandidates predation.js#refreshCandidate predation.js#processFeedingBatch  # @ds:fb0f32c4
   shred.eating:                              shred.js#canEatShred shred.js#shredCandidateNutrition shred.js#consumeShredLayer  # @ds:c14f7a08 @ds:9e4c1b7a @ds:b6f08d21 @ds:4d7c2e93 @ds:f0a6c5d8 @ds:d867989f @ds:98224ab9 @ds:fb0f32c4
@@ -189,6 +189,7 @@ contract_map:
   fish.grow:                                fish.js#grow  # @ds:d867989f @ds:b024b514
   fish.feedingState:                        fish.js#makeFish fish.js#advanceFeedingState  # @ds:4e2a91f0
   fish.updateFacing:                        fish.js#updateFacing  # @ds:8d0ca6a8 @ia:0bdc556b
+  fish.reverseFacing:                       fish.js#reverseFacingFor step.js#step step.js#stepAuthoritativeWorld protocol.js#stateMods protocol.js#parseFishRow render.js#drawFish  # @fix:c13e07b3
   fish.spendEnergy:                         fish.js#spendEnergy fish.js#burstEnergyFactorOf constants.js#ENERGY.lossPerRef  # @ds:f51831f5 @ds:6aa7c828 @ds:9ce87fee @fix:8c4f2a71
   fish.maxSpeedOf:                          fish.js#maxSpeedOf prey.js#capPreySpeed  # @ds:8869f043 @ds:d4f6a1c2
   fish.updateMouth:                         fish.js#updateMouth  # @ds:975ca168 @ia:9c0d1e2f @ia:0bdc556b
@@ -252,6 +253,7 @@ data_model:
       - size
       - radius
       - facing
+      - reverseFacing         # visual reverse marker derived from active steering against velocity
       - mode                   # cruise|burst
       - speedLevel             # 0 for no thrust, 1..30 cruise relative speed, 31..99 burst relative speed
       - age
@@ -1103,9 +1105,9 @@ implementation_instructions:
     #joystick-panel is a fixed square whose width and height are exactly --joystick-footprint-size. Anchor it to the lower-right with the existing safe-area-aware right and bottom offsets until a touch relocation occurs. It is shown after join whenever activeControlMode is not pointer or touch and hidden while pointer or touch experimental mode is active. Do not stretch the panel toward the left viewport edge.
     #joystick-base is the visible circular joystick control anchored one half knob diameter inward from the panel's lower-right edges. Its width and height are --joystick-size, so the knob remains within the panel when its center reaches the base edge. Rings remain inside the base and the complete visual footprint remains within min(340px, 40% of min(viewport width, viewport height)).
     Joystick speed comes from pointer displacement from the visible joystick base center in the same radial control that owns steering.
-    setupJoystickControls stores input.joystick.rawVector as the normalized actual displacement with magnitude 0..1, and stores input.joystick.vector as the same direction clamped to the current available speed radius for internal consistency. During an active touch, when displacement leaves the full burst-99 radius, setJoystickCenter shifts the panel radially so the touch remains on or inside that radius, then clampJoystickCenter keeps the outer circle plus JOYSTICK.edgeInsetKnobRatio of knob size inside the viewport. Pointer release resets only the knob vector; the relocated panel position remains. controls.js#joystickSteer uses rawVector so steering strength follows the held pointer position; controls.js#speedLevel maps rawVector magnitude to desired speedLevel 0..99 with the expanded cruise radius before buildInputPayload clamps it through availableSpeedLevelForSize. main.js#updateJoystickBurstAvailability computes the current available speedLevel for the user fish and redraws rings for v=30 cruise boundary plus selected burst availability levels. If the current user fish has applied speedLevel 1..99, main.js#updateJoystickCurrentBurstRing shows #joystick-current-burst-ring at speedLevelToControlMagnitude(fish.speedLevel), uses a 2px border, and colors it through main.js#joystickCurrentSpeedColor: levels 1..30 return the blue cruise color, and levels 31..99 return the existing pink burstSpeedColor scale. speedLevel 0 hides that ring.  # @ds:cd1c5776 @ds:0eef2d19 @ds:e41821af @fix:f1c6a8d4
+    setupJoystickControls stores input.joystick.rawVector as the normalized actual displacement with magnitude 0..1, and stores input.joystick.vector as the same direction clamped to the current available speed radius for internal consistency. During an active touch, the panel relocation activation threshold is the full burst-99 radius plus JOYSTICK.relocationActivationRatio of the joystick diameter; within this protective zone the panel remains fixed while the control vector stays at the maximum available radius. After the threshold is crossed, setJoystickCenter shifts the panel radially so the touch remains on or inside that radius, then clampJoystickCenter keeps the outer circle plus JOYSTICK.edgeInsetKnobRatio of knob size inside the viewport. Pointer release resets only the knob vector; the relocated panel position remains. controls.js#joystickSteer uses rawVector so steering strength follows the held pointer position; controls.js#speedLevel maps rawVector magnitude to desired speedLevel 0..99 with the expanded cruise radius before buildInputPayload clamps it through availableSpeedLevelForSize. main.js#updateJoystickBurstAvailability computes the current available speedLevel for the user fish and redraws rings for v=30 cruise boundary plus selected burst availability levels. If the current user fish has applied speedLevel 1..99, main.js#updateJoystickCurrentBurstRing shows #joystick-current-burst-ring at speedLevelToControlMagnitude(fish.speedLevel), uses a 2px border, and colors it through main.js#joystickCurrentSpeedColor: levels 1..30 return the blue cruise color, and levels 31..99 return the existing pink burstSpeedColor scale. speedLevel 0 hides that ring.  # @ds:cd1c5776 @ds:0eef2d19 @ds:e41821af @fix:f1c6a8d4 @fix:52cd6e6c
     index.html#game-menu contains #burst-endurance-table with rows for speedLevel v=1..99. main.js#updateBurstEnduranceTable reads BURST_ENDURANCE_SIZE_THRESHOLDS and currentUserFish.size, writes mode, minimum size threshold, current availability, energy factor, expected size loss, and the time window for each speed. updateGameMenu refreshes the table while the menu is open and whenever current fish state changes.  # @ds:cff27cd5
-    constants.js exports VIEWPORT_FISH_CAPACITY with the UI option values and defaultValue. main.js owns viewportFishCapacity as client display state and a dedicated localStorage key. loadViewportFishCapacity reads the key before setupViewportFishCapacity: it accepts only a value contained in VIEWPORT_FISH_CAPACITY.options and otherwise returns the default. setViewportFishCapacity(value) validates the incoming value, updates state and the select, then stores the resolved value; storage read/write failures leave the resolved in-memory value usable. Pass viewportFishCapacity into render(), viewportToWorld(), and worldToViewport() calls that convert current pointer/touch positions.  # @ds:e001d967 @fix:a64e9b31
+    constants.js exports VIEWPORT_FISH_CAPACITY with the UI option values and defaultValue. main.js owns viewportFishCapacity as client display state and a dedicated localStorage key. loadViewportFishCapacity reads the key before setupViewportFishCapacity: it accepts only a value contained in VIEWPORT_FISH_CAPACITY.options and otherwise returns the default. setViewportFishCapacity(value) validates the incoming value, updates state and the select, then stores the resolved value; storage read/write failures leave the resolved in-memory value usable. Pass viewportFishCapacity and the render-only cameraPan offset into render(), viewportToWorld(), and worldToViewport() calls that convert current pointer/touch positions.  # @ds:e001d967 @fix:a64e9b31 @fix:32ef3d51
     The visible joystick layout remains independent from the current user fish screen position.  # @ds:b43d2f95 @ds:cd1c5776 @ds:6896cdc6
   responsive_join_and_status_layout: |
     style.css owns the responsive repair. #join must use overflow-y:auto, align-items:center, and viewport-relative block padding so #join-form is vertically centered whenever it fits, and otherwise is never clipped when its content height exceeds a short viewport; at landscape/short-height breakpoints reduce only spacing and typography while retaining every required form control and exact text. The form itself may scroll within the entry layer and must remain keyboard/touch operable.
@@ -1158,7 +1160,8 @@ implementation_instructions:
     Client decor:
       - main.js owns a clientFishDecor Map keyed by fish id;
       - after extrapolation and before render, applyClientFishDecor advances swimPhase, burstKick, mouthOpen, mouth hold timers, and local exhale cycles using dt;
-      - the input facts for decor are synchronized fish velocity, mode, size, eatenFishCount deltas, and shredEatCueCounter deltas;
+      - the input facts for decor are synchronized fish velocity, mode, reverseFacing marker, size, eatenFishCount deltas, and shredEatCueCounter deltas;
+      - updateClientFishOrientation stores the previous synchronized velocity per fish, computes X/Y braking intensity from the velocity delta only while reverseFacing is active, uses the braking vector as visualDirection, and lets the dominant braking axis choose horizontal mirroring versus limited vertical tilt;
       - protocol rows must not encode or decode mouthOpen, teeth state, swimPhase, burstKick, mouth timers, or any other visual-only fish decor field;
       - server authority over movement must not become server authority over mouth, teeth, or fin animation.
       - clientFishDecor stores an exhale state object per fish id with the same shape as fish.js#makeFish.exhale; this state is client-only and removed when the fish id is absent from the newest visible world.
@@ -1206,7 +1209,7 @@ implementation_instructions:
       - do not store these bubbles in world.bubbles.
     advanceBubbles owns bubble motion and birth/fade animation: increment `age`, decrement `life`, move by velocity, compute `birth = clamp(age / BUBBLE.birthDuration, 0..1)`, compute `fade = clamp(life / BUBBLE.life, 0..1)`, set `radius = targetRadius * easeOut(birth)` and `alpha = min(birth, fade)`. Bounds removal must use the larger of current radius and targetRadius so a just-born zero-radius bubble is not removed incorrectly.
     render(ctx,state) reads bubbles from state.clientBubbles first, then state.world.bubbles only for legacy single-process mode. render.js#drawBubble uses the ordinary white/blue style when bubble.color is absent and a red fill/stroke style when bubble.color is `red`.
-    Camera viewport follows current client user fish via worldToViewport(world, followed, canvas, options).
+    Camera viewport follows current client user fish via worldToViewport(world, followed, canvas, options), then applies the client-only cameraPan screen offset. main.js#setupCameraPan accepts one touch gesture on the gameplay canvas, moves cameraPan by the touch delta, and leaves joystick/control touches to their existing handlers. main.js#clampCameraPanToSafeArea limits cameraPan so the current user fish remains inside a rectangle inset by CAMERA.safeInsetShortSideRatio of the shorter canvas side from every screen edge. render.js#render converts the offset to a shifted camera focus for toroidal projection and background parallax; the minimap continues using canonical world coordinates.
     main.js#resize derives the canvas bitmap dimensions from canvas.getBoundingClientRect(),
     and main.js#scheduleResize debounces resize, orientationchange, visualViewport resize,
     and ResizeObserver notifications before applying one requestAnimationFrame resize with
@@ -1216,7 +1219,7 @@ implementation_instructions:
     # @fix:c7e2a914
   toroidal_viewport_projection: |
     render.js owns viewport projection only; it must not mutate state.world, fish.pos, protocol rows, or snapshotBuffer.
-    worldToViewport(world, followed, canvas, options) keeps the followed fish's canonical position as the viewport focus.
+    worldToViewport(world, followed, canvas, options) keeps the followed fish's canonical position as the viewport focus and adds options.cameraPan in screen pixels.
     Before drawing fish, bubbles, labels, hit-test overlays, and debug relative/absolute traces, render.js builds a derived render world:
       - choose anchor = followed.pos when a followed user fish exists, otherwise world center;
       - for every drawable point p, compute projected p' independently per axis with nearestToroidalCoordinate(pAxis, anchorAxis, worldAxisSize);
@@ -1226,9 +1229,9 @@ implementation_instructions:
       - for fish, copy the fish object shallowly and replace only pos with the projected pos;
       - for bubbles and debug traces, copy the item shallowly and replace only pos with the projected pos;
       - keep velocity, facing, size, owner, user identity, and decor fields unchanged.
-    render(ctx,state) draws the projected copies, not canonical state.world.fish positions.
+    render(ctx,state) derives a camera focus from followed.pos - cameraPan/scale, builds projected copies around that focus, and draws them with the screen offset; canonical state.world.fish positions remain unchanged.
     drawDebugWorldRepeatBounds draws at least the canonical rectangle and the neighboring repeated rectangles around the anchor so the dashed boundary remains meaningful when the viewport is centered near an edge.
-    viewportToWorld(point, world, followed, canvas, options) returns the inverse projected coordinate in continuous viewport space using the same viewportFishCapacity option as rendering; callers that need canonical simulation coordinates must wrap the result back into [0,width) x [0,height).
+    viewportToWorld(point, world, followed, canvas, options) returns the inverse projected coordinate in continuous viewport space using the same viewportFishCapacity and cameraPan options as rendering; callers that need canonical simulation coordinates must wrap the result back into [0,width) x [0,height).
     main.js#handleInspectClick must hit-test against the same projected fish copies used by render, then report serializeFish for the original canonical fish object.
     main.js#buildInputPayload may use the continuous pointer coordinate relative to the followed fish for steering, but must not write that coordinate into world state.
     Edge examples:
@@ -1295,8 +1298,7 @@ implementation_instructions:
     lifetime as `lN`, where N is seconds in tenths. parseFishRow exposes them as
     fish.fryAge and fish.playerActiveAge seconds so start growth suppression and
     the lifetime bar are bound to synchronized server state and PLAYER.maxLifetimeSeconds.
-    encodeFishRow encodes burst fish state as `bN` where N is clamped to 1..99.
-    parseFishRow decodes `vN` into fish.speedLevel=N and derives mode from that value; rows with no v mod decode as fish.mode='cruise' and speedLevel=0.
+    encodeFishRow encodes the current speed level as `vN` when the visual nose follows movement and as `rN` when active steering opposes movement; N is clamped to 1..99. parseFishRow decodes either marker into fish.speedLevel=N, derives mode from that value, and exposes reverseFacing from `r`. Rows with no speed marker decode as fish.mode='cruise', speedLevel=0, and reverseFacing=false.
     applyWorldFragment(world,message,transportState,receivedAt):
       - parse absolute/header N/cellX/cellY; ignore N lower than transportState.currentCycle;
       - on first fragment of a greater N, evaluate the completed previous cycles: objects whose last received cycle is less than or equal to N-2 start temporary fade-out only now, so skipped cycle numbers cannot leave stale extrapolated objects alive; store receivedAt as the new cycle clock;
@@ -1372,8 +1374,7 @@ implementation_instructions:
     authored burst shape with its attack mouth/teeth, and cruise uses the authored
     cruise shape with the mouth closed.  # @ds:975ca168 @ia:9c0d1e2f
   fish_facing_and_burst_mouth_state: |
-    fish.js#updateFacing derives visual facing from fish.vel.x with FISH.facingThreshold hysteresis; do not add a server protocol field for facing direction.
-    protocol.js may preserve previous client facing while decoding rows, but the client fish update/render path must be able to derive facing from movement.
+    fish.js#updateFacing derives movement-facing from fish.vel.x with FISH.facingThreshold hysteresis. fish.js#reverseFacingFor marks active steering that opposes current velocity. stateMods serializes this binary visual mode as `rN` instead of `vN`; main.js#updateClientFishOrientation uses `r` plus the per-axis velocity delta between sync samples to derive the visual reverse direction, while parseFishRow keeps movement-facing separate. With zero steering, drift uses `vN` and preserves movement-facing orientation.
     In multiplayer rendering, main.js#updateClientDecorState computes chaseOpen on the client when fish.mode==='burst' and synchronized speed is above FISH.facingThreshold.
     Do not encode mouthOpen over the protocol; derive the toothed chase mouth locally from synchronized mode and speed.
     Do not open toothed chase mouth for ordinary direction changes, cruise movement, or inertial movement.

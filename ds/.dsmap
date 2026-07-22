@@ -28,6 +28,9 @@ ds/fix/sync-render-smoothing.fix#b3d7e9a2 - b3d7e9a2
 ds/fix/player-lifetime-size-threshold.fix#c4e8a1b7 - c4e8a1b7
 ds/fix/player-low-size-lifetime.fix#de7b4c19 - de7b4c19
 ds/fix/joystick-follow-touch.fix#f1c6a8d4 - f1c6a8d4
+ds/fix/joystick-relocation-deadzone.fix#52cd6e6c - 52cd6e6c
+ds/fix/fish-reverse-steering.fix#77a2a457 - c13e07b3
+ds/fix/camera-touch-pan.fix#32ef3d51 - 32ef3d51
 ds/fix/burst-energy-joystick.fix#8c4f2a71 - 8c4f2a71
 ds/fix/size-delta-label-scale.fix#4d8e2a71 - 4d8e2a71
 ds/fix/joystick-knob-keyboard-hide.fix#5d9e3a71 - 5d9e3a71
@@ -86,6 +89,9 @@ fix:sync.render-smoothing - b3d7e9a2 b3d7e9a2
 fix:player.lifetime-size-threshold - c4e8a1b7 c4e8a1b7
 fix:player.low-size-lifetime - de7b4c19 de7b4c19
 fix:controls.joystick-follow-touch - f1c6a8d4 f1c6a8d4
+fix:controls.joystick-relocation-deadzone - 52cd6e6c 52cd6e6c
+fix:fish.reverse-steering-marker - c13e07b3 c13e07b3
+fix:camera.touch-pan-safe-area - 32ef3d51 32ef3d51
 fix:ui.debug-overlay-parity - 9b6d2e41 9b6d2e41
 fix:fish.visual-heading - 6e2a9c41 6e2a9c41
 fix:fish.fin-timing-bezier - 2e7a4c91 2e7a4c91

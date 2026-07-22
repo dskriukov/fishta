@@ -4,7 +4,7 @@
 // @ds b28b7af6 22fd3ab4 e6be3c03 55c13a4f 10baf178 7ce238da 8869f043 07320d39 9ce87fee 703efd43 579e4888 31cb7a0d e9fb3705 e6ecfbdd d6cebf86 0c8d4e2a 6f1b0a3c 4c7a2b91 c18e5b42 b7a4c391 7d9f5b31 4e7a9c2d
 
 import { FISH, PERCEPTION, PLAYER, REGIME } from './constants.js';
-import { advanceFeedingState, availableSpeedLevelForSize, integrate, normalizeSpeedLevel, runExhaleCycle, requestExhale, updateFishLifetimeState } from './fish.js';
+import { advanceFeedingState, availableSpeedLevelForSize, integrate, normalizeSpeedLevel, reverseFacingFor, runExhaleCycle, requestExhale, updateFishLifetimeState } from './fish.js';
 import { chooseNpcIntent, preySteer, capPreySpeed, maintainPopulation, advanceFryGrowth, expireOldNpcFish } from './prey.js';
 import { advanceUserFryStage, placeUserSpawn, startUserFryStage } from './player.js';
 import { huntSteer } from './hunt.js';
@@ -31,6 +31,7 @@ export function step(state, input, dt, rng){
     state.player.speedLevel = availableSpeedLevelForSize(state.player.size, input.speedLevel ?? (huntMode(input) === 'burst' ? REGIME.burstStartSpeedLevel : 0));
     state.player.mode = state.player.speedLevel >= REGIME.burstStartSpeedLevel ? 'burst' : 'cruise';
     const playerAccel = playerSteer(state.player, input);
+    state.player.reverseFacing = reverseFacingFor(state.player, playerAccel);
     triggerExhaleOnAccelStart(state.player, playerAccel, state.player.prevAccel);
     state.player.prevAccel = { ...playerAccel };
     integrate(state.player, playerAccel, state.world, dt);
@@ -44,6 +45,7 @@ export function step(state, input, dt, rng){
         const steer = hunt.accel ? hunt : preySteer(p, threats, dt, rng);
         const accel = steer.accel ?? { x: 0, y: 0 };
         p.mode = steer.mode;
+        p.reverseFacing = reverseFacingFor(p, accel);
         p.speedLevel = p.mode === 'burst'
             ? npcBurstLevel(steer.speedLevel)
             : REGIME.cruiseMaxSpeedLevel;
@@ -98,6 +100,7 @@ export function stepAuthoritativeWorld(state, inputsByClient, dt, rng){
                 ? npcBurstLevel(steer.speedLevel)
                 : REGIME.cruiseMaxSpeedLevel;
         }
+        fish.reverseFacing = reverseFacingFor(fish, accel);
 
         const previousSpeed = Math.hypot(fish.vel.x, fish.vel.y);
         triggerExhaleOnAccelStart(fish, accel, fish.prevAccel);

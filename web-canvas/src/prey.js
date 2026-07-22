@@ -143,6 +143,7 @@ function spawnCandidate(pos, nominalStartSize, worldScale = 1){
         npcRole: 'prey',
         mode: 'cruise',
         facing: 1,
+        reverseFacing: false,
     };
 }
 

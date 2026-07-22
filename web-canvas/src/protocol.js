@@ -497,12 +497,14 @@ export function parseFishRow(row, byId = new Map(), absolute = false, cellX = 0,
     const speed = Number(speedText) || 0;
     const vx = Math.cos(angle * Math.PI / 180) * speed;
     const vy = Math.sin(angle * Math.PI / 180) * speed;
-    const previousFacing = previous?.facing || 1;
-    const facing = Math.abs(vx) > FISH.facingThreshold
-        ? (vx < 0 ? -1 : 1)
-        : previousFacing;
     const speedLevel = parseSpeedLevelMod(mods);
     const burstMode = speedLevel >= REGIME.burstStartSpeedLevel;
+    const reverseFacing = mods.includes('r');
+    const previousMovementFacing = previous?.movementFacing || previous?.facing || 1;
+    const movementFacing = Math.abs(vx) > FISH.facingThreshold
+        ? (vx < 0 ? -1 : 1)
+        : previousMovementFacing;
+    const facing = movementFacing;
     const absolutePos = absolute || !previous;
     const parsed = {
         ...(previous || {}),
@@ -526,12 +528,14 @@ export function parseFishRow(row, byId = new Map(), absolute = false, cellX = 0,
         },
         mode: burstMode ? 'burst' : 'cruise',
         speedLevel,
+        reverseFacing,
         shredEatCueCounter: parseShredCueMod(mods, previous?.shredEatCueCounter || 0),
         fryAge: parseFryAgeMod(mods, ownerKind, previous?.fryAge),
         playerActiveAge: parsePlayerActiveAgeMod(mods, ownerKind, previous?.playerActiveAge || 0),
         lifetimeMode: parseLifetimeModeMod(mods, ownerKind, previous?.lifetimeMode), // @fix:de7b4c19
         eyeFear: mods.includes('f') ? 1 : 0,
         visualScale: previous?.visualScale || 1,
+        movementFacing,
         facing,
         eaten: mods.includes('e'),
     };
@@ -571,7 +575,7 @@ function shredSnapshot(shred){
 function stateMods(fish){
     let mods = '';
     if( fish.ownerKind === 'npc' && fish.npcRole === 'abandoned-user-fish' ) mods += 'a';
-    if( (fish.speedLevel || 0) > 0 ) mods += `v${Math.max(1, normalizeSpeedLevel(fish.speedLevel))}`;
+    if( (fish.speedLevel || 0) > 0 ) mods += `${fish.reverseFacing ? 'r' : 'v'}${Math.max(1, normalizeSpeedLevel(fish.speedLevel))}`;
     if( (fish.eyeFear || 0) > 0.2 ) mods += 'f';
     if( (fish.shredEatCueCounter || 0) > 0 ) mods += `s${Math.min(999, Math.floor(fish.shredEatCueCounter))}`;
     if( fish.ownerKind === 'user' && fish.fryAge !== null && fish.fryAge !== undefined ){
@@ -585,7 +589,7 @@ function stateMods(fish){
 }
 
 function parseSpeedLevelMod(mods){
-    const match = /v(\d{1,2})/.exec(mods || '');
+    const match = /[vr](\d{1,2})/.exec(mods || '');
     if( !match ) return 0;
     return normalizeSpeedLevel(match[1]);
 }

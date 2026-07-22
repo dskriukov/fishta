@@ -22,6 +22,7 @@ export function startUserFryStage(fish, position, reason = 'spawn', worldScale =
         size: PLAYER.fryStartSize,
         radius: technicalRadiusOf(PLAYER.fryStartSize, worldScale),
         facing: fish.facing || 1,
+        reverseFacing: false,
         mode: 'cruise',
         age: 0,
         ownerKind: 'user',

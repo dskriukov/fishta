@@ -58,6 +58,11 @@ export const VIEWPORT_FISH_CAPACITY = {
 
 export const JOYSTICK = {
     edgeInsetKnobRatio: 0.7, // additional safe inset from viewport edge, relative to knob size — @fix:f1c6a8d4
+    relocationActivationRatio: 0.05, // touch overshoot before the panel starts following — @fix:52cd6e6c
+};
+
+export const CAMERA = {
+    safeInsetShortSideRatio: 0.2, // user fish remains inside this screen-edge inset during map pan
 };
 
 export const SERVER = {

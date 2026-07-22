@@ -136,6 +136,7 @@ export function makeFish({
         size,
         radius: technicalRadiusOf(size, worldScale),
         facing: 1,          // 1 = right, -1 = left
+        reverseFacing: false, // visual reverse marker for active braking/steering
         mode: 'cruise',
         speedLevel: 0,
         age: 0,
@@ -285,6 +286,17 @@ export function spendEnergy(fish, distance, worldScale = 1){
 export function updateFacing(fish){
     if( fish.vel.x > FISH.facingThreshold ) fish.facing = 1;
     else if( fish.vel.x < -FISH.facingThreshold ) fish.facing = -1;
+}
+
+// A binary first approximation: when active steering opposes the current
+// velocity, the visual nose faces against movement. With no steering, drift
+// keeps the movement-facing orientation.
+export function reverseFacingFor(fish, accel){
+    if( !fish || !accel ) return false;
+    const speed = Math.hypot(fish.vel?.x || 0, fish.vel?.y || 0);
+    const steering = Math.hypot(accel.x || 0, accel.y || 0);
+    if( speed <= FISH.facingThreshold || steering <= 1e-6 ) return false;
+    return (fish.vel.x * accel.x + fish.vel.y * accel.y) < 0;
 }
 
 // ds:d867989f

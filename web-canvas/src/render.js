@@ -429,17 +429,27 @@ export function render(ctx, state){
     const followed = fish.find(f => f.id === state.currentUserFishId)
         || fish.find(f => f.clientId === state.clientId && f.ownerKind === 'user')
         || state.player;
+    const viewport = worldToViewport(world, followed, ctx.canvas, {
+        viewportFishCapacity: state.viewportFishCapacity,
+        cameraPan: state.cameraPan,
+    });
+    const cameraFocus = followed ? {
+        ...followed,
+        pos: {
+            x: followed.pos.x - (state.cameraPan?.x || 0) / viewport.scale,
+            y: followed.pos.y - (state.cameraPan?.y || 0) / viewport.scale,
+        },
+    } : followed;
     const renderWorld = buildToroidalRenderWorld({
         ...world,
         fish,
         bubbles: state.clientBubbles || world.bubbles || state.bubbles || [],
-    }, followed, state.debug?.positionTraces || []);
+    }, cameraFocus, state.debug?.positionTraces || []);
 
-    updateWorldBackgroundCss(world, followed, state.viewportFishCapacity, ctx.canvas);
+    updateWorldBackgroundCss(world, cameraFocus, state.viewportFishCapacity, ctx.canvas);
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
     ctx.save();
-    const viewport = worldToViewport(world, followed, ctx.canvas, { viewportFishCapacity: state.viewportFishCapacity });
     ctx.translate(viewport.offsetX, viewport.offsetY);
     ctx.scale(viewport.scale, viewport.scale);
 
@@ -572,10 +582,11 @@ function wrappedTileOffset(value, size){
 export function worldToViewport(world, followed, canvas, options = {}){
     const scale = viewportScaleForFishCapacity(world, canvas, options.viewportFishCapacity) * (world?.scale || 1);
     const focus = followed ? followed.pos : { x: world.width / 2, y: world.height / 2 };
+    const cameraPan = options.cameraPan || { x: 0, y: 0 };
     return {
         scale,
-        offsetX: canvas.width / 2 - focus.x * scale,
-        offsetY: canvas.height / 2 - focus.y * scale,
+        offsetX: canvas.width / 2 - focus.x * scale + (cameraPan.x || 0),
+        offsetY: canvas.height / 2 - focus.y * scale + (cameraPan.y || 0),
     };
 }
 
@@ -629,7 +640,7 @@ export function fishFinTipPositions(fish){
     if( !fish?.pos ) return [];
     const radius = Math.max(0.001, Number(fish.radius) || 0) * Math.max(0.5, Number(fish.visualScale) || 1);
     const scale = radius / Math.max(1e-6, fishSvgGeometry.collisionRadius);
-    const mirror = fish.facing < 0 ? 1 : -1;
+    const mirror = (fish.visualFacing ?? fish.facing) < 0 ? 1 : -1;
     const tilt = Number.isFinite(fish.visualTilt) ? fish.visualTilt : visualFishTurnRadians(fish);
     const cos = Math.cos(tilt);
     const sin = Math.sin(tilt);
@@ -1316,7 +1327,7 @@ function drawSizeDeltaLabel(ctx, label, fish, viewport){
     ctx.restore();
 }
 
-// @ds:df06827a @ds:bd354b7a @ds:906be50b @ds:8c663384 @ia:2f6e7a91
+// @ds:df06827a @ds:bd354b7a @ds:906be50b @ds:8c663384 @ia:2f6e7a91 @fix:c13e07b3
 function drawFish(ctx, f, currentUserFishId, viewport){
     const visualScale = Math.max(0.5, f.visualScale || 1);
     const r = f.radius * visualScale;
@@ -1342,7 +1353,7 @@ function drawFish(ctx, f, currentUserFishId, viewport){
         ctx.translate(f.pos.x, f.pos.y);
         ctx.rotate(Number.isFinite(f.visualTilt) ? f.visualTilt : visualFishTurnRadians(f)); // @fix:6e2a9c41
         // The authored SVG faces left; the domain facing convention is 1 = right.
-        ctx.scale(-f.facing, 1);
+        ctx.scale(-(f.visualFacing ?? f.facing), 1);
         ctx.scale(scale, scale);
         ctx.translate(-fishSvgGeometry.centerX, -fishSvgGeometry.centerY);
         drawSvgNodes(ctx, fishSvgRenderTree, f, animation);
@@ -1355,24 +1366,27 @@ function drawFish(ctx, f, currentUserFishId, viewport){
     ctx.restore();
 }
 
-// @fix:6e2a9c41
+// @fix:6e2a9c41 @fix:c13e07b3
 export function visualFishTurnRadians(fish){
-    const velocityX = Number(fish?.vel?.x) || 0;
-    const velocityY = Number(fish?.vel?.y) || 0;
+    const hasVisualDirection = Boolean(fish?.visualDirection);
+    const direction = fish?.visualDirection || fish?.vel || { x: 0, y: 0 };
+    const velocityX = Number(direction.x) || 0;
+    const velocityY = Number(direction.y) || 0;
     const speed = Math.hypot(velocityX, velocityY);
-    if( speed <= FISH.facingThreshold ) return 0;
-    const facing = fish?.facing < 0 ? -1 : 1;
+    if( speed <= (hasVisualDirection ? 1e-3 : FISH.facingThreshold) ) return 0;
+    const facing = (fish?.visualFacing ?? fish?.facing) < 0 ? -1 : 1;
     const rawMagnitude = Math.atan2(Math.abs(velocityY), Math.abs(velocityX));
     const raw = Math.sign(facing * velocityY) * rawMagnitude;
     const limit = Math.max(0, Math.min(89.9, Number(FISH.visualMaxTiltDeg) || 20)) * Math.PI / 180;
     return clamp(raw, -limit, limit);
 }
 
-// @fix:6e2a9c41
+// @fix:6e2a9c41 @fix:c13e07b3
 function visualFishVerticality(fish){
-    const velocityX = Number(fish?.vel?.x) || 0;
-    const velocityY = Number(fish?.vel?.y) || 0;
+    const direction = fish?.visualDirection || fish?.vel || { x: 0, y: 0 };
+    const velocityX = Number(direction.x) || 0;
+    const velocityY = Number(direction.y) || 0;
     const speed = Math.hypot(velocityX, velocityY);
-    if( speed <= FISH.facingThreshold ) return 0;
+    if( speed <= (fish?.visualDirection ? 1e-3 : FISH.facingThreshold) ) return 0;
     return clamp01(Math.abs(velocityY) / speed);
 }

@@ -3,7 +3,7 @@
 // @ds b28b7af6 27fa3caa ec8cb052 ab1e4f02 c95ca496 48c4fc99 b433f1bc d2e8a84c 5fb1ff09 c83f4c1e ca07d970 d6cebf86 2b3e71e0 3ddf8f67 1f3abc43 cbc1225a 7ce238da c4073e51 ee07d6da 8869f043 07320d39 f51831f5 8d0ca6a8 d867989f 975ca168 bd354b7a 906be50b 91e32235 55c13a4f 10baf178 22fd3ab4 e6be3c03 0eef2d19 e001d967 cff27cd5 7b9a7984 ad8d81d8 31cb7a0d 579e4888 e699c42d e6ecfbdd 1e66d817 a3e394a8 98224ab9 e9fb3705 fcdfb2b7 0c8d4e2a 6f1b0a3c 39305789 2e91f6d4 b9136c2e c5a92431 c656f0ec e42a7c19 a2d5936f 73b91e4c ed2b4f19
 // @ia 3983084a
 
-import { DEBUG, ENERGY, EXHALE, FISH, FLOW_MAP, JOYSTICK, LOOP, MOUTH, PLAYER, REGIME, SHRED, SIZE_DELTA_LABEL, SWIM, SYNC, VIEWPORT_FISH_CAPACITY, WORLD_MAP } from './constants.js';
+import { CAMERA, DEBUG, ENERGY, EXHALE, FISH, FLOW_MAP, JOYSTICK, LOOP, MOUTH, PLAYER, REGIME, SHRED, SIZE_DELTA_LABEL, SWIM, SYNC, VIEWPORT_FISH_CAPACITY, WORLD_MAP } from './constants.js';
 import { advanceBubbles, emitBubble, makeBubble, makeWorld } from './world.js';
 import { BURST_ENDURANCE_SIZE_THRESHOLDS, availableSpeedLevelForSize, burstEnergyFactorOf, requestExhale, runExhaleCycle, serializeFish, speedCapOf, technicalRadiusOf } from './fish.js';
 import { createControlModeState, createInput, keySteer, pointerSteer, joystickSteer, speedLevel, speedLevelToControlMagnitude } from './controls.js';
@@ -84,6 +84,9 @@ const clientBubbles = [];
 const clientFinSparks = []; // @fix:4f8a2c71
 const clientBubbleEmitters = new Map();
 const clientFishDecor = new Map();
+const cameraPan = { x: 0, y: 0 };
+let cameraPanPointerId = null;
+let cameraPanLastPoint = null;
 let serializeKeyLatch = false;
 let lastSentInputKey = null;
 let lastInputFlushAt = 0;
@@ -149,6 +152,7 @@ function resize(){
     canvas.width = width;
     canvas.height = height;
     clampJoystickPositionToViewport(); // @fix:f1c6a8d4
+    clampCameraPanToSafeArea(); // @fix:32ef3d51
 }
 
 // @fix:c7e2a914
@@ -178,7 +182,11 @@ const input = createInput(canvas);
 net = createClientNet({
     onSnapshot(message){
         openFlowMapTransport(); // @fix:4e9b2c71
-        if( state.currentUserFishId !== message.currentUserFishId ) lastSentInputKey = null;
+        if( state.currentUserFishId !== message.currentUserFishId ){ // @fix:32ef3d51
+            lastSentInputKey = null;
+            cameraPan.x = 0;
+            cameraPan.y = 0;
+        }
         state.world = message.world;
         state.currentUserFishId = message.currentUserFishId;
         updateWorldSyncMetrics(message);
@@ -347,7 +355,7 @@ canvas.addEventListener('click', e =>{
     const rect = canvas.getBoundingClientRect();
     const clickState = lastVisibleState || state;
     const followed = currentUserFish(clickState.world, clickState.currentUserFishId);
-    const clickPos = viewportToWorld(v(e.clientX - rect.left, e.clientY - rect.top), clickState.world, followed, canvas, { viewportFishCapacity });
+    const clickPos = viewportToWorld(v(e.clientX - rect.left, e.clientY - rect.top), clickState.world, followed, canvas, { viewportFishCapacity, cameraPan });
     const renderWorld = buildToroidalRenderWorld(clickState.world, followed);
     const projectedFish = (renderWorld.fish || []).find(candidate => candidate && dist(clickPos, candidate.pos) <= candidate.radius);
     const fish = projectedFish ? (state.world.fish || []).find(candidate => candidate.id === projectedFish.id) : null;
@@ -626,6 +634,7 @@ if( debugModeToggle ){
 }
 setupViewportFishCapacity();
 setupControlModes();
+setupCameraPan(); // @fix:32ef3d51
 setupJoystickControls();
 window.addEventListener('keydown', e =>{
     if( e.key === '`' || e.key === '~' ){
@@ -694,6 +703,7 @@ function frame(now){
     dt = Math.min(dt, LOOP.maxDt);   // clamp — ecs-loop.dsr
 
     const visibleState = renderState(now);
+    clampCameraPanToSafeArea(); // @fix:32ef3d51
     advanceClientShredRotation(visibleState.world, dt, flowMapField); // @fix:4e9b2c71
     if( flowVectorsVisible ) advanceClientFlowCrosses(flowMapField, dt); // @fix:5f2a8c71
     applyClientFishDecor(visibleState.world, clientBubbles, clientFinSparks, dt, Math.random); // @fix:4f8a2c71
@@ -705,6 +715,7 @@ function frame(now){
     render(ctx, {
         ...visibleState,
         viewportFishCapacity,
+        cameraPan,
         clientBubbles,
         finSparks: clientFinSparks, // @fix:4f8a2c71
         sizeDeltaLabels: sizeDeltaLabelState.labels,
@@ -1127,6 +1138,7 @@ function applyClientFishDecor(world, bubbles, finSparks, dt, rng){
         fish.swimPhase = decor.swimPhase;
         fish.burstKick = decor.burstKick;
         fish.mouthOpen = decor.mouthOpen;
+        updateClientFishOrientation(decor, fish); // @fix:c13e07b3
         const inertialBraking = !fish.mode || fish.mode === 'cruise' && Number(fish.speedLevel || 0) === 0;
         const targetTilt = inertialBraking ? 0 : visualFishTurnRadians(fish);
         const tiltResponse = 1 - Math.exp(-SWIM.visualTiltResponse * Math.max(0, dt));
@@ -1169,6 +1181,12 @@ function makeClientDecor(fish){
         wasBurstActive: fish.mode === 'burst',
         lastBurstSpeedLevel: fish.mode === 'burst' ? Math.floor(Number(fish.speedLevel) || 0) : 0, // @fix:4f8a2c71
         lastDirection: null,
+        lastMotionSample: null,
+        lastVelocity: null,
+        brakingDirection: null,
+        brakingIntensity: { x: 0, y: 0 },
+        visualFacing: fish.movementFacing ?? fish.facing ?? 1,
+        visualDirection: null,
         visualScale: fish.visualScale || 1,
         exhale: {
             requested: false,
@@ -1189,6 +1207,48 @@ function makeClientDecor(fish){
         lastShredEatCueCounter: 0,
         lastSize: fish.size || 1,
     };
+}
+
+// @fix:c13e07b3
+function updateClientFishOrientation(decor, fish){
+    const velocity = v(Number(fish.vel?.x) || 0, Number(fish.vel?.y) || 0);
+    const speed = Math.hypot(velocity.x, velocity.y);
+    const sample = fish._syncCycle ?? null;
+    if( decor.lastVelocity && (sample === null || sample !== decor.lastMotionSample) ){
+        const braking = v(velocity.x - decor.lastVelocity.x, velocity.y - decor.lastVelocity.y);
+        const brakingMagnitude = Math.hypot(braking.x, braking.y);
+        const brakingAgainstMotion = braking.x * velocity.x + braking.y * velocity.y < 0;
+        if( fish.reverseFacing && brakingMagnitude > 1e-4 && brakingAgainstMotion ){
+            decor.brakingDirection = normalize(braking);
+            decor.brakingIntensity = { x: Math.abs(braking.x), y: Math.abs(braking.y) };
+        }
+    }
+    decor.lastVelocity = velocity;
+    decor.lastMotionSample = sample;
+    const movementFacing = fish.movementFacing ?? fish.facing ?? decor.visualFacing ?? 1;
+    if( speed <= FISH.facingThreshold ){
+        decor.visualDirection = null;
+        decor.visualFacing = movementFacing;
+        return;
+    }
+    if( !fish.reverseFacing ){
+        decor.brakingDirection = null;
+        decor.brakingIntensity = { x: 0, y: 0 };
+        decor.visualDirection = velocity;
+        decor.visualFacing = movementFacing;
+        return;
+    }
+    const fallback = scale(normalize(velocity), -1);
+    const direction = decor.brakingDirection || fallback;
+    decor.visualDirection = direction;
+    // Keep vertical motion readable without forcing a horizontal flip from
+    // tiny X-axis noise; the tilt carries the dominant Y-axis direction.
+    const brakingX = decor.brakingIntensity?.x || Math.abs(velocity.x);
+    const brakingY = decor.brakingIntensity?.y || Math.abs(velocity.y);
+    const horizontalBraking = brakingX > 1e-4 && brakingX >= brakingY;
+    decor.visualFacing = horizontalBraking
+        ? (direction.x < 0 ? -1 : 1)
+        : movementFacing;
 }
 
 function updateClientDecorState(decor, fish, dt, bubbles, finSparks, rng){
@@ -1376,7 +1436,7 @@ function buildInputPayload(){
     if( joystickBase ) joystickBase.classList.toggle('is-keyboard-control', keyboardAccel); // @fix:5d9e3a71
     if( !accel ){
         if( controlMode.active === 'pointer' && fish && input.pointer.active ){
-            const worldPointer = viewportToWorld(input.pointer.pos, state.world, fish, canvas, { viewportFishCapacity });
+            const worldPointer = viewportToWorld(input.pointer.pos, state.world, fish, canvas, { viewportFishCapacity, cameraPan });
             accel = pointerSteer(fish.pos, { active: true, pos: worldPointer });
         }else if( controlMode.active === 'touch' && fish && input.pointer.active && input.touchDown ){
             input.pointer.vector = controlVectorFromFish(fish, input.pointer.pos);
@@ -1445,7 +1505,7 @@ function inputPayloadKey(payload){
 }
 
 function currentUserFishViewportPos(fish){
-    const viewport = worldToViewport(state.world, fish, canvas, { viewportFishCapacity });
+    const viewport = worldToViewport(state.world, fish, canvas, { viewportFishCapacity, cameraPan });
     return v(fish.pos.x * viewport.scale + viewport.offsetX, fish.pos.y * viewport.scale + viewport.offsetY);
 }
 
@@ -1700,6 +1760,55 @@ function renderJoystickKnob(vector){
     joystickKnob.style.transform = `translate(calc(-50% + ${direction.x * distance}px), calc(-50% + ${direction.y * distance}px))`;
 }
 
+// @fix:32ef3d51
+function cameraPanEnabled(e){
+    return e.pointerType === 'touch' && controlMode.active !== 'touch' && controlMode.active !== 'pointer';
+}
+
+// @fix:32ef3d51
+function clampCameraPanToSafeArea(){
+    const fish = currentUserFish(lastVisibleState?.world || state.world, lastVisibleState?.currentUserFishId || state.currentUserFishId);
+    if( !fish || canvas.width <= 0 || canvas.height <= 0 ){
+        cameraPan.x = 0;
+        cameraPan.y = 0;
+        return;
+    }
+    const inset = Math.min(canvas.width, canvas.height) * CAMERA.safeInsetShortSideRatio;
+    const minPanX = inset - canvas.width / 2;
+    const maxPanX = canvas.width - inset - canvas.width / 2;
+    const minPanY = inset - canvas.height / 2;
+    const maxPanY = canvas.height - inset - canvas.height / 2;
+    cameraPan.x = Math.max(minPanX, Math.min(maxPanX, cameraPan.x));
+    cameraPan.y = Math.max(minPanY, Math.min(maxPanY, cameraPan.y));
+}
+
+// @fix:32ef3d51
+function setupCameraPan(){
+    if( !canvas ) return;
+    canvas.addEventListener('pointerdown', e =>{
+        if( !cameraPanEnabled(e) ) return;
+        cameraPanPointerId = e.pointerId;
+        cameraPanLastPoint = v(e.clientX, e.clientY);
+        canvas.setPointerCapture?.(e.pointerId);
+        e.preventDefault();
+    });
+    canvas.addEventListener('pointermove', e =>{
+        if( e.pointerId !== cameraPanPointerId || !cameraPanLastPoint ) return;
+        cameraPan.x += e.clientX - cameraPanLastPoint.x;
+        cameraPan.y += e.clientY - cameraPanLastPoint.y;
+        cameraPanLastPoint = v(e.clientX, e.clientY);
+        clampCameraPanToSafeArea();
+        e.preventDefault();
+    });
+    const release = e =>{
+        if( e.pointerId !== cameraPanPointerId ) return;
+        cameraPanPointerId = null;
+        cameraPanLastPoint = null;
+    };
+    canvas.addEventListener('pointerup', release);
+    canvas.addEventListener('pointercancel', release);
+}
+
 // @ds:b43d2f95 @ds:cd1c5776
 function setupJoystickControls(){
     if( !joystickBase ) return;
@@ -1712,7 +1821,8 @@ function setupJoystickControls(){
         const radius = Math.max(1, rect.width / 2);
         const distanceFromCenter = Math.hypot(raw.x, raw.y);
         let isAtOuterBoundary = false;
-        if( distanceFromCenter > radius ){
+        const relocationDeadzone = rect.width * JOYSTICK.relocationActivationRatio; // @fix:52cd6e6c
+        if( distanceFromCenter > radius + relocationDeadzone ){
             const outward = normalize(raw);
             const overshoot = distanceFromCenter - radius;
             const desiredCenter = v(center.x + outward.x * overshoot, center.y + outward.y * overshoot);
