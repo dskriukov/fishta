@@ -4,7 +4,7 @@
 // @ds b28b7af6 22fd3ab4 e6be3c03 55c13a4f 10baf178 7ce238da 8869f043 07320d39 9ce87fee 703efd43 579e4888 31cb7a0d e9fb3705 e6ecfbdd d6cebf86 0c8d4e2a 6f1b0a3c 4c7a2b91 c18e5b42 b7a4c391 7d9f5b31 4e7a9c2d
 
 import { FISH, PERCEPTION, PLAYER, REGIME } from './constants.js';
-import { advanceFeedingState, availableSpeedLevelForSize, integrate, normalizeSpeedLevel, runExhaleCycle, requestExhale } from './fish.js';
+import { advanceFeedingState, availableSpeedLevelForSize, integrate, normalizeSpeedLevel, runExhaleCycle, requestExhale, updateFishLifetimeState } from './fish.js';
 import { chooseNpcIntent, preySteer, capPreySpeed, maintainPopulation, advanceFryGrowth, expireOldNpcFish } from './prey.js';
 import { advanceUserFryStage, placeUserSpawn, startUserFryStage } from './player.js';
 import { huntSteer } from './hunt.js';
@@ -75,14 +75,14 @@ export function step(state, input, dt, rng){
 export function stepAuthoritativeWorld(state, inputsByClient, dt, rng){
     const world = state.world;
     world.tick = (world.tick || 0) + 1;
+    world.elapsedSeconds = Math.max(0, Number(world.elapsedSeconds) || 0) + Math.max(0, dt);
     rebuildPerception(world, { resetDirectionDanger: true, motionHorizonSeconds: dt * PERCEPTION.dangerRasterMotionTicks }); // @ds:c94d2a8f @ds:9a6e4c31 @ds:d5c8b740 @fix:8c4e1a72 @fix:7f3c9a21
     const allFish = world.fish;
 
     for( const fish of allFish ){
         let accel = { x: 0, y: 0 };
         if( fish.ownerKind === 'user' ){
-            const inFryStage = advanceUserFryStage(fish, dt, world.scale);
-            if( !inFryStage ) fish.playerActiveAge = (fish.playerActiveAge || 0) + dt;
+            advanceUserFryStage(fish, dt, world.scale);
             const input = inputsByClient.get(fish.clientId) || {};
             fish.speedLevel = normalizeSpeedLevel(input.speedLevel);
             fish.cruiseControl = input.cruiseControl === 'keyboard' ? 'keyboard' : null;
@@ -105,6 +105,7 @@ export function stepAuthoritativeWorld(state, inputsByClient, dt, rng){
         integrate(fish, accel, world, dt);
         if( fish.ownerKind === 'npc' ) capPreySpeed(fish, previousSpeed, world.scale);
         advanceFeedingState(fish, dt);
+        updateFishLifetimeState(fish, world.elapsedSeconds); // @fix:c4e8a1b7
     }
 
     expireOldUserFish(world, rng);
@@ -112,6 +113,7 @@ export function stepAuthoritativeWorld(state, inputsByClient, dt, rng){
     rebuildPerception(world, { resetDirectionDanger: false, motionHorizonSeconds: dt * PERCEPTION.dangerRasterMotionTicks }); // @fix:8c4e1a72 @fix:7f3c9a21
     expireOldNpcFish(world, rng); // @ds:a6c9e8b4
     resolveFeedingBatches(world, rng); // @ds:9b41d2ac @ds:6c80e3b4 @ds:f2ad71c9 @ds:a8f03d2e
+    for( const fish of world.fish || [] ) updateFishLifetimeState(fish, world.elapsedSeconds); // @fix:c4e8a1b7
     maintainPopulation({ world }, rng);
     world.bubbles = [];
     return state;
@@ -129,10 +131,15 @@ function npcBurstLevel(requestedLevel){
 
 // @ds:b7a4c391 @ds:c18e5b42 @ds:e13d7a52
 function expireOldUserFish(world, rng){
+    const now = Math.max(0, Number(world.elapsedSeconds) || 0);
     for( const fish of world.fish || [] ){
         if( fish.ownerKind !== 'user' ) continue;
         if( fish.fryAge !== null && fish.fryAge !== undefined ) continue;
-        if( (fish.playerActiveAge || 0) < PLAYER.maxLifetimeSeconds ) continue;
+        if( !Number.isFinite(fish.lifetimeStartedAt) ) continue;
+        const lifetimeLimit = fish.lifetimeMode === 'lowSize'
+            ? PLAYER.lowSizeMaxLifetimeSeconds
+            : PLAYER.maxLifetimeSeconds;
+        if( (now - fish.lifetimeStartedAt) < lifetimeLimit ) continue;
         const origin = { ...fish.pos };
         const shreds = spawnShredsFromFish(world, fish, rng);
         const position = placeUserSpawn(world, 'oldAge', rng, { origin, shreds });

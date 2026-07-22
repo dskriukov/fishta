@@ -39,18 +39,25 @@ export const FISH = {
     npcSpeedFactor: 0.6,    // NPC maximum speed multiplier — @ds:8869f043
     accel: 500,            // px/s^2 steering force — ds:55c13a4f ds:10baf178 ds:7ce238da
     facingThreshold: 8,     // velocity.x deadzone to avoid flip jitter — fish.air#ia:9a0b1c2d, ds:8d0ca6a8
+    visualMaxTiltDeg: 20,    // @fix:6e2a9c41
 };
 
 export const PLAYER = {
     startSize: 1,           // player nominal start size after fry growth — @ds:4c7a2b91 @ds:39305789
     fryStartSize: 0.03,     // practically a point, still visible — @ds:4c7a2b91
     fryGrowthSeconds: 3,    // @ds:4c7a2b91 @ds:9d62f0a7 @ds:b7a4c391
+    lifetimeStartSize: 5,   // active lifetime starts when user fish reaches this size — @fix:c4e8a1b7
+    lowSizeMaxLifetimeSeconds: 60, // low-size recovery lifetime — @fix:de7b4c19
     maxLifetimeSeconds: 120, // longer than NPC lifetime — @ds:b7a4c391
 };
 
 export const VIEWPORT_FISH_CAPACITY = {
     options: ['5', '10', '30', 'max'], // @ds:e001d967
     defaultValue: '10',                // @ds:e001d967
+};
+
+export const JOYSTICK = {
+    edgeInsetKnobRatio: 0.7, // additional safe inset from viewport edge, relative to knob size — @fix:f1c6a8d4
 };
 
 export const SERVER = {
@@ -79,6 +86,7 @@ export const SYNC = {
     newObjectAbsoluteCycles: 10, // @ds:6c8c56e7
     temporaryFadeSeconds: 0.2, // @ds:8c663384
     removalFadeSeconds: 0.1, // @ds:8c663384
+    renderSmoothingRate: 32, // seconds^-1; short client-side convergence at sync boundaries — @fix:b3d7e9a2
 };
 
 export const DEBUG = {
@@ -101,6 +109,18 @@ export const WORLD_MAP = {
 export const DANGER_MAP = {
     bitmapAlpha: 0.42, // @fix:b5c7d9e1
     gridAlpha: 0.72,   // @fix:b5c7d9e1
+};
+
+export const FLOW_MAP = {
+    bitmapAlpha: 0.97, // @fix:6a7b8c9d
+    vectorStrideCells: 3, // @fix:5f2a8c71
+    vectorCrossSizeRatio: 0.4, // @fix:5f2a8c71
+    vectorLengthScale: 0.08, // @fix:5f2a8c71
+    vectorMaxLength: 18, // @fix:5f2a8c71
+    vectorLineWidth: 7.2, // @fix:5f2a8c71
+    vectorCrossLineWidth: 1.2, // @fix:5f2a8c71
+    vectorCrossAlpha: 0.24, // @fix:5f2a8c71
+    vectorAlpha: 0.7, // @fix:5f2a8c71
 };
 
 export const SIZE_DELTA_LABEL = {
@@ -136,7 +156,7 @@ export const GROWTH = {
 };
 
 export const ENERGY = {
-    lossPerRef: 0.01,       // -1% size per reference distance — ds:f51831f5
+    lossPerRef: 0.009,      // -0.9% size per reference distance in burst — @fix:8c4f2a71
     refSizes: 100,          // reference distance = refSizes * size ("100 размеров")
     minSize: 0.2,           // size floor so radius>0 & predation stays defined — ia:7c8d9e0f
     userMinSize: 0.36,      // > PREY.minSize * PREDATION.eatRatio (0.3 * 1.15) — @ds:6aa7c828
@@ -227,6 +247,18 @@ export const SHRED = {
     wakeRadiusRatio: 4.8,   // @ds:8b62d9ce @ds:ed2b4f19
     wakeStrength: 0.85,     // @ds:8b62d9ce @ds:ed2b4f19
     wakeMinFishSpeed: 18,   // @ds:8b62d9ce @ds:ed2b4f19
+    flowWakeRadiusRatio: 4.8, // @fix:6a7b8c9d
+    flowRearStrength: 0.85, // @fix:6a7b8c9d
+    flowFrontStrength: 0.25, // @fix:6a7b8c9d
+    flowRearInwardStrength: 0.18, // @fix:6a7b8c9d
+    flowAccelerationLeadSeconds: 0.25, // @fix:6a7b8c9d
+    mouthPositionRadiusRatio: 0.9, // @fix:6a7b8c9d
+    mouthSuctionRadiusRatio: 3.8, // @fix:6a7b8c9d
+    mouthSuctionStrength: 240, // @fix:6a7b8c9d
+    flowMapMaxImpulse: 600, // @fix:6a7b8c9d
+    flowAngularReferenceSpeed: 90, // @fix:4e9b2c71
+    flowAngularImpulseStrength: 22, // @fix:4e9b2c71
+    flowAngularDrag: 5.8, // @fix:4e9b2c71
     layerFractions: {
         part_30_percents: 0.3,
         part_30_percents_main_color: 0.3,
@@ -284,13 +316,23 @@ export const MOUTH = {
 };
 
 export const SWIM = {
-    basePhaseRate: 4.5,     // radians/s idle swim motion — fish.air#ia:3a4b5c6e, ds:bd354b7a
-    speedPhaseRate: 0.045,  // extra radians/s per px/s — fish.air#ia:3a4b5c6e, ds:bd354b7a
-    tailBaseSwing: 0.18,    // calm tail swing in radii — fish.air#ia:3a4b5c6e, ds:bd354b7a
-    tailBurstSwing: 0.28,   // additional burst swing in radii — fish.air#ia:3a4b5c6e, ds:bd354b7a
-    finBaseSwing: 0.12,     // calm fin swing in radii — fish.air#ia:3a4b5c6e, ds:bd354b7a
-    finBurstSwing: 0.18,    // additional burst fin swing in radii — fish.air#ia:3a4b5c6e, ds:bd354b7a
+    basePhaseRate: 7.5,     // radians/s idle swim motion — fish.air#ia:3a4b5c6e, ds:bd354b7a
+    speedPhaseRate: 0.1,  // extra radians/s per px/s — fish.air#ia:3a4b5c6e, ds:bd354b7a
+    tailBaseSwing: 0.2,    // calm tail swing in radii — fish.air#ia:3a4b5c6e, ds:bd354b7a
+    tailBurstSwing: 0.7,   // additional burst swing in radii — fish.air#ia:3a4b5c6e, ds:bd354b7a
+    finBaseSwing: 0.18,     // calm fin swing in radii — fish.air#ia:3a4b5c6e, ds:bd354b7a
+    finBurstSwing: 0.45,    // additional burst fin swing in radii — fish.air#ia:3a4b5c6e, ds:bd354b7a
+    verticalFinSwingBoost: 0.9, // stronger fin motion while swimming vertically — @fix:6e2a9c41
+    visualTiltResponse: 7,   // seconds^-1 return toward horizontal during inertial braking — @fix:6e2a9c41
+    finTimingCurve: { x1: 0.35, y1: 0.05, x2: 0.65, y2: 0.95 }, // calm fin phase easing — @fix:2e7a4c91
+    finBurstTimingCurve: { x1: 0.22, y1: 0.02, x2: 0.78, y2: 0.98 }, // burst fin phase easing — @fix:2e7a4c91
     kickDecay: 4.5,         // seconds^-1 decay after burst start — fish.air#ia:3a4b5c6e, ds:bd354b7a
+    finSparkChance: 0.72,    // one decorative wake point per eligible fin on a burst-level change — @fix:4f8a2c71
+    finSparkMinSizePx: 1,
+    finSparkMaxSizePx: 2,
+    finSparkSmallLifeSeconds: 1,
+    finSparkLargeLifeSeconds: 1.4,
+    finSparkAlpha: 0.86,
 };
 
 export const FEAR_EYE = {

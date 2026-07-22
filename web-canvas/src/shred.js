@@ -4,6 +4,7 @@
 import { FISH, WORLD, SHRED } from './constants.js';
 import { nearestToroidalDelta } from './predation.js';
 import { canAddControlledObjects, wrapPoint } from './world.js';
+import { buildFlowField, sampleFlowField } from './flow.js';
 
 const DEFAULT_NPC_COLOR = '#d6b84f';
 
@@ -34,6 +35,29 @@ export function spawnShredsFromFish(world, fish, rng){
         const shred = makeShred(world, fish, size, remainingArea, sourceColor, random);
         world.shreds.push(shred);
         created.push(shred);
+    }
+    return created;
+}
+
+// @fix:7c8d9e0f
+export function spawnTestShreds(world, amount, rng = Math.random){
+    const created = [];
+    const target = Math.max(0, Math.floor(Number(amount) || 0));
+    while( created.length < target && canAddControlledObjects(world, 1) ){
+        const remaining = target - created.length;
+        const groupAmount = Math.min(remaining, 8 + Math.floor(rng() * 17));
+        const groupSize = 15 + rng() * 20;
+        const fish = {
+            pos: { x: rng() * world.width, y: rng() * world.height },
+            radius: FISH.nominalStartDiameter * Math.sqrt(groupSize) / 2 / Math.max(1e-6, world.scale || 1),
+        };
+        for( let i = 0; i < groupAmount && created.length < target && canAddControlledObjects(world, 1); i++ ){
+            const sampledSize = technicalDiameterFromPixelDiameter(sampleShredDiameterPx(rng), world.scale);
+            const geometricArea = circleAreaFromDiameter(sampledSize);
+            const shred = makeShred(world, fish, sampledSize, geometricArea, DEFAULT_NPC_COLOR, rng);
+            world.shreds.push(shred);
+            created.push(shred);
+        }
     }
     return created;
 }
@@ -111,10 +135,12 @@ function sourceColorForFish(fish){
 // @ds:8b62d9ce @ds:d3187816
 export function advanceShreds(world, dt){
     const shreds = world.shreds || [];
+    const flowField = buildFlowField(world);
+    world.flowField = flowField;
     updateShredDensityLimit(world, dt);
     for( let i = shreds.length - 1; i >= 0; i-- ){
         const shred = shreds[i];
-        applyFishWake(world, shred, dt);
+        applyFlowField(shred, flowField, world, dt);
         const drag = Math.exp(-Math.max(0, shred.drag || 0) * dt);
         shred.vel.x *= drag;
         shred.vel.y *= drag;
@@ -129,6 +155,13 @@ export function advanceShreds(world, dt){
             shreds.splice(i, 1);
         }
     }
+}
+
+// @fix:6a7b8c9d
+function applyFlowField(shred, flowField, world, dt){
+    const flow = sampleFlowField(flowField, shred.pos, world);
+    shred.vel.x += flow.x * dt;
+    shred.vel.y += flow.y * dt;
 }
 
 // @ds:d3187816 @ds:31a8f5c2
@@ -163,22 +196,6 @@ function currentShredDensity(world){
 // @ds:fb0f32c4
 export function refreshShredDecay(shred){
     if( shred ) shred.decayAge = 0;
-}
-
-// @ds:8b62d9ce @ds:ed2b4f19
-function applyFishWake(world, shred, dt){
-    for( const fish of world.fish || [] ){
-        const speed = Math.hypot(fish.vel?.x || 0, fish.vel?.y || 0);
-        if( speed < SHRED.wakeMinFishSpeed ) continue;
-        const delta = nearestToroidalDelta(fish.pos, shred.pos, world);
-        const distance = Math.hypot(delta.x, delta.y);
-        const radius = Math.max(1, ((fish.radius || 0) + (shred.radius || 0)) * SHRED.wakeRadiusRatio);
-        if( distance > radius ) continue;
-        const proximity = 1 - distance / radius;
-        const influence = proximity * proximity * SHRED.wakeStrength * dt;
-        shred.vel.x += (fish.vel.x || 0) * influence;
-        shred.vel.y += (fish.vel.y || 0) * influence;
-    }
 }
 
 // @ds:c14f7a08 @ds:3ad65f20

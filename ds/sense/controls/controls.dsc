@@ -180,7 +180,7 @@ input:
         Space and key 1 select speedLevel 31,
         key 2 selects speedLevel 65, and key 3 selects speedLevel 99; the highest
         active key-selected level wins in every activeControlMode. Pointer mode uses held mouse button as
-        speedLevel 31 only when selected as the experimental screen mode. Touch mode derives speedLevel linearly from radial distance to the current user fish screen position. Joystick mode derives speedLevel from radial distance to the visible joystick base center with an expanded cruise radius: values 0..30 occupy 1.5 * (30/99) of the joystick radius, and values 31..99 occupy the remaining radius. Mode is cruise for speedLevel 0..30 and burst for speedLevel 31..99. Steering remains defined by the active movement source with keyboard priority.
+        speedLevel 31 only when selected as the experimental screen mode. Touch mode derives speedLevel linearly from radial distance to the current user fish screen position. Joystick mode uses the scaled reference diameters [136, 220, 250, 280, 310, 340, 370, 400, 430] for boundaries v30, v31, v40, v50, v60, v70, v80, v90, and v99. The interval from diameter 136 to 220 returns v31, and each following interval interpolates its stated burst levels linearly. Mode is cruise for speedLevel 0..30 and burst for speedLevel 31..99. Steering remains defined by the active movement source with keyboard priority.
   burst_endurance_limit:
     from: ds:controls.burst-endurance-limit
     contract:

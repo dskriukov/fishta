@@ -1,6 +1,7 @@
 // PNG encoder for the diagnostic danger-map stream.
 // @ds e6d3b9a1 9a6e4c31 c94d2a8f
 import { deflateSync } from 'node:zlib';
+import { SHRED } from './constants.js';
 const signature = Buffer.from([137,80,78,71,13,10,26,10]);
 const crcTable = Array.from({ length: 256 }, (_, n) => { let c = n; for(let i=0;i<8;i++) c = c & 1 ? (c >>> 1) ^ 0xedb88320 : c >>> 1; return c >>> 0; });
 export function encodeDangerMapPng(world){
@@ -15,6 +16,42 @@ export function encodeDangerMapPng(world){
     const raw = Buffer.alloc((width * 4 + 1) * height); for(let y=0;y<height;y++) pixels.copy(raw, y*(width*4+1)+1, y*width*4, (y+1)*width*4);
     const header=Buffer.alloc(13); header.writeUInt32BE(width,0); header.writeUInt32BE(height,4); header[8]=8; header[9]=6;
     return Buffer.concat([signature,chunk('IHDR',header),chunk('IDAT',deflateSync(raw)),chunk('IEND',Buffer.alloc(0))]);
+}
+
+// @fix:6a7b8c9d
+export function encodeFlowMapPng(world){
+    const field = world.flowField;
+    if( !field ) return null;
+    const { columns: width, rows: height, flowX, flowY, flowAngular } = field;
+    const pixels = Buffer.alloc(width * height * 4);
+    const maxImpulse = Math.max(1, Number(field.maxImpulse) || SHRED.flowMapMaxImpulse);
+    for( let index = 0; index < width * height; index++ ){
+        const x = flowX[index] || 0;
+        const y = flowY[index] || 0;
+        const magnitude = Math.hypot(x, y);
+        const angular = Math.max(-1, Math.min(1, Number(flowAngular?.[index]) || 0));
+        const offset = index * 4;
+        const angle = magnitude > 1e-6 ? (Math.atan2(y, x) + Math.PI) / (Math.PI * 2) : 0;
+        const encodedAngle = Math.max(0, Math.min(65535, Math.round(angle * 65535)));
+        pixels[offset] = encodedAngle >> 8;
+        pixels[offset + 1] = encodedAngle & 255;
+        pixels[offset + 2] = angular < 0
+            ? Math.max(0, Math.min(127, Math.round(127 + angular * 127)))
+            : Math.max(127, Math.min(255, Math.round(127 + angular * 128)));
+        pixels[offset + 3] = Math.max(0, Math.min(255, Math.round(magnitude / maxImpulse * 255)));
+    }
+    return encodeRgbaPng(width, height, pixels);
+}
+
+function encodeRgbaPng(width, height, pixels){
+    const raw = Buffer.alloc((width * 4 + 1) * height);
+    for( let y = 0; y < height; y++ ) pixels.copy(raw, y * (width * 4 + 1) + 1, y * width * 4, (y + 1) * width * 4);
+    const header = Buffer.alloc(13);
+    header.writeUInt32BE(width, 0);
+    header.writeUInt32BE(height, 4);
+    header[8] = 8;
+    header[9] = 6;
+    return Buffer.concat([signature, chunk('IHDR', header), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
 }
 
 // @fix:8c4e1a72

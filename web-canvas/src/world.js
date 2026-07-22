@@ -223,5 +223,5 @@ export function isOldAgeSuspended(world){
 
 // @ia 5a6b7c8d
 export function makeWorld(width = WORLD.initialWidth, height = WORLD.initialHeight){
-    return { width, height, scale: 1, userCount: 0, fish: [], shreds: [], bubbles: [], tick: 0, nextShredId: 1 };
+    return { width, height, scale: 1, userCount: 0, fish: [], shreds: [], bubbles: [], tick: 0, elapsedSeconds: 0, nextShredId: 1 };
 }

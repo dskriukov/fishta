@@ -19,12 +19,21 @@ import { technicalRadiusOf } from './fish.js';
 
 // @ds b9e5d274 e6d3b9a1
 export function createDangerMapSocket(onFrame){
+    return createDiagnosticMapSocket('/danger-map', onFrame);
+}
+
+// @fix:6a7b8c9d
+export function createFlowMapSocket(onFrame){
+    return createDiagnosticMapSocket('/flow-map', onFrame);
+}
+
+function createDiagnosticMapSocket(path, onFrame){
     let socket = null;
     return {
         open(){
             if( socket && socket.readyState <= WebSocket.OPEN ) return;
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            socket = new WebSocket(`${protocol}//${window.location.host}/danger-map`);
+            socket = new WebSocket(`${protocol}//${window.location.host}${path}`);
             socket.binaryType = 'blob';
             socket.addEventListener('message', async event => {
                 const bitmap = await createImageBitmap(event.data);

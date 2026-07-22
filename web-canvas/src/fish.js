@@ -4,7 +4,7 @@
 // @ds:07320d39
 // @ds:9ce87fee
 
-import { FISH, WORLD, GROWTH, ENERGY, REGIME, MOUTH, SWIM, FEAR_EYE, BUBBLE, EXHALE, PREDATION } from './constants.js';
+import { FISH, WORLD, GROWTH, ENERGY, REGIME, MOUTH, SWIM, FEAR_EYE, BUBBLE, EXHALE, PREDATION, PLAYER } from './constants.js';
 import { add, sub, scale, normalize, clampLen, len } from './vec.js';
 import { clampToBounds, applyDrag } from './world.js';
 
@@ -139,6 +139,8 @@ export function makeFish({
         mode: 'cruise',
         speedLevel: 0,
         age: 0,
+        lifetimeStartedAt: null, // @fix:c4e8a1b7
+        lifetimeMode: null, // @fix:de7b4c19
         eatenFishCount: 0,
         feedingSuccessFactor: 1,     // @ds:4e2a91f0
         feedingCooldown: 0,          // @ds:4e2a91f0
@@ -179,6 +181,31 @@ export function makeFish({
         // prey-only steering memory (ignored for player)
         heading: { x: 0, y: 0 },
     };
+}
+
+// @fix:c4e8a1b7
+export function updateFishLifetimeState(fish, simulationTime){
+    if( !fish ) return false;
+    const now = Math.max(0, Number(simulationTime) || 0);
+    const size = Number(fish.size);
+    const finiteSize = Number.isFinite(size) ? size : 0;
+    const highSizeThreshold = finiteSize >= PLAYER.lifetimeStartSize;
+    const userLowSizeThreshold = fish.ownerKind === 'user'
+        && (fish.fryAge === null || fish.fryAge === undefined)
+        && finiteSize < PLAYER.startSize;
+    const lifetimeMode = userLowSizeThreshold ? 'lowSize' : (highSizeThreshold ? 'highSize' : null);
+    if( !lifetimeMode ){
+        fish.lifetimeStartedAt = null;
+        fish.lifetimeMode = null;
+        if( fish.ownerKind === 'user' ) fish.playerActiveAge = 0;
+        return false;
+    }
+    if( !Number.isFinite(fish.lifetimeStartedAt) || fish.lifetimeMode !== lifetimeMode ){
+        fish.lifetimeStartedAt = now;
+        fish.lifetimeMode = lifetimeMode;
+    }
+    if( fish.ownerKind === 'user' ) fish.playerActiveAge = Math.max(0, now - fish.lifetimeStartedAt);
+    return true;
 }
 
 // @ds:c5a92431

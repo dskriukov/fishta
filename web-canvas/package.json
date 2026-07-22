@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
+    "more-shred": "node tools/test-populate.mjs shred",
+    "more-fish": "node tools/test-populate.mjs fish",
     "load-test": "export CLIENTS=100; node tools/load-test.mjs",
     "fishta-test": "export CLIENTS=50; export URL=http://fishta.staging.globalqb.com/; node tools/load-test.mjs"
   },

@@ -16,7 +16,22 @@ ds/fix/danger-direction-accumulation.fix#8c4e1a72 - 6d2f9b40
 ds/fix/danger-raster-motion-sweep.fix#7f3c9a21 - 7f3c9a21
 ds/fix/prey-hunt-inertia-strategies.fix#9d4e7b21 - 9d4e7b21
 ds/fix/world-info-compact.fix#b8c4d9e2 - b8c4d9e2
-ds/fix/canvas-orientation-resize.fix#c7e2a914 - c7e2a914
+ds/fix/canvas-orientation-resize.fix#fce4b1cc - c7e2a914
+ds/fix/flow-field-map.fix#c75c80e5 - 6a7b8c9d
+ds/fix/flow-angular-impulse.fix#a690cf5e - 4e9b2c71
+ds/fix/flow-vector-overlay.fix#8f574af5 - 5f2a8c71
+ds/fix/debug-overlay-parity.fix#e6fec0fa - 9b6d2e41
+ds/fix/fish-visual-heading.fix#1c8bb49b - 6e2a9c41
+ds/fix/fish-fin-timing-bezier.fix#2e7a4c91 - 2e7a4c91
+ds/fix/fish-fin-sparks.fix#4f8a2c71 - 4f8a2c71
+ds/fix/sync-render-smoothing.fix#b3d7e9a2 - b3d7e9a2
+ds/fix/player-lifetime-size-threshold.fix#c4e8a1b7 - c4e8a1b7
+ds/fix/player-low-size-lifetime.fix#de7b4c19 - de7b4c19
+ds/fix/joystick-follow-touch.fix#f1c6a8d4 - f1c6a8d4
+ds/fix/burst-energy-joystick.fix#8c4f2a71 - 8c4f2a71
+ds/fix/size-delta-label-scale.fix#4d8e2a71 - 4d8e2a71
+ds/fix/joystick-knob-keyboard-hide.fix#5d9e3a71 - 5d9e3a71
+ds/fix/test-population-endpoints.fix#063a234b - 7c8d9e0f
 ds/fix/responsive-ui.fix#412c746b - fa07d905
 ds/fix/predation.fix#f95ca67f - 7b2f6d88
 ds/sense/fish/fish.ds#9f0866ff - 0e1af7e8
@@ -63,6 +78,21 @@ fix:world.danger-raster-motion-sweep - 7f3c9a21 7f3c9a21
 fix:npc.hunt-inertia-strategies - 9d4e7b21 9d4e7b21
 fix:ui.world-info-compact - b8c4d9e2 b8c4d9e2
 fix:ui.canvas-orientation-resize - c7e2a914 c7e2a914
+fix:world.flow-field-map - 6a7b8c9d 6a7b8c9d
+fix:world.flow-angular-impulse - 4e9b2c71 4e9b2c71
+fix:world.flow-vector-overlay - 5f2a8c71 5f2a8c71
+fix:fish.fin-sparks - 4f8a2c71 4f8a2c71
+fix:sync.render-smoothing - b3d7e9a2 b3d7e9a2
+fix:player.lifetime-size-threshold - c4e8a1b7 c4e8a1b7
+fix:player.low-size-lifetime - de7b4c19 de7b4c19
+fix:controls.joystick-follow-touch - f1c6a8d4 f1c6a8d4
+fix:ui.debug-overlay-parity - 9b6d2e41 9b6d2e41
+fix:fish.visual-heading - 6e2a9c41 6e2a9c41
+fix:fish.fin-timing-bezier - 2e7a4c91 2e7a4c91
+fix:fish.burst-energy-joystick - 8c4f2a71 8c4f2a71
+fix:ui.size-delta-label-scale - 4d8e2a71 4d8e2a71
+fix:ui.joystick-knob-keyboard-hide - 5d9e3a71 5d9e3a71
+fix:testing.population-endpoints - 7c8d9e0f 7c8d9e0f
 fix:predation.fish-contact-only - 3e7a9c21 7b2f6d88
 ds:controls.join-after-leave - 9772e9ac 323e0d97
 ds:controls.join-presentation - 277a51d7 323e0d97

@@ -30,6 +30,8 @@ export function startUserFryStage(fish, position, reason = 'spawn', worldScale =
         formerUserColor: null,
         fryAge: 0,
         nominalStartSize: PLAYER.startSize,
+        lifetimeStartedAt: null, // @fix:c4e8a1b7
+        lifetimeMode: null, // @fix:de7b4c19
         playerActiveAge: 0,
         playerSpawnReason: reason,
         feedingSuccessFactor: 1,
@@ -59,10 +61,8 @@ export function advanceUserFryStage(fish, dt, worldScale = 1){
         fish.size = Math.min(PLAYER.startSize, Math.max(fish.size, grownSize));
     }
     fish.radius = technicalRadiusOf(fish.size, worldScale);
-    fish.playerActiveAge = 0;
     if( fish.fryAge >= PLAYER.fryGrowthSeconds ){
         fish.fryAge = null;
-        fish.playerActiveAge = 0;
     }
     return true;
 }

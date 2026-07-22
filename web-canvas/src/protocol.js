@@ -529,6 +529,7 @@ export function parseFishRow(row, byId = new Map(), absolute = false, cellX = 0,
         shredEatCueCounter: parseShredCueMod(mods, previous?.shredEatCueCounter || 0),
         fryAge: parseFryAgeMod(mods, ownerKind, previous?.fryAge),
         playerActiveAge: parsePlayerActiveAgeMod(mods, ownerKind, previous?.playerActiveAge || 0),
+        lifetimeMode: parseLifetimeModeMod(mods, ownerKind, previous?.lifetimeMode), // @fix:de7b4c19
         eyeFear: mods.includes('f') ? 1 : 0,
         visualScale: previous?.visualScale || 1,
         facing,
@@ -578,6 +579,7 @@ function stateMods(fish){
     }
     if( fish.ownerKind === 'user' ){
         mods += `l${encodeAgeTenths(fish.playerActiveAge || 0, 9999)}`;
+        mods += `t${fish.lifetimeMode === 'lowSize' ? 1 : fish.lifetimeMode === 'highSize' ? 2 : 0}`; // @fix:de7b4c19
     }
     return mods || '=';
 }
@@ -608,6 +610,14 @@ function parsePlayerActiveAgeMod(mods, ownerKind, previous){
     if( ownerKind !== 'user' ) return 0;
     const match = /l(\d+)/.exec(mods || '');
     return match ? Number(match[1]) / 10 : previous;
+}
+
+// @fix:de7b4c19
+function parseLifetimeModeMod(mods, ownerKind, previous){
+    if( ownerKind !== 'user' ) return null;
+    const match = /t([012])/.exec(mods || '');
+    if( !match ) return previous ?? null;
+    return match[1] === '1' ? 'lowSize' : match[1] === '2' ? 'highSize' : null;
 }
 
 function encodeAgeTenths(value, max){

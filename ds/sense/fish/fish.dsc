@@ -239,11 +239,11 @@ energy:
     name: spendEnergy
     inputs: [size, mode, speedLevel, activeBurstThrust, distanceMoved]
     output: size'
-    rule: "if activeBurstThrust and speedLevel>=31: size' = max(userMinSize for user fish, npcMinSize for NPC fish, size * (1 - 0.01 * burstEnergyFactor(speedLevel) * (distance / (100*size)))); else size unchanged; burstEnergyFactor(N)=1 + burstExtraSpendFactor * (N - 31) / 68 for N in 31..99"
+    rule: "if activeBurstThrust and speedLevel>=31: size' = max(userMinSize for user fish, npcMinSize for NPC fish, size * (1 - 0.009 * burstEnergyFactor(speedLevel) * (distance / (100*size)))); else size unchanged; burstEnergyFactor(N)=1 + burstExtraSpendFactor * (N - 31) / 68 for N in 31..99"
     properties:
       - "speedLevel 0..30 costs nothing"
       - "inertial braking after burst thrust stops costs nothing even while actual speed remains above cruise range"
-      - "traveling 100*size at v=31 => -1% size; v=99 applies the maximum configured extra spend factor"
+      - "traveling 100*size at v=31 => -0.9% size; v=99 applies the maximum configured extra spend factor"
       - "NPC size never drops below a positive NPC minimum (fish.air#ia:fish.energy.burst-only)"
       - "userMinSize is above PREY.minSize by the predation eat-ratio margin, so the smallest fully grown ordinary NPC remains edible by a maximally depleted user fish"
 

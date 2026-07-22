@@ -4,7 +4,7 @@
 // @ia 2f6e7a91 3983084a
 // @fix 4bbc0692
 
-import { BACKGROUND, BUBBLE, DEBUG, DANGER_MAP, FISH, PERCEPTION, PLAYER, RENDER_LAYERS, SHRED, SIZE_DELTA_LABEL, SWIM, FEAR_EYE, SYNC, WORLD, WORLD_MAP } from './constants.js';
+import { BACKGROUND, BUBBLE, DEBUG, DANGER_MAP, FLOW_MAP, FISH, PERCEPTION, PLAYER, RENDER_LAYERS, SHRED, SIZE_DELTA_LABEL, SWIM, FEAR_EYE, SYNC, WORLD, WORLD_MAP } from './constants.js';
 
 const DEFAULT_SVG_GEOMETRY = {
     width: 494,
@@ -13,6 +13,12 @@ const DEFAULT_SVG_GEOMETRY = {
     centerY: 192.557,
     collisionRadius: 192.057,
 };
+
+const FIN_TIP_POINTS = [
+    { x: 207, y: 32 },
+    { x: 180, y: 384 },
+    { x: 333, y: 294 },
+]; // @fix:4f8a2c71
 
 let fishSvgGeometry = DEFAULT_SVG_GEOMETRY;
 let fishSvgRenderTree = null;
@@ -370,6 +376,35 @@ function shearYFromVerticalEdge(ctx, shearY, anchorX){
     ctx.translate(-anchorX, 0);
 }
 
+function easedCyclicPhase(phase, curve){
+    const cycle = ((phase % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+    const half = cycle < Math.PI ? 0 : 1;
+    const progress = half === 0 ? cycle / Math.PI : (cycle - Math.PI) / Math.PI;
+    const eased = cubicBezierEase(progress, curve);
+    return (half + eased) * Math.PI;
+}
+
+function cubicBezierEase(x, curve){
+    const x1 = clamp01(Number(curve?.x1));
+    const y1 = clamp01(Number(curve?.y1));
+    const x2 = clamp01(Number(curve?.x2));
+    const y2 = clamp01(Number(curve?.y2));
+    let low = 0;
+    let high = 1;
+    for( let i = 0; i < 12; i++ ){
+        const t = (low + high) / 2;
+        if( cubicBezierCoordinate(t, x1, x2) < x ) low = t;
+        else high = t;
+    }
+    const t = (low + high) / 2;
+    return cubicBezierCoordinate(t, y1, y2);
+}
+
+function cubicBezierCoordinate(t, c1, c2){
+    const inv = 1 - t;
+    return 3 * inv * inv * t * c1 + 3 * inv * t * t * c2 + t * t * t;
+}
+
 function clamp(value, min, max){
     return Math.max(min, Math.min(max, value));
 }
@@ -408,12 +443,20 @@ export function render(ctx, state){
     ctx.translate(viewport.offsetX, viewport.offsetY);
     ctx.scale(viewport.scale, viewport.scale);
 
-    if( state.debug?.dangerMapUnderlay && state.dangerMapBitmap ){
-        drawDangerMapUnderlay(ctx, world, renderWorld.anchor, state.dangerMapBitmap);
-    }
     if( state.debug?.enabled && state.syncSegmentsVisible ){
         drawGameplaySyncGrid(ctx, world, renderWorld.anchor, viewport);
     }
+    if( state.flowMapVisible && state.flowMapBitmap ){
+        drawFlowMapUnderlay(ctx, world, renderWorld.anchor, state.flowMapBitmap);
+    }
+    if( state.flowVectorsVisible && state.flowVectorField ){
+        drawFlowVectorField(ctx, world, renderWorld.anchor, state.flowVectorField, viewport);
+    }
+    if( state.dangerMapVisible && state.dangerMapBitmap ){
+        drawDangerMapUnderlay(ctx, world, renderWorld.anchor, state.dangerMapBitmap);
+    }
+
+    drawFinSparks(ctx, state.finSparks || [], renderWorld, world, viewport); // @fix:4f8a2c71
 
     const renderItems = buildRenderItems(renderWorld, (state.debug?.now || performance.now()) / 1000);
     for( const item of renderItems ){
@@ -441,9 +484,16 @@ export function render(ctx, state){
         state.currentUserFishId,
         state.worldMapTop,
         {
+            flowMapBitmap: state.flowMapVisible ? state.flowMapBitmap : null,
+            flowMapVisible: state.flowMapVisible,
+            flowVectorField: state.flowVectorsVisible ? state.flowVectorField : null,
+            flowVectorsVisible: state.flowVectorsVisible,
             dangerMapBitmap: state.dangerMapVisible ? state.dangerMapBitmap : null,
             dangerMapVisible: state.dangerMapVisible,
             syncSegmentsVisible: state.syncSegmentsVisible,
+            debugEnabled: Boolean(state.debug?.enabled),
+            debugPositionTraces: state.debug?.positionTraces || [],
+            debugNow: state.debug?.now || performance.now(),
             cellSyncAverages: state.cellSyncAverages || [],
         },
     );
@@ -574,6 +624,26 @@ export function nearestToroidalCoordinate(value, anchor, size){
     return nearest;
 }
 
+// @fix:4f8a2c71
+export function fishFinTipPositions(fish){
+    if( !fish?.pos ) return [];
+    const radius = Math.max(0.001, Number(fish.radius) || 0) * Math.max(0.5, Number(fish.visualScale) || 1);
+    const scale = radius / Math.max(1e-6, fishSvgGeometry.collisionRadius);
+    const mirror = fish.facing < 0 ? 1 : -1;
+    const tilt = Number.isFinite(fish.visualTilt) ? fish.visualTilt : visualFishTurnRadians(fish);
+    const cos = Math.cos(tilt);
+    const sin = Math.sin(tilt);
+    return FIN_TIP_POINTS.map(point => {
+        const authoredX = (point.x - fishSvgGeometry.centerX) * scale * mirror;
+        const authoredY = (point.y - fishSvgGeometry.centerY) * scale;
+        const offset = {
+            x: authoredX * cos - authoredY * sin,
+            y: authoredX * sin + authoredY * cos,
+        };
+        return { offset };
+    });
+}
+
 // @ds:7b9a7984 @ds:c83f4c1e @ia:dd909d1a
 export function buildToroidalRenderWorld(world, followed, debugTraces = []){
     const anchor = followed?.pos || { x: world.width / 2, y: world.height / 2 };
@@ -605,6 +675,7 @@ function drawShred(ctx, shred, timeSeconds = 0){
     ctx.save();
     ctx.globalAlpha *= shred.syncOpacity ?? 1;
     ctx.translate(shred.pos.x, shred.pos.y);
+    ctx.rotate(Number(shred.renderRotation) || 0); // @fix:4e9b2c71
     const scale = Math.max(0.001, shred.size || 1) / Math.max(1, shredSvgGeometry.width);
     ctx.scale(scale, scale);
     ctx.translate(-shredSvgGeometry.centerX, -shredSvgGeometry.centerY);
@@ -753,6 +824,26 @@ function drawBubble(ctx, bubble, renderWorld, world, viewport){
     ctx.restore();
 }
 
+// @fix:4f8a2c71
+function drawFinSparks(ctx, sparks, renderWorld, world, viewport){
+    if( !Array.isArray(sparks) || !sparks.length ) return;
+    const anchor = renderWorld.anchor || { x: world.width / 2, y: world.height / 2 };
+    const worldScale = Math.max(1e-6, world?.scale || 1);
+    ctx.save();
+    ctx.fillStyle = '#d9f6ff';
+    for( const spark of sparks ){
+        if( !spark?.pos || !(spark.alpha > 0) ) continue;
+        const x = nearestToroidalCoordinate(spark.pos.x, anchor.x, world.width);
+        const y = nearestToroidalCoordinate(spark.pos.y, anchor.y, world.height);
+        const radius = Math.max(0.25, Number(spark.sizePx) || 1) / WORLD.pixelsPerWorldUnit / worldScale;
+        ctx.globalAlpha = Math.max(0, Math.min(1, Number(spark.alpha) || 0));
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    ctx.restore();
+}
+
 // @ds:7435b6ce
 function drawDebugWorldRepeatBounds(ctx, world, anchor, viewport){
     ctx.save();
@@ -837,6 +928,23 @@ function drawWorldMap(ctx, world, currentUserFishId, top, inspection = {}){
     ctx.fillRect(left, top, size, size);
     ctx.strokeRect(left + 0.5, top + 0.5, size, size);
 
+    if( inspection.debugEnabled || inspection.syncSegmentsVisible ){
+        drawDebugCellSyncAveragesOnMap(ctx, world, inspection.cellSyncAverages || [], left, top, size);
+        drawWorldMapSyncGrid(ctx, world, left, top, size);
+        drawWorldMapDebugTraces(ctx, world, inspection.debugPositionTraces || [], inspection.debugNow, left, top, size);
+    }
+    if( inspection.flowMapVisible && inspection.flowMapBitmap ){
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(left, top, size, size);
+        ctx.clip();
+        ctx.globalAlpha = FLOW_MAP.bitmapAlpha;
+        ctx.drawImage(inspection.flowMapBitmap, left, top, size, size);
+        ctx.restore();
+    }
+    if( inspection.flowVectorsVisible && inspection.flowVectorField ){
+        drawFlowVectorFieldOnMap(ctx, world, inspection.flowVectorField, left, top, size);
+    }
     if( inspection.dangerMapVisible ){
         drawDangerMapGrid(ctx, world, left, top, size);
     }
@@ -850,16 +958,28 @@ function drawWorldMap(ctx, world, currentUserFishId, top, inspection = {}){
         ctx.restore();
     }
 
-    if( inspection.syncSegmentsVisible ){
-        drawDebugCellSyncAveragesOnMap(ctx, world, inspection.cellSyncAverages || [], left, top, size);
-        drawWorldMapSyncGrid(ctx, world, left, top, size);
-    }
-
     for( const fish of world.fish || [] ){
         if( !fish?.pos ) continue;
         const x = left + clamp01(fish.pos.x / world.width) * size;
         const y = top + clamp01(fish.pos.y / world.height) * size;
         drawWorldMapFish(ctx, fish, currentUserFishId, x, y, maxLinearSize, nominalLinearSize);
+    }
+    ctx.restore();
+}
+
+// @fix:9b6d2e41
+function drawWorldMapDebugTraces(ctx, world, traces, now, left, top, size){
+    ctx.save();
+    for( const trace of traces || [] ){
+        const alpha = traceAlpha(trace, now);
+        if( alpha <= 0 || !trace?.pos ) continue;
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = trace.kind === 'absolute' ? DEBUG.absoluteTraceColor : DEBUG.relativeTraceColor;
+        const x = left + clamp01(trace.pos.x / world.width) * size;
+        const y = top + clamp01(trace.pos.y / world.height) * size;
+        ctx.beginPath();
+        ctx.arc(x, y, trace.kind === 'absolute' ? 2.5 : 2, 0, Math.PI * 2);
+        ctx.fill();
     }
     ctx.restore();
 }
@@ -901,6 +1021,116 @@ function drawDangerMapUnderlay(ctx, world, anchor, bitmap){
         for( let row = -1; row <= 1; row++ ){
             ctx.drawImage(bitmap, originX + column * width, originY + row * height, width, height);
         }
+    }
+    ctx.restore();
+}
+
+// @fix:6a7b8c9d
+function drawFlowMapUnderlay(ctx, world, anchor, bitmap){
+    const width = Number(world.width);
+    const height = Number(world.height);
+    if( !bitmap || !Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0 ) return;
+    const originX = nearestToroidalCoordinate(0, anchor?.x ?? width / 2, width);
+    const originY = nearestToroidalCoordinate(0, anchor?.y ?? height / 2, height);
+    ctx.save();
+    ctx.globalAlpha = FLOW_MAP.bitmapAlpha;
+    for( let column = -1; column <= 1; column++ ){
+        for( let row = -1; row <= 1; row++ ){
+            ctx.drawImage(bitmap, originX + column * width, originY + row * height, width, height);
+        }
+    }
+    ctx.restore();
+}
+
+// @fix:5f2a8c71
+function drawFlowVectorField(ctx, world, anchor, field, viewport){
+    const width = Number(world.width);
+    const height = Number(world.height);
+    if( !field || !Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0 ) return;
+    const cellSize = FISH.nominalStartDiameter / 4;
+    const stride = Math.max(1, Math.floor(FLOW_MAP.vectorStrideCells));
+    const crossRadius = FISH.nominalStartDiameter * FLOW_MAP.vectorCrossSizeRatio / 2;
+    const viewportScale = Math.max(1e-6, viewport?.scale || 1);
+    const crossAngles = field.crossAngles || [];
+    ctx.save();
+    ctx.lineWidth = FLOW_MAP.vectorCrossLineWidth / viewportScale;
+    ctx.lineCap = 'round';
+    for( let row = 0; row < field.rows; row += stride ) for( let column = 0; column < field.columns; column += stride ){
+        const index = row * field.columns + column;
+        const centerX = nearestToroidalCoordinate((column + 0.5) * cellSize, anchor?.x ?? width / 2, width);
+        const centerY = nearestToroidalCoordinate((row + 0.5) * cellSize, anchor?.y ?? height / 2, height);
+        const crossAngle = Number(crossAngles[index]) || 0;
+        ctx.save();
+        ctx.globalAlpha = FLOW_MAP.vectorCrossAlpha;
+        ctx.lineWidth = FLOW_MAP.vectorCrossLineWidth / viewportScale;
+        ctx.translate(centerX, centerY);
+        ctx.rotate(crossAngle);
+        ctx.strokeStyle = '#fff';
+        ctx.beginPath();
+        ctx.moveTo(-crossRadius, 0); ctx.lineTo(crossRadius, 0);
+        ctx.moveTo(0, -crossRadius); ctx.lineTo(0, crossRadius);
+        ctx.stroke();
+        ctx.restore();
+
+        const offset = index * 4;
+        const magnitude = (field.pixels[offset + 3] || 0) / 255 * SHRED.flowMapMaxImpulse;
+        if( magnitude <= 1e-6 ) continue;
+        const encodedAngle = ((field.pixels[offset] || 0) * 256) + (field.pixels[offset + 1] || 0);
+        const angle = encodedAngle / 65535 * Math.PI * 2 - Math.PI;
+        const length = Math.min(FLOW_MAP.vectorMaxLength, magnitude * FLOW_MAP.vectorLengthScale);
+        ctx.globalAlpha = FLOW_MAP.vectorAlpha;
+        ctx.lineWidth = FLOW_MAP.vectorLineWidth / viewportScale;
+        ctx.strokeStyle = Math.cos(angle) < 0 ? '#48a7ff' : '#48e68a';
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY);
+        ctx.lineTo(centerX + Math.cos(angle) * length, centerY + Math.sin(angle) * length);
+        ctx.stroke();
+    }
+    ctx.restore();
+}
+
+// @fix:9b6d2e41
+function drawFlowVectorFieldOnMap(ctx, world, field, left, top, size){
+    const cellSize = FISH.nominalStartDiameter / 4;
+    const stride = Math.max(1, Math.floor(FLOW_MAP.vectorStrideCells));
+    const crossRadius = FISH.nominalStartDiameter * FLOW_MAP.vectorCrossSizeRatio / 2 / world.width * size;
+    const crossLineWidth = Math.max(0.5, FLOW_MAP.vectorCrossLineWidth / world.width * size);
+    const vectorLineWidth = Math.max(0.75, FLOW_MAP.vectorLineWidth / world.width * size);
+    const crossAngles = field.crossAngles || [];
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(left, top, size, size);
+    ctx.clip();
+    ctx.lineCap = 'round';
+    for( let row = 0; row < field.rows; row += stride ) for( let column = 0; column < field.columns; column += stride ){
+        const index = row * field.columns + column;
+        const centerX = left + ((column + 0.5) * cellSize / world.width) * size;
+        const centerY = top + ((row + 0.5) * cellSize / world.height) * size;
+        ctx.save();
+        ctx.globalAlpha = FLOW_MAP.vectorCrossAlpha;
+        ctx.lineWidth = crossLineWidth;
+        ctx.translate(centerX, centerY);
+        ctx.rotate(Number(crossAngles[index]) || 0);
+        ctx.strokeStyle = '#fff';
+        ctx.beginPath();
+        ctx.moveTo(-crossRadius, 0); ctx.lineTo(crossRadius, 0);
+        ctx.moveTo(0, -crossRadius); ctx.lineTo(0, crossRadius);
+        ctx.stroke();
+        ctx.restore();
+
+        const offset = index * 4;
+        const magnitude = (field.pixels[offset + 3] || 0) / 255 * SHRED.flowMapMaxImpulse;
+        if( magnitude <= 1e-6 ) continue;
+        const encodedAngle = ((field.pixels[offset] || 0) * 256) + (field.pixels[offset + 1] || 0);
+        const angle = encodedAngle / 65535 * Math.PI * 2 - Math.PI;
+        const length = Math.min(FLOW_MAP.vectorMaxLength, magnitude * FLOW_MAP.vectorLengthScale) / world.width * size;
+        ctx.globalAlpha = FLOW_MAP.vectorAlpha;
+        ctx.lineWidth = vectorLineWidth;
+        ctx.strokeStyle = Math.cos(angle) < 0 ? '#48a7ff' : '#48e68a';
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY);
+        ctx.lineTo(centerX + Math.cos(angle) * length, centerY + Math.sin(angle) * length);
+        ctx.stroke();
     }
     ctx.restore();
 }
@@ -1064,7 +1294,7 @@ function clamp01(value){
     return Math.max(0, Math.min(1, value));
 }
 
-// @ds:c2d7f4a1
+// @ds:c2d7f4a1 @fix:4d8e2a71
 function drawSizeDeltaLabel(ctx, label, fish, viewport){
     const t = Math.max(0, Math.min(1, label.age / label.life));
     const alpha = 1 - t;
@@ -1079,7 +1309,8 @@ function drawSizeDeltaLabel(ctx, label, fish, viewport){
     ctx.lineWidth = 4 / viewportScale;
     ctx.strokeStyle = 'rgba(2, 18, 28, 0.72)';
     ctx.fillStyle = label.value > 0 ? SIZE_DELTA_LABEL.gainColor : SIZE_DELTA_LABEL.lossColor;
-    const y = fish.pos.y - fish.radius - SIZE_DELTA_LABEL.gapPx + label.yOffset;
+    const screenPxToWorld = 1 / viewportScale;
+    const y = fish.pos.y - fish.radius - SIZE_DELTA_LABEL.gapPx * screenPxToWorld + label.yOffset * screenPxToWorld;
     ctx.strokeText(text, fish.pos.x, y);
     ctx.fillText(text, fish.pos.x, y);
     ctx.restore();
@@ -1095,17 +1326,21 @@ function drawFish(ctx, f, currentUserFishId, viewport){
     const eyeScale = 1 + (FEAR_EYE.maxScale - 1) * eyeFear;
     const burstBlend = f.mode === 'burst' ? 1 : 0;
     const tailWave = Math.sin(swimPhase) * (SWIM.tailBaseSwing + SWIM.tailBurstSwing * burstBlend + SWIM.tailBurstSwing * burstKick);
-    const finWave = Math.sin(swimPhase + Math.PI * 0.55) * (SWIM.finBaseSwing + SWIM.finBurstSwing * burstBlend + SWIM.finBurstSwing * burstKick);
+    const verticalFinBoost = 1 + visualFishVerticality(f) * SWIM.verticalFinSwingBoost;
+    const finTimingCurve = burstBlend > 0 ? SWIM.finBurstTimingCurve : SWIM.finTimingCurve;
+    const finPhase = easedCyclicPhase(swimPhase + Math.PI * 0.55, finTimingCurve);
+    const finWave = Math.sin(finPhase) * (SWIM.finBaseSwing + SWIM.finBurstSwing * burstBlend + SWIM.finBurstSwing * burstKick) * verticalFinBoost;
     if( fishSvgRenderTree ){
         const scale = r / fishSvgGeometry.collisionRadius;
         const animation = {
             tailWave: clamp(tailWave, -0.46, 0.46),
-            finWave: clamp(finWave, -0.3, 0.3),
+            finWave: clamp(finWave, -0.45, 0.45),
             eyeScale,
         };
         ctx.save();
         ctx.globalAlpha *= f.syncOpacity ?? 1;
         ctx.translate(f.pos.x, f.pos.y);
+        ctx.rotate(Number.isFinite(f.visualTilt) ? f.visualTilt : visualFishTurnRadians(f)); // @fix:6e2a9c41
         // The authored SVG faces left; the domain facing convention is 1 = right.
         ctx.scale(-f.facing, 1);
         ctx.scale(scale, scale);
@@ -1118,4 +1353,26 @@ function drawFish(ctx, f, currentUserFishId, viewport){
     ctx.globalAlpha *= f.syncOpacity ?? 1;
     drawFishLabel(ctx, f, currentUserFishId, viewport);
     ctx.restore();
+}
+
+// @fix:6e2a9c41
+export function visualFishTurnRadians(fish){
+    const velocityX = Number(fish?.vel?.x) || 0;
+    const velocityY = Number(fish?.vel?.y) || 0;
+    const speed = Math.hypot(velocityX, velocityY);
+    if( speed <= FISH.facingThreshold ) return 0;
+    const facing = fish?.facing < 0 ? -1 : 1;
+    const rawMagnitude = Math.atan2(Math.abs(velocityY), Math.abs(velocityX));
+    const raw = Math.sign(facing * velocityY) * rawMagnitude;
+    const limit = Math.max(0, Math.min(89.9, Number(FISH.visualMaxTiltDeg) || 20)) * Math.PI / 180;
+    return clamp(raw, -limit, limit);
+}
+
+// @fix:6e2a9c41
+function visualFishVerticality(fish){
+    const velocityX = Number(fish?.vel?.x) || 0;
+    const velocityY = Number(fish?.vel?.y) || 0;
+    const speed = Math.hypot(velocityX, velocityY);
+    if( speed <= FISH.facingThreshold ) return 0;
+    return clamp01(Math.abs(velocityY) / speed);
 }

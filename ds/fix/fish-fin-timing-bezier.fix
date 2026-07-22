@@ -1,0 +1,4 @@
+# Fish fin timing Bézier
+
+**[fix:fish.fin-timing-bezier]\
+Геометрия плавников сохраняет существующие shear/scale-преобразования. Для обычного и burst-режима меняется только прохождение синусоидальной фазы: циклическое ускорение и замедление задаются отдельными кубическими Bézier-кривыми `SWIM.finTimingCurve` и `SWIM.finBurstTimingCurve`.

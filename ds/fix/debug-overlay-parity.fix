@@ -1,0 +1,4 @@
+# Debug overlay parity
+
+**[fix:ui.debug-overlay-parity]**\
+Debug mode activates synchronization traces, synchronization cell boundaries, and repeating world bounds on both the gameplay canvas and the minimap. Flow-map, danger-map, and flow-vector controls render their corresponding diagnostic data on both surfaces with the same layer order: synchronization data, flow data, danger data, then world objects/markers. Flow-vector crosses and linear vectors use the decoded client flow field on the minimap as well as the gameplay canvas.

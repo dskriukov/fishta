@@ -5,7 +5,20 @@
 import { FISH, REGIME } from './constants.js';
 import { v, sub, len, normalize, scale } from './vec.js';
 
-const JOYSTICK_CRUISE_MAGNITUDE = Math.min(1, (REGIME.cruiseMaxSpeedLevel / REGIME.speedLevels) * 1.5);
+const JOYSTICK_REFERENCE_DIAMETER_PX = 430; // @fix:8c4f2a71
+const JOYSTICK_LEVEL_BOUNDARIES = [
+    { level: 30, diameterPx: 136 },
+    { level: 31, diameterPx: 220 },
+    { level: 40, diameterPx: 250 },
+    { level: 50, diameterPx: 280 },
+    { level: 60, diameterPx: 310 },
+    { level: 70, diameterPx: 340 },
+    { level: 80, diameterPx: 370 },
+    { level: 90, diameterPx: 400 },
+    { level: 99, diameterPx: 430 },
+];
+const JOYSTICK_CRUISE_MAGNITUDE = JOYSTICK_LEVEL_BOUNDARIES[0].diameterPx / JOYSTICK_REFERENCE_DIAMETER_PX;
+const JOYSTICK_BURST_START_MAGNITUDE = JOYSTICK_LEVEL_BOUNDARIES[1].diameterPx / JOYSTICK_REFERENCE_DIAMETER_PX; // @fix:8c4f2a71
 
 function normalizeKey(key){
     return typeof key === 'string' && key.length === 1 ? key.toLowerCase() : key;
@@ -113,9 +126,16 @@ export function speedLevelToControlMagnitude(level){
     if( n <= REGIME.cruiseMaxSpeedLevel ){
         return (n / REGIME.cruiseMaxSpeedLevel) * JOYSTICK_CRUISE_MAGNITUDE;
     }
-    const burstRange = REGIME.speedLevels - REGIME.burstStartSpeedLevel;
-    const burstUnit = (n - REGIME.burstStartSpeedLevel) / Math.max(1, burstRange);
-    return JOYSTICK_CRUISE_MAGNITUDE + burstUnit * (1 - JOYSTICK_CRUISE_MAGNITUDE);
+    for( let index = 1; index < JOYSTICK_LEVEL_BOUNDARIES.length; index++ ){
+        const lower = JOYSTICK_LEVEL_BOUNDARIES[index - 1];
+        const upper = JOYSTICK_LEVEL_BOUNDARIES[index];
+        if( n <= upper.level ){
+            const unit = (n - lower.level) / Math.max(1, upper.level - lower.level);
+            const diameter = lower.diameterPx + unit * (upper.diameterPx - lower.diameterPx);
+            return diameter / JOYSTICK_REFERENCE_DIAMETER_PX;
+        }
+    }
+    return 1;
 }
 
 function levelFromUnit(unit){
@@ -128,9 +148,18 @@ function joystickLevelFromUnit(unit){
     if( magnitude <= JOYSTICK_CRUISE_MAGNITUDE ){
         return Math.max(1, Math.min(REGIME.cruiseMaxSpeedLevel, Math.round((magnitude / JOYSTICK_CRUISE_MAGNITUDE) * REGIME.cruiseMaxSpeedLevel)));
     }
-    const burstRange = REGIME.speedLevels - REGIME.burstStartSpeedLevel;
-    const burstUnit = (magnitude - JOYSTICK_CRUISE_MAGNITUDE) / Math.max(1e-6, 1 - JOYSTICK_CRUISE_MAGNITUDE);
-    return Math.max(REGIME.burstStartSpeedLevel, Math.min(REGIME.speedLevels, REGIME.burstStartSpeedLevel + Math.floor(burstUnit * burstRange)));
+    if( magnitude <= JOYSTICK_BURST_START_MAGNITUDE ) return REGIME.burstStartSpeedLevel;
+    const diameter = magnitude * JOYSTICK_REFERENCE_DIAMETER_PX;
+    for( let index = 1; index < JOYSTICK_LEVEL_BOUNDARIES.length; index++ ){
+        const lower = JOYSTICK_LEVEL_BOUNDARIES[index - 1];
+        const upper = JOYSTICK_LEVEL_BOUNDARIES[index];
+        if( diameter <= upper.diameterPx ){
+            const unit = (diameter - lower.diameterPx) / Math.max(1, upper.diameterPx - lower.diameterPx);
+            const level = lower.level + Math.floor(unit * (upper.level - lower.level) + 1e-9);
+            return Math.max(REGIME.burstStartSpeedLevel + 1, Math.min(upper.level, level));
+        }
+    }
+    return REGIME.speedLevels;
 }
 
 // ds:55c13a4f ds:10baf178

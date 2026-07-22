@@ -113,11 +113,11 @@ contract_map:
   controls.immediateInputFlush:              main.js#sendInputIfChanged client-net.js#sendInput  # @ds:10baf178 @ds:22fd3ab4 @ds:671e9773
   controls.touchSteer:                      controls.js#touchSteer  # @ds:3c41aad0
   controls.joystickSteer:                   controls.js#joystickSteer  # @ds:b43d2f95
-  controls.speedControl:                    controls.js#huntMode controls.js#speedLevel  # @ds:22fd3ab4 @ds:27129cfa @ds:cd1c5776 @ds:e6be3c03 @ia:6b7c8d9e
-  controls.joystickRadialHunt:              controls.js#joystickSteer main.js#setupJoystickControls style.css##joystick-panel  # @ds:cd1c5776
+  controls.speedControl:                    controls.js#huntMode controls.js#speedLevel controls.js#JOYSTICK_LEVEL_BOUNDARIES  # @ds:22fd3ab4 @ds:27129cfa @ds:cd1c5776 @ds:e6be3c03 @ia:6b7c8d9e @fix:8c4f2a71
+  controls.joystickRadialHunt:              controls.js#joystickSteer controls.js#speedLevelToControlMagnitude controls.js#joystickLevelFromUnit main.js#setupJoystickControls main.js#setJoystickCenter main.js#clampJoystickCenter main.js#clampJoystickPositionToViewport main.js#buildInputPayload main.js#renderJoystickBurstRings style.css##joystick-panel style.css##joystick-burst-base style.css##joystick-knob constants.js#JOYSTICK  # @ds:cd1c5776 @fix:8c4f2a71 @fix:5d9e3a71 @fix:f1c6a8d4
   controls.joystickViewportFootprint:       style.css#:root style.css##joystick-panel style.css##joystick-base  # @ds:6896cdc6
   controls.responsiveJoinAndStatusLayout:   style.css##join style.css##join-form style.css##world-info style.css##joystick-panel  # @fix:3196de1d
-  controls.burstEnduranceJoystickUi:        main.js#updateJoystickBurstAvailability main.js#renderJoystickBurstRings main.js#updateJoystickCurrentBurstRing style.css##joystick-base  # @ds:0eef2d19 @ds:e41821af
+  controls.burstEnduranceJoystickUi:        main.js#updateJoystickBurstAvailability main.js#renderJoystickBurstRings main.js#updateJoystickCurrentBurstRing style.css##joystick-base style.css##joystick-burst-base  # @ds:0eef2d19 @ds:e41821af @fix:8c4f2a71
   controls.primaryKeyboardAndJoystick:      controls.js#createControlModeState main.js#buildInputPayload main.js#updateJoystickPanelVisibility main.js#setControlMode  # @ds:93b8abba @ds:10baf178 @ds:b43d2f95
   controls.burstEnduranceMenuTable:         main.js#updateBurstEnduranceTable index.html#burst-endurance-table style.css#burst-endurance-table  # @ds:cff27cd5
   controls.viewportFishCapacity:            constants.js#VIEWPORT_FISH_CAPACITY main.js#viewportFishCapacity main.js#loadViewportFishCapacity main.js#setViewportFishCapacity render.js#viewportScaleForFishCapacity render.js#worldToViewport index.html#viewport-fish-capacity style.css#viewport-fish-capacity  # @ds:e001d967 @fix:a64e9b31 @ds:7b9a7984
@@ -127,6 +127,8 @@ contract_map:
   world.backgroundDepthHaze:                style.css#body::after  # @ds:a43de7ec
   controls.toroidalViewportProjection:      render.js#buildToroidalRenderWorld render.js#nearestToroidalCoordinate  # @ds:7b9a7984 @ds:c83f4c1e @ia:dd909d1a
   client.decorState:                         main.js#applyClientFishDecor main.js#updateClientDecorState  # @ds:975ca168 @ds:bd354b7a @ds:3ddf8f67 @ds:a44b9d2c @fn:a9a3ed12 @ia:9c0d1e2f @ia:3a4b5c6e
+  client.finSparks:                           main.js#visibleDecorFishIds main.js#emitFinSparks main.js#advanceClientFinSparks main.js#sampleLinearFlow render.js#fishFinTipPositions render.js#drawFinSparks constants.js#SWIM  # @fix:4f8a2c71
+  client.syncRenderSmoothing:                 main.js#smoothSyncedPosition main.js#extrapolateFish main.js#extrapolateShred constants.js#SYNC  # @fix:b3d7e9a2
   ui.gameMenu:                              main.js#toggleGameMenu main.js#updateGameMenu index.html#game-menu-toggle index.html#game-menu style.css#game-menu-toggle style.css#game-menu  # @ds:ab1e4f02 @ds:8d13f6a2 @ds:59c118f5 @ds:70871bc5 @ds:fb11044e @ds:e001d967
   ui.worldMap:                              main.js#toggleWorldMap main.js#updateWorldMapUi main.js#worldMapVisible index.html#world-map-toggle index.html#world-map style.css#world-map-toggle style.css#world-map render.js#drawWorldMap  # @ds:3a980720 @ds:8f2c91ad
   ui.worldInspectionControls:               main.js#toggleSyncSegments main.js#toggleDangerMapUnderlay index.html#hud .hud-row index.html#world-map-toggle index.html#sync-segments-toggle index.html#danger-map-toggle style.css#.hud-row style.css#world-map-toggle style.css#sync-segments-toggle style.css#danger-map-toggle render.js#drawGameplaySyncGrid render.js#drawDebugReceivedQuadrants render.js#drawDebugPositionTraces render.js#drawDangerMapUnderlay  # @ds:f3a1c7d9 @fix:c2e1a7b4
@@ -157,13 +159,19 @@ contract_map:
   player.startUserFryStage:                  player.js#startUserFryStage server.js#handleJoin predation.js#respawnUserFishAfterEating  # @ds:4c7a2b91 @ds:39305789 @ds:4bfe0352
   player.spawnPlacement:                     player.js#placeUserSpawn predation.js#respawnUserFishAfterEating player.js#expireOldUserFish  # @ds:c18e5b42 @ds:53db39eb
   player.fryProtection:                      predation.js#canBeVictimOf predation.js#collectFeedingCandidates  # @ds:9d62f0a7 @ds:32745a4f
-  player.lifetimeAging:                      player.js#advancePlayerLifecycle player.js#expireOldUserFish step.js#stepAuthoritativeWorld  # @ds:b7a4c391 @ds:e13d7a52
-  player.lifetimeUi:                         protocol.js#encodeFishRow protocol.js#parseFishRow main.js#updatePlayerLifetimeBar index.html#player-metrics index.html#lifetime-bar style.css#player-metrics style.css#lifetime  # @ds:2e91f6d4
+  player.lifetimeAging:                      fish.js#updateFishLifetimeState player.js#advanceUserFryStage step.js#stepAuthoritativeWorld prey.js#expireOldNpcFish world.js#makeWorld constants.js#PLAYER  # @ds:b7a4c391 @ds:e13d7a52 @fix:c4e8a1b7 @fix:de7b4c19
+  player.lifetimeUi:                         protocol.js#encodeFishRow protocol.js#parseFishRow main.js#updatePlayerLifetimeBar index.html#player-metrics index.html#lifetime-bar style.css#player-metrics style.css#lifetime constants.js#PLAYER  # @ds:2e91f6d4 @fix:de7b4c19
   player.nameMetric:                         main.js#updatePlayerNameMetric index.html#player-name style.css#player-name render.js#drawFishLabel  # @ds:c5a92431 @ds:2e91f6d4
   player.sizeUi:                             main.js#updatePlayerSizeMetric index.html#player-size style.css#player-size  # @ds:b9136c2e
   player.speedModeUi:                        main.js#updatePlayerSpeedMetric index.html#player-speed-metric style.css#player-speed-metric  # @ds:c656f0ec
   shred.spawn:                               shred.js#spawnShredsFromFish prey.js#expireOldNpcFish player.js#expireOldUserFish  # @ds:e13d7a52 @ds:7c2f91ad @ds:918d4b63 @ds:d5e7a01c @ds:a6c9e8b4 @ds:b7a4c391 @ds:eccfca7e
   shred.drift:                               shred.js#advanceShreds  # @ds:8b62d9ce @ds:ed2b4f19 @ds:d3187816 @ds:31a8f5c2
+  testing.populationEndpoints:               server.js#/test/more-shred server.js#/test/more-fish shred.js#spawnTestShreds prey.js#findSafeNpcSpawn tools/test-populate.mjs package.json#scripts  # @fix:7c8d9e0f
+  world.flowFieldMap:                        flow.js#buildFlowField flow.js#sampleFlowField shred.js#advanceShreds danger-map.js#encodeFlowMapPng server.js#/flow-map client-net.js#createFlowMapSocket main.js#toggleFlowMap render.js#drawFlowMapUnderlay render.js#drawWorldMap  # @fix:6a7b8c9d
+  world.flowAngularImpulse:                  flow.js#buildFlowField flow.js#stampAngularImpulse danger-map.js#encodeFlowMapPng main.js#decodeFlowMapBitmap main.js#sampleAngularFlow main.js#advanceClientShredRotation render.js#drawShred constants.js#SHRED  # @fix:4e9b2c71
+  world.flowVectorOverlay:                   index.html#flow-vectors-toggle main.js#toggleFlowVectors main.js#advanceClientFlowCrosses render.js#drawFlowVectorField constants.js#FLOW_MAP style.css#flow-vectors-toggle  # @fix:5f2a8c71
+  fish.visualHeading:                        render.js#drawFish render.js#visualFishTurnRadians render.js#visualFishVerticality main.js#applyClientFishDecor constants.js#FISH.visualMaxTiltDeg constants.js#SWIM.verticalFinSwingBoost constants.js#SWIM.visualTiltResponse  # @fix:6e2a9c41
+  ui.debugOverlayParity:                     main.js#toggleDebugMode render.js#drawWorldMap render.js#drawWorldMapDebugTraces render.js#drawFlowVectorFieldOnMap render.js#drawFlowMapUnderlay render.js#drawDangerMapUnderlay  # @fix:9b6d2e41
   shred.decayRefresh:                        shred.js#refreshShredDecay predation.js#collectFeedingCandidates predation.js#refreshCandidate predation.js#processFeedingBatch  # @ds:fb0f32c4
   shred.eating:                              shred.js#canEatShred shred.js#shredCandidateNutrition shred.js#consumeShredLayer  # @ds:c14f7a08 @ds:9e4c1b7a @ds:b6f08d21 @ds:4d7c2e93 @ds:f0a6c5d8 @ds:d867989f @ds:98224ab9 @ds:fb0f32c4
   shred.protocol:                            protocol.js#encodeShredRow protocol.js#encodeShredDeltaRow protocol.js#parseShredRow protocol.js#encodeWorldSync protocol.js#applyWorldSync  # @ds:ed2b4f19 @ds:682570c7 @ds:d3187816 @ds:9f50b1be
@@ -181,10 +189,10 @@ contract_map:
   fish.grow:                                fish.js#grow  # @ds:d867989f @ds:b024b514
   fish.feedingState:                        fish.js#makeFish fish.js#advanceFeedingState  # @ds:4e2a91f0
   fish.updateFacing:                        fish.js#updateFacing  # @ds:8d0ca6a8 @ia:0bdc556b
-  fish.spendEnergy:                         fish.js#spendEnergy fish.js#burstEnergyFactorOf  # @ds:f51831f5 @ds:6aa7c828 @ds:9ce87fee
+  fish.spendEnergy:                         fish.js#spendEnergy fish.js#burstEnergyFactorOf constants.js#ENERGY.lossPerRef  # @ds:f51831f5 @ds:6aa7c828 @ds:9ce87fee @fix:8c4f2a71
   fish.maxSpeedOf:                          fish.js#maxSpeedOf prey.js#capPreySpeed  # @ds:8869f043 @ds:d4f6a1c2
   fish.updateMouth:                         fish.js#updateMouth  # @ds:975ca168 @ia:9c0d1e2f @ia:0bdc556b
-  fish.updateSwimMotion:                    fish.js#updateSwimMotion render.js#drawFish  # @ds:bd354b7a @ds:df06827a @ia:3a4b5c6e
+  fish.updateSwimMotion:                    fish.js#updateSwimMotion render.js#drawFish render.js#easedCyclicPhase render.js#cubicBezierEase constants.js#SWIM.finTimingCurve constants.js#SWIM.finBurstTimingCurve  # @ds:bd354b7a @ds:df06827a @ia:3a4b5c6e @fix:2e7a4c91
   fish.regimeShapeVisual:                   render.js#drawFish  # @ds:1e323735 @ds:df06827a
   fish.updateFearEye:                       fish.js#updateFearEye  # @ds:906be50b @ia:7d8e9f0a
   fish.updateUserLabel:                     fish.js#updateUserLabel  # @ds:c5a92431
@@ -247,6 +255,8 @@ data_model:
       - mode                   # cruise|burst
       - speedLevel             # 0 for no thrust, 1..30 cruise relative speed, 31..99 burst relative speed
       - age
+      - lifetimeStartedAt      # server simulation time marker; null while the fish is immortal
+      - lifetimeMode           # null|highSize|lowSize; selects the applicable lifetime limit
       - playerActiveAge          # user active lifetime after start window, synchronized for lifetime UI
       - fryAge                   # active for NPC fry and user 3s start-window protection
       - nominalStartSize         # target size for fry growth
@@ -565,24 +575,28 @@ implementation_instructions:
         and userTier;
       - sets ownerKind='user', isPlayer=true, npcRole=null, pos=position, vel=0,
         mode='cruise', size=PLAYER.fryStartSize, radius=radiusOf(size),
-        fryAge=0, nominalStartSize=PLAYER.startSize, playerActiveAge=0, age=0,
+        fryAge=0, nominalStartSize=PLAYER.startSize, lifetimeStartedAt=null,
+        playerActiveAge=0, age=0,
         feedingSuccessFactor=1, feedingCooldown=0;
       - leaves the same object in world.fish so existing client control binding
         remains attached to the same id.
     advancePlayerLifecycle(world, dt, rng):
-      - for every ownerKind='user' fish, if fryAge is active, advance it toward
-        PLAYER.fryGrowthSeconds=3 and reset playerActiveAge to 0 while the start
-        window is active;
+      - for every ownerKind='user' fish, advance fryAge toward
+        PLAYER.fryGrowthSeconds=3 while the start window is active;
       - while fryAge is active and fish.size is below PLAYER.startSize, interpolate
         start growth from PLAYER.fryStartSize to PLAYER.startSize using the fryAge
         ratio and clamp size to PLAYER.startSize; if feeding raises size to
         PLAYER.startSize or above before 3 seconds, leave that larger current
         size intact and keep fryAge active for protection until the timer expires;
-      - when fryAge reaches PLAYER.fryGrowthSeconds, clear fryAge and start active
-        lifetime counting from playerActiveAge=0;
-      - when fryAge is not active, increment playerActiveAge by dt;
-      - when playerActiveAge reaches PLAYER.maxLifetimeSeconds, call
-        expireOldUserFish(world, fish, rng).
+      - after movement and feeding, updateFishLifetimeState(fish, world.elapsedSeconds):
+        clear lifetimeStartedAt when fish.size is below PLAYER.lifetimeStartSize=5;
+        for a user fish whose fryAge is inactive, also allow the low-size condition
+        fish.size < PLAYER.startSize; otherwise set lifetimeStartedAt once when a
+        valid threshold is first reached and derive playerActiveAge for user fish
+        from elapsed simulation time since that marker;
+      - expire each marked user or NPC fish when world.elapsedSeconds minus its
+        lifetimeStartedAt reaches the corresponding PLAYER/NPC maximum lifetime.
+        A fish without the marker is not eligible for old-age expiry;
     expireOldUserFish(world, fish, rng):
       - copy the user identity fields and current fish id;
       - call spawnShredsFromFish(world, fish, rng) before resetting the body;
@@ -591,9 +605,10 @@ implementation_instructions:
         no shred was created because of the controlled-object limit;
       - restart the same fish object with startUserFryStage(reason='oldAge') at
         that cloud center.
-    stepAuthoritativeWorld must call advancePlayerLifecycle after fish integration
-    and before feeding resolution, so expired user bodies create shreds and re-enter
-    the world as protected fry in the same authoritative tick.  # @ds:4c7a2b91 @ds:c18e5b42 @ds:9d62f0a7 @ds:b7a4c391 @ds:e13d7a52
+    stepAuthoritativeWorld must advance world.elapsedSeconds, update the lifetime
+    marker after integration and feeding, then expire marked user bodies so expired
+    bodies create shreds and re-enter the world as protected fry in the same
+    authoritative tick.  # @ds:4c7a2b91 @ds:c18e5b42 @ds:9d62f0a7 @ds:b7a4c391 @ds:e13d7a52 @fix:c4e8a1b7
   player_lifetime_ui: |
     protocol.js includes user fish start-window age and playerActiveAge in fish row state mods as
     `gN` and `lN`, where N is age in tenths of a second clamped to a non-negative
@@ -614,11 +629,13 @@ implementation_instructions:
       - keep #player-metrics hidden unless a current ownerKind='user' fish exists
         and the joined entry UI has been resolved;
       - read activeAge = max(0, fish.playerActiveAge || 0);
-      - ratio = clamp(1 - activeAge / PLAYER.maxLifetimeSeconds, 0, 1);
+      - choose lifetimeLimit = PLAYER.lowSizeMaxLifetimeSeconds when parsed
+        fish.lifetimeMode is lowSize, otherwise PLAYER.maxLifetimeSeconds;
+      - ratio = clamp(1 - activeAge / lifetimeLimit, 0, 1);
       - set #lifetime-bar scaleX to ratio;
       - use the start-window color only when activeAge is 0 and fish.fryAge is
         active in the parsed snapshot;
-      - otherwise compute remainingSeconds = PLAYER.maxLifetimeSeconds - activeAge;
+      - otherwise compute remainingSeconds = lifetimeLimit - activeAge;
         set the active bar color red when remainingSeconds < 3, yellow when
         remainingSeconds < 10, and the ordinary active color otherwise.
     main.js must not infer lifetime progress from local performance.now(), fish
@@ -661,9 +678,9 @@ implementation_instructions:
     #debug-mode-toggle toggles only debugMode and does not own menu visibility.
     #leave-game remains the explicit leave/enter command inside the menu and keeps the same joined-state behavior.  # @ds:ab1e4f02 @ds:8d13f6a2 @ds:59c118f5 @ds:70871bc5 @ds:fb11044e @ds:22fd3ab4
   world_map_ui: |
-    Danger-map rendering draws the black segment grid first with DANGER_MAP.gridAlpha, then composites the danger bitmap with DANGER_MAP.bitmapAlpha; the PNG stream contains danger values only and no baked segment boundaries. The server PNG encoder overlays thick bright blue lines whenever an NPC has steerDecision.huntTarget, using the shortest wrapped target direction, red flee lines from steerDecision.fleeDirection with length 2..4 current fish diameters from speedLevel 31..79, and subdued water-colored circles using steerDecision.searchMaxDiameter. prey.js stores huntTarget, fleeDirection, and searchMaxDiameter as server-only diagnostic state. When Debug and the danger-map control are enabled, render.js#drawDangerMapUnderlay repeats the same world-coordinate grid and latest PNG frame under fish, shreds, bubbles, and other gameplay objects while the viewport transform is active; main.js keeps the danger-map transport open while the overview danger-map control is enabled and releases it when disabled.
+    The synchronization layer is drawn first, the flow-map bitmap second, and the danger-map grid/bitmap third. flow.js#buildFlowField uses the danger-raster cell size and accumulates directional wake, coasting wake, mouth suction, and signed side angular impulses into Float32 arrays. flow.js#sampleFlowField uses toroidal bilinear interpolation of the four cell-centre samples for each shred. danger-map.js#encodeFlowMapPng packs flow angle into R/G, linear impulse intensity into alpha, and signed angular impulse into B with 127 as zero; server.js broadcasts it through `/flow-map` at the diagnostic snapshot rate and client-net.js#createFlowMapSocket decodes each PNG as an ImageBitmap. After the first world snapshot main.js keeps the flow stream open for visual shred rotation even when the diagnostic map is hidden; main.js#decodeFlowMapBitmap reads B into a bilinear client field, main.js#advanceClientShredRotation applies it only to visual shred rotation and damps angular velocity by SHRED.flowAngularDrag. The flow-map button opens the minimap, controls the flow bitmap there, and, when Debug is active, render.js#drawFlowMapUnderlay repeats it under gameplay objects. The flow-vectors button independently enables render.js#drawFlowVectorField on the gameplay canvas; main.js#advanceClientFlowCrosses updates per-cell cross angle/velocity, while the renderer draws white crosses and blue-left/green-right linear vectors using the alpha/R/G channels. Danger-map rendering retains its black grid and diagnostic overlays above the flow layer.
     index.html contains #world-map-toggle in the top-right of #hud and #world-map as a screen-space 200x200 px overlay. The map button is visible only while an active joined session exists, has the same toolbar button footprint as #game-menu-toggle, and independently toggles worldMapVisible without changing debugMode, world state, input, or socket messages. #world-map is hidden unless worldMapVisible is true. In every responsive breakpoint, #hud .hud-row keeps explicit left-button, shrinkable metrics, and right-button grid tracks; #world-map-toggle uses the same breakpoint-specific width, height, border radius, and visual container as #game-menu-toggle, so neither button can wrap below the toolbar.  # @ds:3a980720
-    constants.js exports WORLD_MAP with the fixed 200px square size, 12px left inset, and 12px overlay gap; do not reuse DEBUG minimap coordinates for player-facing map UI. main.js#getWorldMapTop reads #hud and visible #player-metrics bounding rectangles every animation frame, takes the greater bottom edge, and adds WORLD_MAP.overlayGapPx. Pass this screen-space top coordinate, dangerMapBitmap, syncSegmentsVisible, dangerMapVisible, and cellSyncAverages in the render state. render.js#drawWorldMap(ctx, world, currentUserFishId, top, inspection) runs after restoring the viewport transform, uses WORLD_MAP.sizePx and WORLD_MAP.leftPx with the supplied top coordinate, validates positive world dimensions, draws the fixed square frame, maps the danger bitmap to the square when active, fills each synchronization cell from cellSyncAverages with the debug-mode color scale, draws the synchronization boundaries when active, and maps each canonical fish position into the square using clamped float coordinates without mutating fish.pos. NPC point diameter is derived from linear size sqrt(max(0, fish.size)): nominal PLAYER.startSize maps to 2px, every smaller value also maps to 2px, and the largest current fish maps to 5px; clamp the final diameter to [2, 5] and handle the no-range case without division by zero. Other user fish use a 3px inner point plus a 1px-gap, 1px-stroke outer circle; the current user uses a 5px inner point plus a 1px-gap, 2px-stroke outer circle. Keep the fish color resolution used by the existing minimap.  # @ds:3a980720 @ds:8f2c91ad
+    constants.js exports WORLD_MAP with the fixed 200px square size, 12px left inset, and 12px overlay gap; do not reuse DEBUG minimap coordinates for player-facing map UI. main.js#getWorldMapTop reads #hud and visible #player-metrics bounding rectangles every animation frame, takes the greater bottom edge, and adds WORLD_MAP.overlayGapPx. Pass this screen-space top coordinate, flowMapBitmap, flowMapVisible, dangerMapBitmap, syncSegmentsVisible, dangerMapVisible, and cellSyncAverages in the render state. render.js#drawWorldMap(ctx, world, currentUserFishId, top, inspection) runs after restoring the viewport transform, uses WORLD_MAP.sizePx and WORLD_MAP.leftPx with the supplied top coordinate, validates positive world dimensions, draws the fixed square frame, then composites synchronization averages/grid, flow bitmap, and danger grid/bitmap in that order before mapping each canonical fish position into the square using clamped float coordinates without mutating fish.pos. NPC point diameter is derived from linear size sqrt(max(0, fish.size)): nominal PLAYER.startSize maps to 2px, every smaller value also maps to 2px, and the largest current fish maps to 5px; clamp the final diameter to [2, 5] and handle the no-range case without division by zero. Other user fish use a 3px inner point plus a 1px-gap, 1px-stroke outer circle; the current user uses a 5px inner point plus a 1px-gap, 2px-stroke outer circle. Keep the fish color resolution used by the existing minimap.  # @ds:3a980720 @ds:8f2c91ad @fix:6a7b8c9d
   world_snapshot_info_ui: |
     index.html contains #world-info in the bottom-left overlay layer. It has twelve
     value spans: #world-fish-count, #world-fish-area, #world-nutrient-count,
@@ -1022,7 +1039,7 @@ implementation_instructions:
         PREY.maxSpeed ceiling;
       - capPreySpeed must not raise fleeing prey to FISH.minBurstSpeed; that floor
         belongs to hunter/predator burst movement, not prey escape movement.
-    spendEnergy runs only for active burst thrust: speedLevel >= 31 and a non-zero acceleration vector in the current tick. speedLevel 0..30 and inertial braking after burst thrust stops preserve size, even while actual velocity is still above the cruise range. In burst, multiply the base size loss by burstEnergyFactorOf(fish.speedLevel): 1 + ENERGY.burstExtraSpendFactor*(speedLevel-31)/68 for levels 31..99. Level 31 remains available at the minimum size and does not reduce size below the owner-specific minimum.
+    spendEnergy runs only for active burst thrust: speedLevel >= 31 and a non-zero acceleration vector in the current tick. speedLevel 0..30 and inertial braking after burst thrust stops preserve size, even while actual velocity is still above the cruise range. In burst, multiply the 0.009 base size loss by burstEnergyFactorOf(fish.speedLevel): 1 + ENERGY.burstExtraSpendFactor*(speedLevel-31)/68 for levels 31..99. Level 31 remains available at the minimum size and does not reduce size below the owner-specific minimum.
     spendEnergy clamps NPC fish to ENERGY.minSize and user fish to ENERGY.userMinSize.
     ENERGY.userMinSize must be greater than PREY.minSize * PREDATION.eatRatio, with a small margin, so the smallest fully grown ordinary NPC remains edible by a maximally depleted user fish.  # @ds:f51831f5 @ds:6aa7c828 @ds:d4f6a1c2 @ds:9ce87fee
   player_input: |
@@ -1034,9 +1051,9 @@ implementation_instructions:
     Keyboard movement keys select speedLevel 30 when no higher keyboard speed key is held. Keyboard Space and key 1 select speedLevel 31, key 2 selects speedLevel 65, key 3 selects speedLevel 99; when several are held, use the highest selected level.
     Pointer mode mouse hold selects speedLevel 31.
     Touch mode uses a single primary touch around the current user fish screen position. Compute the vector from that screen position to the touch, divide by the invisible touch control radius, clamp to 0..1, and map linearly to speedLevel round(unit*99). This same vector direction is used for steering.
-    Joystick mode uses the visible joystick base in the lower-right interface area. Compute the vector from the joystick base center to the pointer/touch and divide by the joystick base radius, clamped to 0..1. Map joystick radial unit to speedLevel with an expanded cruise radius: unit 0..(30/99*1.5) maps to speedLevel 0..30, and the remaining outer unit range maps to speedLevel 31..99. This same vector direction is used for steering.
+    Joystick mode uses the visible joystick base in the lower-right interface area. Compute the vector from the joystick base center to the pointer/touch and divide by the joystick base radius, clamped to 0..1. Map joystick radial unit to speedLevel with an expanded cruise radius: unit 0..(30/99*1.5) maps to speedLevel 0..30, the next 18% radial band holds speedLevel 31, and the remaining outer unit range maps to speedLevel 32..99. This same vector direction is used for steering.
     The touch control radius is min(112px, 80% of min viewport side / 2) and is centered on the current user fish screen position only in activeControlMode == touch, so its invisible diameter is twice the unchanged 112px visible joystick diameter unless the viewport cap is smaller.
-    controls.js#speedLevelToControlMagnitude is the inverse of the joystick radial mapping and is used by availability clamping and ring placement. The cruise/burst visual boundary is level 30 at 1.5*(30/99) of joystick radius.
+    controls.js#speedLevelToControlMagnitude is the inverse of the joystick radial mapping and is used by availability clamping and ring placement. The cruise/burst visual boundary is level 30 at 1.5*(30/99) of joystick radius, followed by the dedicated minimum-burst level 31 band.
     No separate vulnerability toggle exists in UI or input state.
     Implement buildInputPayload() in main.js:
       - read keySteer(input.keys) first;
@@ -1083,10 +1100,10 @@ implementation_instructions:
   mobile_joystick_layout: |
     style.css owns the on-screen joystick layout.
     Define --joystick-footprint-size as min(340px, 40vmin), where vmin makes the cap follow the smaller viewport side in both portrait and landscape. Keep --joystick-knob-size as the existing responsive knob diameter and derive --joystick-size as calc(var(--joystick-footprint-size) - var(--joystick-knob-size)). Mobile media rules may change only --joystick-knob-size; they must not replace the footprint-derived --joystick-size with a fixed base diameter.
-    #joystick-panel is a fixed square whose width and height are exactly --joystick-footprint-size. Anchor it to the lower-right with the existing safe-area-aware right and bottom offsets. It is shown after join whenever activeControlMode is not pointer or touch and hidden while pointer or touch experimental mode is active. Do not stretch the panel toward the left viewport edge.
+    #joystick-panel is a fixed square whose width and height are exactly --joystick-footprint-size. Anchor it to the lower-right with the existing safe-area-aware right and bottom offsets until a touch relocation occurs. It is shown after join whenever activeControlMode is not pointer or touch and hidden while pointer or touch experimental mode is active. Do not stretch the panel toward the left viewport edge.
     #joystick-base is the visible circular joystick control anchored one half knob diameter inward from the panel's lower-right edges. Its width and height are --joystick-size, so the knob remains within the panel when its center reaches the base edge. Rings remain inside the base and the complete visual footprint remains within min(340px, 40% of min(viewport width, viewport height)).
     Joystick speed comes from pointer displacement from the visible joystick base center in the same radial control that owns steering.
-    setupJoystickControls stores input.joystick.rawVector as the normalized actual displacement with magnitude 0..1, and stores input.joystick.vector as the same direction clamped to the current available speed radius for internal consistency. controls.js#joystickSteer uses rawVector so steering strength follows the held pointer position; controls.js#speedLevel maps rawVector magnitude to desired speedLevel 0..99 with the expanded cruise radius before buildInputPayload clamps it through availableSpeedLevelForSize. main.js#updateJoystickBurstAvailability computes the current available speedLevel for the user fish and redraws rings for v=30 cruise boundary plus selected burst availability levels. If the current user fish has applied speedLevel 1..99, main.js#updateJoystickCurrentBurstRing shows #joystick-current-burst-ring at speedLevelToControlMagnitude(fish.speedLevel), uses a 2px border, and colors it through main.js#joystickCurrentSpeedColor: levels 1..30 return the blue cruise color, and levels 31..99 return the existing pink burstSpeedColor scale. speedLevel 0 hides that ring.  # @ds:cd1c5776 @ds:0eef2d19 @ds:e41821af
+    setupJoystickControls stores input.joystick.rawVector as the normalized actual displacement with magnitude 0..1, and stores input.joystick.vector as the same direction clamped to the current available speed radius for internal consistency. During an active touch, when displacement leaves the full burst-99 radius, setJoystickCenter shifts the panel radially so the touch remains on or inside that radius, then clampJoystickCenter keeps the outer circle plus JOYSTICK.edgeInsetKnobRatio of knob size inside the viewport. Pointer release resets only the knob vector; the relocated panel position remains. controls.js#joystickSteer uses rawVector so steering strength follows the held pointer position; controls.js#speedLevel maps rawVector magnitude to desired speedLevel 0..99 with the expanded cruise radius before buildInputPayload clamps it through availableSpeedLevelForSize. main.js#updateJoystickBurstAvailability computes the current available speedLevel for the user fish and redraws rings for v=30 cruise boundary plus selected burst availability levels. If the current user fish has applied speedLevel 1..99, main.js#updateJoystickCurrentBurstRing shows #joystick-current-burst-ring at speedLevelToControlMagnitude(fish.speedLevel), uses a 2px border, and colors it through main.js#joystickCurrentSpeedColor: levels 1..30 return the blue cruise color, and levels 31..99 return the existing pink burstSpeedColor scale. speedLevel 0 hides that ring.  # @ds:cd1c5776 @ds:0eef2d19 @ds:e41821af @fix:f1c6a8d4
     index.html#game-menu contains #burst-endurance-table with rows for speedLevel v=1..99. main.js#updateBurstEnduranceTable reads BURST_ENDURANCE_SIZE_THRESHOLDS and currentUserFish.size, writes mode, minimum size threshold, current availability, energy factor, expected size loss, and the time window for each speed. updateGameMenu refreshes the table while the menu is open and whenever current fish state changes.  # @ds:cff27cd5
     constants.js exports VIEWPORT_FISH_CAPACITY with the UI option values and defaultValue. main.js owns viewportFishCapacity as client display state and a dedicated localStorage key. loadViewportFishCapacity reads the key before setupViewportFishCapacity: it accepts only a value contained in VIEWPORT_FISH_CAPACITY.options and otherwise returns the default. setViewportFishCapacity(value) validates the incoming value, updates state and the select, then stores the resolved value; storage read/write failures leave the resolved in-memory value usable. Pass viewportFishCapacity into render(), viewportToWorld(), and worldToViewport() calls that convert current pointer/touch positions.  # @ds:e001d967 @fix:a64e9b31
     The visible joystick layout remains independent from the current user fish screen position.  # @ds:b43d2f95 @ds:cd1c5776 @ds:6896cdc6
@@ -1178,7 +1195,7 @@ implementation_instructions:
       - labels store `{ fishId, value, age, life, yOffset }`, where value > 0 renders green with a leading plus and value < 0 renders red;
       - each frame increases age, removes labels with age >= life, and computes yOffset from age/life so the label rises slightly while fading;
       - labels are client-render-only and must not be written to protocol rows, world.fish, fish.size, or server state.
-    render(ctx,state) projects sizeDeltaLabels through the same toroidal render world as fish: each label attaches to the projected current-user fish position and draws above it with alpha from remaining lifetime.  # @ds:c2d7f4a1
+    render(ctx,state) projects sizeDeltaLabels through the same toroidal render world as fish: each label attaches to the projected current-user fish position and draws above it with alpha from remaining lifetime. Label gap and rise are screen-pixel distances converted through the current viewport scale before drawing.  # @ds:c2d7f4a1 @fix:4d8e2a71
     advanceClientBubbles(clientBubbles, clientBubbleEmitters, world, dt, rng):
       - remove emitter entries whose fish ID is absent from world.fish;
       - for each fish in world.fish, read or create emitter state `{ bubbleTimer: 0, bubbleBurstRemaining: 0 }` from clientBubbleEmitters by fish.id;
@@ -1191,8 +1208,10 @@ implementation_instructions:
     render(ctx,state) reads bubbles from state.clientBubbles first, then state.world.bubbles only for legacy single-process mode. render.js#drawBubble uses the ordinary white/blue style when bubble.color is absent and a red fill/stroke style when bubble.color is `red`.
     Camera viewport follows current client user fish via worldToViewport(world, followed, canvas, options).
     main.js#resize derives the canvas bitmap dimensions from canvas.getBoundingClientRect(),
-    and main.js#scheduleResize coalesces resize, orientationchange, and visualViewport resize
-    events with a second-frame sample so the bitmap and CSS viewport keep the same aspect ratio.
+    and main.js#scheduleResize debounces resize, orientationchange, visualViewport resize,
+    and ResizeObserver notifications before applying one requestAnimationFrame resize with
+    a second-frame sample, so intermediate mobile layout sizes do not trigger repeated layout work
+    and the bitmap and CSS viewport keep the same aspect ratio.
     Rendering projects game-world units to canvas pixels. render.js#viewportScaleForFishCapacity(world, canvas, value) computes nominalStartDiameter = FISH.baseRadius * sqrt(PLAYER.startSize) * 2, numericScale = min(canvas.width, canvas.height) / (Number(value) * nominalStartDiameter) for 10/20/30, and maxScale = max(canvas.width / world.width, canvas.height / world.height). This maxScale uses the cover scale: at least one complete world axis fits the corresponding screen axis, while the other axis may extend beyond the viewport. The function then returns max(numericScale, maxScale). For value max it returns maxScale. worldToViewport uses that scale and keeps the followed fish centered. The scale is display-only and must not write to world, fish, protocol rows, or server state.  # @ds:e559831a @ds:7b9a7984 @ds:e001d967 @ds:d6cebf86 @ia:3c4d5e6f @ia:5a6b7c8d
     # @fix:c7e2a914
   toroidal_viewport_projection: |
@@ -1438,6 +1457,23 @@ new_or_changed_constants:
   SHRED.wakeRadiusRatio: "fish wake influence radius multiplier" # @ds:8b62d9ce @ds:ed2b4f19
   SHRED.wakeStrength: "dt-scaled fish wake velocity coupling" # @ds:8b62d9ce @ds:ed2b4f19
   SHRED.wakeMinFishSpeed: "minimum fish speed that can pull shreds" # @ds:8b62d9ce @ds:ed2b4f19
+  SHRED.flowWakeRadiusRatio: "flow-field wake radius multiplier" # @fix:6a7b8c9d
+  SHRED.flowRearStrength/flowFrontStrength: "rear and front directional wake coupling" # @fix:6a7b8c9d
+  SHRED.flowRearInwardStrength: "rear wake side-to-axis entrainment coupling" # @fix:6a7b8c9d
+  SHRED.flowAccelerationLeadSeconds: "acceleration contribution horizon for active wake" # @fix:6a7b8c9d
+  SHRED.mouthPositionRadiusRatio/mouthSuctionRadiusRatio: "mouth flow position and influence radius" # @fix:6a7b8c9d
+  SHRED.mouthSuctionStrength: "open-mouth suction field strength" # @fix:6a7b8c9d
+  SHRED.flowMapMaxImpulse: "flow PNG impulse normalization ceiling" # @fix:6a7b8c9d
+  SHRED.flowAngularReferenceSpeed: "NPC speed used to normalize side angular impulse" # @fix:4e9b2c71
+  SHRED.flowAngularImpulseStrength: "client visual angular impulse strength" # @fix:4e9b2c71
+  SHRED.flowAngularDrag: "client visual angular velocity damping" # @fix:4e9b2c71
+  FLOW_MAP.vectorStrideCells: "fixed gameplay vector overlay spacing" # @fix:5f2a8c71
+  FLOW_MAP.vectorCrossSizeRatio: "gameplay overlay cross size relative to start fish" # @fix:5f2a8c71
+  FLOW_MAP.vectorLengthScale/vectorMaxLength: "linear impulse vector display scale and cap" # @fix:5f2a8c71
+  FLOW_MAP.vectorLineWidth: "linear impulse vector stroke width" # @fix:5f2a8c71
+  FLOW_MAP.vectorCrossLineWidth: "rotating cross stroke width" # @fix:5f2a8c71
+  FLOW_MAP.vectorCrossAlpha: "rotating cross opacity separate from vector opacity" # @fix:5f2a8c71
+  FLOW_MAP.vectorAlpha: "gameplay overlay cross/vector opacity" # @fix:5f2a8c71
   SHRED.layerFractions: "0.3,0.3,0.2,0.1,0.1" # @ds:9e4c1b7a
   SHRED.colorFactorMin: 0.3            # @ds:b6f08d21
   SHRED.colorFactorMaxDifferent: 0.7   # @ds:b6f08d21

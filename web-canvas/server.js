@@ -8,14 +8,16 @@ import { execFileSync } from 'node:child_process';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
-import { SERVER, SYNC, RECONNECT, REGIME, WORLD } from './src/constants.js';
+import { SERVER, SYNC, RECONNECT, REGIME, PREY, WORLD } from './src/constants.js';
 import { makeFish, technicalRadiusOf, updateAbandonedGradient } from './src/fish.js';
 import { startUserFryStage } from './src/player.js';
 import { makeWorld, findLowestDensitySpawn, formatWorldScale, worldScale } from './src/world.js';
-import { maintainPopulation } from './src/prey.js';
+import { findSafeNpcSpawn, maintainPopulation, sampleSize } from './src/prey.js';
 import { stepAuthoritativeWorld } from './src/step.js';
 import { isLeaveBlockedByUserAttack } from './src/predation.js';
-import { encodeDangerMapPng } from './src/danger-map.js';
+import { spawnTestShreds } from './src/shred.js';
+import { canAddControlledObjects } from './src/world.js';
+import { encodeDangerMapPng, encodeFlowMapPng } from './src/danger-map.js';
 import {
     encodeEvent,
     encodeIdentity,
@@ -34,6 +36,7 @@ const world = makeWorld();
 const inputsByClient = new Map();
 const sockets = new Map();
 const dangerMapSockets = new Set();
+const flowMapSockets = new Set(); // @fix:6a7b8c9d
 const disconnects = new Map();
 let nextClientId = 1;
 let syncCycle = 0;
@@ -64,6 +67,14 @@ maintainPopulation({ world }, Math.random);
 
 const server = createServer(async (req, res) =>{
     const url = new URL(req.url, `http://${req.headers.host}`);
+    if( req.method === 'POST' && url.pathname === '/test/more-shred' ){
+        respondTestPopulation(res, addTestShreds(parseTestAmount(url.searchParams.get('amount'))), 'shreds');
+        return;
+    }
+    if( req.method === 'POST' && url.pathname === '/test/more-fish' ){
+        respondTestPopulation(res, addTestFish(parseTestAmount(url.searchParams.get('amount'))), 'fish');
+        return;
+    }
     if( url.pathname === '/version.json' ){
         res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
         res.end(JSON.stringify({ version: appVersion }));
@@ -87,12 +98,64 @@ const server = createServer(async (req, res) =>{
     }
 });
 
+// @fix:7c8d9e0f
+function parseTestAmount(value){
+    const amount = Math.floor(Number(value));
+    return Number.isFinite(amount) ? Math.max(0, Math.min(amount, WORLD.maxControlledObjects)) : 0;
+}
+
+// @fix:7c8d9e0f
+function respondTestPopulation(res, added, kind){
+    res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+    res.end(JSON.stringify({ kind, requested: added.requested, added: added.added, total: added.total, capacity: WORLD.maxControlledObjects }));
+}
+
+// @fix:7c8d9e0f
+function addTestShreds(requested){
+    const before = world.shreds.length;
+    const created = spawnTestShreds(world, requested, Math.random);
+    return { requested, added: created.length, total: world.shreds.length, before };
+}
+
+// @fix:7c8d9e0f
+function addTestFish(requested){
+    const before = world.fish.length;
+    let added = 0;
+    while( added < requested && canAddControlledObjects(world, 1) ){
+        const nominalStartSize = sampleSize(Math.random);
+        const fish = makeFish({
+            pos: findSafeNpcSpawn(world, nominalStartSize, Math.random),
+            size: nominalStartSize,
+            hue: 30 + Math.random() * 60,
+            ownerKind: 'npc',
+            npcRole: 'prey',
+            nominalStartSize,
+            courage: 50,
+            worldScale: world.scale,
+        });
+        const angle = Math.random() * Math.PI * 2;
+        const speed = PREY.maxSpeed * 0.45;
+        fish.vel = { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed };
+        fish.heading = { x: Math.cos(angle), y: Math.sin(angle) };
+        fish.spawnGrace = 0;
+        world.fish.push(fish);
+        added++;
+    }
+    updateWorldScale();
+    return { requested, added, total: world.fish.length, before };
+}
+
 // @ds e6d3b9a1
 const wss = new WebSocketServer({ server });
 wss.on('connection', (socket, request) =>{
     if( new URL(request.url, 'http://localhost').pathname === '/danger-map' ){
         dangerMapSockets.add(socket);
         socket.on('close', () => dangerMapSockets.delete(socket));
+        return;
+    }
+    if( new URL(request.url, 'http://localhost').pathname === '/flow-map' ){
+        flowMapSockets.add(socket);
+        socket.on('close', () => flowMapSockets.delete(socket));
         return;
     }
     const clientId = `c${nextClientId++}`;
@@ -212,6 +275,8 @@ function convertUserFishToNpc(fish){
     fish.userTier = null;
     fish.clientId = null;
     fish.age = 0; // @ds:a6c9e8b4
+    fish.lifetimeStartedAt = null; // @fix:c4e8a1b7
+    fish.lifetimeMode = null; // @fix:de7b4c19
     updateAbandonedGradient(fish);
     updateWorldScale();
 }
@@ -303,6 +368,14 @@ function broadcastDangerMap(){
     const png = encodeDangerMapPng(world);
     if( !png ) return;
     for( const socket of dangerMapSockets ) if( socket.readyState === socket.OPEN && socket.bufferedAmount <= SYNC.maxSocketBufferedBytes ) socket.send(png, { binary: true });
+}
+
+// @fix:6a7b8c9d
+function broadcastFlowMap(){
+    if( flowMapSockets.size === 0 ) return;
+    const png = encodeFlowMapPng(world);
+    if( !png ) return;
+    for( const socket of flowMapSockets ) if( socket.readyState === socket.OPEN && socket.bufferedAmount <= SYNC.maxSocketBufferedBytes ) socket.send(png, { binary: true });
 }
 
 // @ds:c39827ed @ds:0a2b6379 @ds:682570c7
@@ -523,6 +596,7 @@ function contentType(path){
 setInterval(tick, 1000 / SERVER.tickRate);
 setInterval(broadcastWorldSync, 1000 / SYNC.snapshotHz);
 setInterval(broadcastDangerMap, 1000 / SYNC.snapshotHz);
+setInterval(broadcastFlowMap, 1000 / SYNC.snapshotHz);
 setInterval(reportPerformanceStatistics, SERVER.performanceStatisticsIntervalMs);
 
 server.listen(port, () =>{

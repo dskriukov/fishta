@@ -75,6 +75,8 @@
                 <svg viewBox="0 0 512 512" aria-hidden="true"><path d="M256 48C141.13 48 48 141.13 48 256s93.13 208 208 208 208-93.13 208-208S370.87 48 256 48Z"/><path d="M256 48c-58.07 0-112.67 93.13-112.67 208S197.93 464 256 464s112.67-93.13 112.67-208S314.07 48 256 48Z"/><path d="M117.33 117.33c38.24 27.15 86.38 43.34 138.67 43.34s100.43-16.19 138.67-43.34M394.67 394.67c-38.24-27.15-86.38-43.34-138.67-43.34s-100.43 16.19-138.67 43.34"/><path d="M256 48v416M464 256H48"/></svg>
             </button>
             <button id="sync-segments-toggle" type="button" aria-label="Synchronization segments" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4zM4 10h16M4 16h16M10 4v16M16 4v16"/></svg></button>
+            <button id="flow-map-toggle" type="button" aria-label="Flow map" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h12M3 12h18M3 17h12"/><path d="m13 4 3 3-3 3M17 9l3 3-3 3M13 14l3 3-3 3"/></svg></button>
+            <button id="flow-vectors-toggle" type="button" aria-label="Flow vectors on game field" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18M7 7l10 10M17 7 7 17"/><path d="m12 3-2 3M12 3l2 3M21 12l-3-2M21 12l-3 2"/></svg></button>
             <button id="danger-map-toggle" type="button" aria-label="Danger map" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 1v3M23 12h-3M12 23v-3M1 12h3"/></svg></button>
         </div>
     </div>
@@ -130,6 +132,7 @@
     </div>
     <div id="joystick-panel" hidden>
         <div id="joystick-base" aria-label="joystick">
+            <div id="joystick-burst-base"></div>
             <div id="joystick-burst-rings"></div>
             <div id="joystick-current-burst-ring"></div>
             <!-- @ds:c656f0ec -->

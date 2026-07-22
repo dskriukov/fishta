@@ -278,6 +278,7 @@ body::after {
 #leave-game[hidden],
 #game-menu-toggle[hidden],
 #world-map-toggle[hidden],
+#flow-map-toggle[hidden],
 #control-modes[hidden],
 #control-help[hidden],
 #player-metrics[hidden] {
@@ -899,12 +900,20 @@ body::after {
 /* @ds:f3a1c7d9 @ds:3a980720 */
 #world-map-toggle,
 #sync-segments-toggle,
+#flow-map-toggle,
+#flow-vectors-toggle,
 #danger-map-toggle { grid-column-start: 3; }
 #sync-segments-toggle,
+#flow-map-toggle,
+#flow-vectors-toggle,
 #danger-map-toggle { pointer-events: auto; display: grid; place-items: center; justify-self: end; width: 38px; height: 38px; padding: 7px; border: 1px solid rgba(205, 238, 255, .36); border-radius: 12px; background: rgba(110, 215, 239, .18); color: #edf8ff; cursor: pointer; }
 #sync-segments-toggle svg,
+#flow-map-toggle svg,
+#flow-vectors-toggle svg,
 #danger-map-toggle svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 #sync-segments-toggle[aria-pressed="true"],
+#flow-map-toggle[aria-pressed="true"],
+#flow-vectors-toggle[aria-pressed="true"],
 #danger-map-toggle[aria-pressed="true"] { background: rgba(110, 215, 239, .34); border-color: rgba(205, 238, 255, .72); }
 
 #control-modes {
@@ -1229,10 +1238,25 @@ body::after {
     position: absolute;
     left: 50%;
     top: 50%;
-    width: 45.45%;
+    width: var(--cruise-base-diameter, 31.63%);
     aspect-ratio: 1;
     border-radius: 50%;
-    background: rgba(110, 215, 239, 0.3);
+    background: rgba(3, 35, 60, 0.9);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 1;
+}
+
+#joystick-burst-base {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: var(--burst-base-diameter, 0%);
+    aspect-ratio: 1;
+    border: 7px solid rgba(111, 96, 79, 0.62);
+    border-radius: 50%;
+    background: rgba(75, 72, 67, 0.72);
+    box-sizing: border-box;
     transform: translate(-50%, -50%);
     pointer-events: none;
     z-index: 0;
@@ -1242,7 +1266,7 @@ body::after {
     position: absolute;
     inset: 0;
     pointer-events: none;
-    z-index: 1;
+    z-index: 2;
 }
 
 .joystick-burst-ring {
@@ -1269,7 +1293,7 @@ body::after {
     opacity: 0;
     transform: translate(-50%, -50%);
     pointer-events: none;
-    z-index: 2;
+    z-index: 3;
 }
 
 #joystick-current-burst-ring.is-visible {
@@ -1287,7 +1311,13 @@ body::after {
     background: rgba(110, 215, 239, 0.28);
     transform: translate(-50%, -50%);
     pointer-events: none;
-    z-index: 3;
+    z-index: 5;
+    opacity: 1;
+    transition: opacity 200ms ease;
+}
+
+#joystick-base.is-keyboard-control #joystick-knob {
+    opacity: 0;
 }
 
 /* @ds:2e91f6d4 @ds:b9136c2e @ds:c5a92431 @ds:e42a7c19 @ds:ab1e4f02 @ia:32288dfb */

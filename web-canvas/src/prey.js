@@ -265,10 +265,12 @@ function tryCompromiseHunt(self, target, world, dt, rng){
 // @ds:a6c9e8b4 @ds:e13d7a52 @ds:d140effd
 export function expireOldNpcFish(world, rng){
     if( isOldAgeSuspended(world) ) return;
+    const now = Math.max(0, Number(world.elapsedSeconds) || 0);
     const fish = world.fish || [];
     for( let i = fish.length - 1; i >= 0; i-- ){
         const candidate = fish[i];
-        if( candidate.ownerKind !== 'npc' || (candidate.age || 0) < NPC.maxLifetimeSeconds ) continue;
+        if( candidate.ownerKind !== 'npc' || !Number.isFinite(candidate.lifetimeStartedAt) ) continue;
+        if( (now - candidate.lifetimeStartedAt) < NPC.maxLifetimeSeconds ) continue;
         fish.splice(i, 1);
         spawnShredsFromFish(world, candidate, rng);
     }

@@ -3,13 +3,13 @@
 // @ds b28b7af6 27fa3caa ec8cb052 ab1e4f02 c95ca496 48c4fc99 b433f1bc d2e8a84c 5fb1ff09 c83f4c1e ca07d970 d6cebf86 2b3e71e0 3ddf8f67 1f3abc43 cbc1225a 7ce238da c4073e51 ee07d6da 8869f043 07320d39 f51831f5 8d0ca6a8 d867989f 975ca168 bd354b7a 906be50b 91e32235 55c13a4f 10baf178 22fd3ab4 e6be3c03 0eef2d19 e001d967 cff27cd5 7b9a7984 ad8d81d8 31cb7a0d 579e4888 e699c42d e6ecfbdd 1e66d817 a3e394a8 98224ab9 e9fb3705 fcdfb2b7 0c8d4e2a 6f1b0a3c 39305789 2e91f6d4 b9136c2e c5a92431 c656f0ec e42a7c19 a2d5936f 73b91e4c ed2b4f19
 // @ia 3983084a
 
-import { DEBUG, ENERGY, EXHALE, FISH, LOOP, MOUTH, PLAYER, REGIME, SHRED, SIZE_DELTA_LABEL, SWIM, SYNC, VIEWPORT_FISH_CAPACITY, WORLD_MAP } from './constants.js';
+import { DEBUG, ENERGY, EXHALE, FISH, FLOW_MAP, JOYSTICK, LOOP, MOUTH, PLAYER, REGIME, SHRED, SIZE_DELTA_LABEL, SWIM, SYNC, VIEWPORT_FISH_CAPACITY, WORLD_MAP } from './constants.js';
 import { advanceBubbles, emitBubble, makeBubble, makeWorld } from './world.js';
-import { BURST_ENDURANCE_SIZE_THRESHOLDS, availableSpeedLevelForSize, burstEnergyFactorOf, maxSpeedOf, requestExhale, runExhaleCycle, serializeFish, speedCapOf, technicalRadiusOf } from './fish.js';
+import { BURST_ENDURANCE_SIZE_THRESHOLDS, availableSpeedLevelForSize, burstEnergyFactorOf, requestExhale, runExhaleCycle, serializeFish, speedCapOf, technicalRadiusOf } from './fish.js';
 import { createControlModeState, createInput, keySteer, pointerSteer, joystickSteer, speedLevel, speedLevelToControlMagnitude } from './controls.js';
-import { buildToroidalRenderWorld, loadFishGeometry, loadShredGeometry, render, viewportToWorld, worldToViewport } from './render.js';
+import { buildToroidalRenderWorld, fishFinTipPositions, loadFishGeometry, loadShredGeometry, render, viewportToWorld, visualFishTurnRadians, worldToViewport } from './render.js';
 import { dist, normalize, scale, v } from './vec.js';
-import { createClientNet, createDangerMapSocket } from './client-net.js';
+import { createClientNet, createDangerMapSocket, createFlowMapSocket } from './client-net.js';
 import { syncOpacityAt } from './protocol.js';
 
 const canvas = document.getElementById('game');
@@ -54,6 +54,8 @@ const gameMenuToggle = document.getElementById('game-menu-toggle');
 const gameMenu = document.getElementById('game-menu');
 const worldMapToggle = document.getElementById('world-map-toggle');
 const syncSegmentsToggle = document.getElementById('sync-segments-toggle');
+const flowMapToggle = document.getElementById('flow-map-toggle');
+const flowVectorsToggle = document.getElementById('flow-vectors-toggle');
 const dangerMapToggle = document.getElementById('danger-map-toggle');
 const worldMap = document.getElementById('world-map');
 const debugModeToggle = document.getElementById('debug-mode-toggle');
@@ -64,6 +66,7 @@ const viewportFishCapacitySelect = document.getElementById('viewport-fish-capaci
 const burstEnduranceRows = document.getElementById('burst-endurance-rows');
 const joystickPanel = document.getElementById('joystick-panel');
 const joystickBase = document.getElementById('joystick-base');
+const joystickBurstBase = document.getElementById('joystick-burst-base');
 const joystickBurstRings = document.getElementById('joystick-burst-rings');
 const joystickKnob = document.getElementById('joystick-knob');
 const joystickCurrentBurstRing = document.getElementById('joystick-current-burst-ring');
@@ -73,8 +76,12 @@ const appVersion = document.getElementById('app-version');
 
 let state = { world: makeWorld(), currentUserFishId: null };
 let resizeFrame = 0;
+let resizeDebounceTimer = 0; // @fix:c7e2a914
+const RESIZE_DEBOUNCE_MS = 90; // @fix:c7e2a914
 const snapshotBuffer = [];
+const clientSyncRenderPositions = new Map(); // @fix:b3d7e9a2
 const clientBubbles = [];
+const clientFinSparks = []; // @fix:4f8a2c71
 const clientBubbleEmitters = new Map();
 const clientFishDecor = new Map();
 let serializeKeyLatch = false;
@@ -86,9 +93,18 @@ let gameMenuOpen = false;
 let worldMapVisible = false;
 let debugMode = false;
 let syncSegmentsVisible = false;
+let flowMapVisible = false; // @fix:6a7b8c9d
+let flowMapBitmap = null; // @fix:6a7b8c9d
+let flowMapField = null; // @fix:4e9b2c71
+let flowMapFrameSerial = 0; // @fix:4e9b2c71
+let flowMapTransportEnabled = false; // @fix:4e9b2c71
+let flowVectorsVisible = false; // @fix:5f2a8c71
+let flowVectorsResetPending = false; // @fix:5f2a8c71
+const clientShredSpin = new Map(); // @fix:4e9b2c71
 let dangerMapVisible = false;
 let dangerMapBitmap = null;
 const dangerMapNet = createDangerMapSocket(bitmap => { dangerMapBitmap?.close?.(); dangerMapBitmap = bitmap; });
+const flowMapNet = createFlowMapSocket(bitmap => { handleFlowMapFrame(bitmap); });
 let worldCalculationMs = null;
 let syncCycleMs = null;
 let lastMeasuredSyncCycle = null;
@@ -132,18 +148,23 @@ function resize(){
     if( canvas.width === width && canvas.height === height ) return;
     canvas.width = width;
     canvas.height = height;
+    clampJoystickPositionToViewport(); // @fix:f1c6a8d4
 }
 
 // @fix:c7e2a914
 function scheduleResize(){
-    if( resizeFrame ) cancelAnimationFrame(resizeFrame);
-    resizeFrame = requestAnimationFrame(() => {
-        resizeFrame = 0;
-        resize();
-        // Mobile browsers can commit the new visual viewport one frame after
-        // the orientation event; sample the final CSS box as well.
-        requestAnimationFrame(resize);
-    });
+    if( resizeDebounceTimer ) window.clearTimeout(resizeDebounceTimer);
+    resizeDebounceTimer = window.setTimeout(() => {
+        resizeDebounceTimer = 0;
+        if( resizeFrame ) cancelAnimationFrame(resizeFrame);
+        resizeFrame = requestAnimationFrame(() => {
+            resizeFrame = 0;
+            resize();
+            // Mobile browsers can commit the new visual viewport one frame after
+            // the orientation event; sample the final CSS box as well.
+            requestAnimationFrame(resize);
+        });
+    }, RESIZE_DEBOUNCE_MS);
 }
 
 // @ds:3a980720
@@ -156,6 +177,7 @@ function getWorldMapTop(){
 const input = createInput(canvas);
 net = createClientNet({
     onSnapshot(message){
+        openFlowMapTransport(); // @fix:4e9b2c71
         if( state.currentUserFishId !== message.currentUserFishId ) lastSentInputKey = null;
         state.world = message.world;
         state.currentUserFishId = message.currentUserFishId;
@@ -193,6 +215,7 @@ net = createClientNet({
     onEvent(message){
         hudStatus.textContent = message.status || message.event || 'event';
         if( message.event === 'rj' ){
+            closeFlowMapTransport(); // @fix:4e9b2c71
             state.currentUserFishId = null;
             lastSentInputKey = null;
             lastInputFlushAt = 0;
@@ -333,6 +356,10 @@ canvas.addEventListener('click', e =>{
 window.addEventListener('resize', scheduleResize);
 window.addEventListener('orientationchange', scheduleResize);
 window.visualViewport?.addEventListener('resize', scheduleResize);
+const canvasResizeObserver = typeof ResizeObserver === 'function'
+    ? new ResizeObserver(scheduleResize)
+    : null;
+canvasResizeObserver?.observe(canvas);
 
 // @ds:c9f4b821 @ia:d2c6a901
 const JOIN_PROFILE_STORAGE_KEY = 'fish.joinProfile';
@@ -527,18 +554,71 @@ function toggleDangerMapUnderlay(){
     syncDangerMapTransport();
 }
 
+// @fix:6a7b8c9d
+function toggleFlowMap(){
+    flowMapVisible = !flowMapVisible;
+    if( flowMapVisible ){
+        worldMapVisible = true;
+        updateWorldMapUi();
+    }
+    if( flowMapToggle ){
+        flowMapToggle.setAttribute('aria-pressed', String(flowMapVisible));
+        flowMapToggle.classList.toggle('is-active', flowMapVisible);
+    }
+    syncDiagnosticMapTransport();
+}
+
+// @fix:5f2a8c71
+function toggleFlowVectors(){
+    flowVectorsVisible = !flowVectorsVisible;
+    if( flowVectorsVisible ){
+        flowVectorsResetPending = true;
+        resetClientFlowCrosses();
+    }
+    if( flowVectorsToggle ){
+        flowVectorsToggle.setAttribute('aria-pressed', String(flowVectorsVisible));
+        flowVectorsToggle.classList.toggle('is-active', flowVectorsVisible);
+    }
+}
+
 // @fix:1f5d8c42
 function syncDangerMapTransport(){
+    syncDiagnosticMapTransport();
+}
+
+// @fix:6a7b8c9d
+function syncDiagnosticMapTransport(){
     if( dangerMapVisible ){
         dangerMapNet.open();
-        return;
+    }else{
+        dangerMapNet.close();
+        dangerMapBitmap?.close?.();
+        dangerMapBitmap = null;
     }
-    dangerMapNet.close();
-    dangerMapBitmap?.close?.();
-    dangerMapBitmap = null;
+    if( flowMapVisible ) openFlowMapTransport();
+}
+
+// @fix:4e9b2c71
+function openFlowMapTransport(){
+    if( flowMapTransportEnabled ) return;
+    flowMapTransportEnabled = true;
+    flowMapNet.open();
+}
+
+// @fix:4e9b2c71
+function closeFlowMapTransport(){
+    if( !flowMapTransportEnabled ) return;
+    flowMapTransportEnabled = false;
+    flowMapNet.close();
+    flowMapBitmap?.close?.();
+    flowMapBitmap = null;
+    flowMapField = null;
+    flowMapFrameSerial++;
 }
 
 if( syncSegmentsToggle ) syncSegmentsToggle.addEventListener('click', toggleSyncSegments);
+if( flowMapToggle ) flowMapToggle.addEventListener('click', toggleFlowMap);
+if( flowVectorsToggle ) flowVectorsToggle.addEventListener('click', toggleFlowVectors);
 if( dangerMapToggle ) dangerMapToggle.addEventListener('click', toggleDangerMapUnderlay);
 if( debugModeToggle ){
     debugModeToggle.addEventListener('click', toggleDebugMode);
@@ -614,7 +694,10 @@ function frame(now){
     dt = Math.min(dt, LOOP.maxDt);   // clamp — ecs-loop.dsr
 
     const visibleState = renderState(now);
-    applyClientFishDecor(visibleState.world, clientBubbles, dt, Math.random);
+    advanceClientShredRotation(visibleState.world, dt, flowMapField); // @fix:4e9b2c71
+    if( flowVectorsVisible ) advanceClientFlowCrosses(flowMapField, dt); // @fix:5f2a8c71
+    applyClientFishDecor(visibleState.world, clientBubbles, clientFinSparks, dt, Math.random); // @fix:4f8a2c71
+    advanceClientFinSparks(visibleState.world, clientFinSparks, dt, flowMapField); // @fix:4f8a2c71
     updateSizeDeltaLabels(visibleState.world, dt);
     lastVisibleState = visibleState;
     advanceClientBubbles(clientBubbles, clientBubbleEmitters, visibleState.world, dt, Math.random);
@@ -623,10 +706,12 @@ function frame(now){
         ...visibleState,
         viewportFishCapacity,
         clientBubbles,
+        finSparks: clientFinSparks, // @fix:4f8a2c71
         sizeDeltaLabels: sizeDeltaLabelState.labels,
         debug: {
             enabled: debugMode,
             dangerMapUnderlay: debugMode && dangerMapVisible,
+            flowMapUnderlay: debugMode && flowMapVisible, // @fix:6a7b8c9d
             positionTraces: debugPositionTraces,
             receivedQuadrants: [...debugReceivedQuadrants.values()],
             cellSyncAverages: debugSyncCellAverages(),
@@ -634,6 +719,10 @@ function frame(now){
         },
         cellSyncAverages: debugSyncCellAverages(),
         syncSegmentsVisible,
+        flowMapVisible,
+        flowMapBitmap: flowMapVisible ? flowMapBitmap : null,
+        flowVectorsVisible,
+        flowVectorField: flowVectorsVisible ? flowMapField : null,
         dangerMapVisible,
         dangerMapBitmap: dangerMapVisible ? dangerMapBitmap : null,
         worldMapVisible,
@@ -681,27 +770,26 @@ function updatePlayerSpeedMetric(fish){
     if( !playerSpeedMetric || !playerSpeedPercent || !playerSpeedReal ) return;
     const speed = fish ? Math.hypot(fish.vel?.x || 0, fish.vel?.y || 0) : 0;
     const displayed = Number(speed.toFixed(2));
-    const visible = entrySessionReady && net?.isJoined && fish && displayed > 0;
+    const level = Math.max(0, Math.min(REGIME.speedLevels, Math.floor(Number(fish?.speedLevel) || 0)));
+    const visible = entrySessionReady && net?.isJoined && fish && level > 0;
     playerSpeedMetric.classList.toggle('is-visible', Boolean(visible));
     playerSpeedMetric.setAttribute('aria-hidden', visible ? 'false' : 'true');
     playerSpeedReal.textContent = displayed.toFixed(2);
-    if( !fish || displayed <= 0 ){
+    if( !fish || level <= 0 ){
         playerSpeedPercent.textContent = '0';
-        playerSpeedPercent.style.color = '#7bd88f';
+        playerSpeedPercent.style.color = '#11b8ee';
         return;
     }
 
-    const maxPossibleSpeed = maxSpeedOf(fish.size, 'user') * 0.99;
-    const percent = Math.max(1, Math.min(99, Math.round(speed / Math.max(1, maxPossibleSpeed) * 100)));
-    playerSpeedPercent.textContent = String(percent);
-    playerSpeedPercent.style.color = fish.mode === 'burst'
-        ? burstSpeedColor(percent)
-        : '#7bd88f';
+    playerSpeedPercent.textContent = String(level);
+    playerSpeedPercent.style.color = level > REGIME.cruiseMaxSpeedLevel
+        ? burstSpeedColor(level)
+        : '#11b8ee';
 }
 
 function burstSpeedColor(percent){
     const t = Math.max(0, Math.min(1, (percent - 1) / 98));
-    return mixHexColor('#d58fb3', '#ff4f62', t);
+    return mixHexColor('#ffb14c', '#ff4f62', t);
 }
 
 // @ds:e41821af
@@ -739,9 +827,12 @@ function updatePlayerLifetimeBar(fish){
         return;
     }
     const activeAge = Math.max(0, fish.playerActiveAge || 0);
-    const ratio = Math.max(0, Math.min(1, 1 - activeAge / PLAYER.maxLifetimeSeconds));
+    const lifetimeLimit = fish.lifetimeMode === 'lowSize'
+        ? PLAYER.lowSizeMaxLifetimeSeconds
+        : PLAYER.maxLifetimeSeconds;
+    const ratio = Math.max(0, Math.min(1, 1 - activeAge / lifetimeLimit));
     const inFryStage = fish.fryAge !== null && fish.fryAge !== undefined;
-    const remainingSeconds = Math.max(0, PLAYER.maxLifetimeSeconds - activeAge);
+    const remainingSeconds = Math.max(0, lifetimeLimit - activeAge);
     lifetimeBar.style.transform = `scaleX(${ratio.toFixed(3)})`;
     lifetimeBar.style.background = lifetimeBarColor(remainingSeconds, inFryStage);
 }
@@ -816,37 +907,201 @@ function renderState(now){
 
 // @ds:8c663384
 function extrapolateWorld(world, now){
+    const shreds = (world.shreds || []).map(shred => extrapolateShred(shred, now, world.width, world.height)).filter(object => object.syncOpacity > 0);
+    const fish = (world.fish || []).map(fish => extrapolateFish(fish, now, world.width, world.height)).filter(object => object.syncOpacity > 0);
+    const liveKeys = new Set([
+        ...fish.map(object => `fish:${object.id}`),
+        ...shreds.map(object => `shred:${object.id}`),
+    ]);
+    for( const key of clientSyncRenderPositions.keys() ) if( !liveKeys.has(key) ) clientSyncRenderPositions.delete(key);
     return {
         ...world,
         bubbles: world.bubbles || [],
-        shreds: (world.shreds || []).map(shred => extrapolateShred(shred, now, world.width, world.height)).filter(object => object.syncOpacity > 0),
-        fish: (world.fish || []).map(fish => extrapolateFish(fish, now, world.width, world.height)).filter(object => object.syncOpacity > 0),
+        shreds,
+        fish,
     };
 }
 
 // @ds:8b62d9ce @ds:8c663384
 function extrapolateShred(shred, now, worldWidth, worldHeight){
     const elapsedSeconds = Math.max(0, (now - (shred._syncBaseAt ?? now)) / 1000);
+    const targetPos = {
+        x: wrapValue(shred.pos.x + (shred.vel?.x || 0) * elapsedSeconds, worldWidth),
+        y: wrapValue(shred.pos.y + (shred.vel?.y || 0) * elapsedSeconds, worldHeight),
+    };
     return {
         ...shred,
         syncOpacity: syncOpacityAt(shred, now),
-        pos: {
-            x: wrapValue(shred.pos.x + (shred.vel?.x || 0) * elapsedSeconds, worldWidth),
-            y: wrapValue(shred.pos.y + (shred.vel?.y || 0) * elapsedSeconds, worldHeight),
-        },
+        pos: smoothSyncedPosition(`shred:${shred.id}`, targetPos, now, worldWidth, worldHeight), // @fix:b3d7e9a2
+    };
+}
+
+// @fix:4e9b2c71
+function handleFlowMapFrame(bitmap){
+    const serial = ++flowMapFrameSerial;
+    flowMapBitmap?.close?.();
+    flowMapBitmap = bitmap;
+    decodeFlowMapBitmap(bitmap).then(field => {
+        if( serial !== flowMapFrameSerial ) return;
+        if( field && flowMapField && field.columns === flowMapField.columns && field.rows === flowMapField.rows ){
+            field.crossAngles = flowMapField.crossAngles;
+            field.crossVelocities = flowMapField.crossVelocities;
+        }
+        flowMapField = field;
+        if( flowVectorsResetPending ){
+            resetClientFlowCrosses();
+            flowVectorsResetPending = false;
+        }
+    }).catch(() => {
+        if( serial === flowMapFrameSerial ) flowMapField = null;
+    });
+}
+
+// @fix:4e9b2c71
+async function decodeFlowMapBitmap(bitmap){
+    if( !bitmap?.width || !bitmap?.height ) return null;
+    let surface;
+    if( typeof OffscreenCanvas === 'function' ) surface = new OffscreenCanvas(bitmap.width, bitmap.height);
+    else{
+        surface = document.createElement('canvas');
+        surface.width = bitmap.width;
+        surface.height = bitmap.height;
+    }
+    const context = surface.getContext('2d', { willReadFrequently: true });
+    if( !context ) return null;
+    context.clearRect(0, 0, bitmap.width, bitmap.height);
+    context.drawImage(bitmap, 0, 0);
+    const length = bitmap.width * bitmap.height;
+    return {
+        columns: bitmap.width,
+        rows: bitmap.height,
+        pixels: context.getImageData(0, 0, bitmap.width, bitmap.height).data,
+        crossAngles: new Float32Array(length),
+        crossVelocities: new Float32Array(length),
+    };
+}
+
+// @fix:5f2a8c71
+function resetClientFlowCrosses(){
+    if( !flowMapField ) return;
+    flowMapField.crossAngles?.fill(0);
+    flowMapField.crossVelocities?.fill(0);
+}
+
+// @fix:5f2a8c71
+function advanceClientFlowCrosses(field, dt){
+    if( !field || !Number.isFinite(dt) || dt <= 0 ) return;
+    const stride = Math.max(1, Math.floor(FLOW_MAP.vectorStrideCells));
+    for( let y = 0; y < field.rows; y += stride ) for( let x = 0; x < field.columns; x += stride ){
+        const index = y * field.columns + x;
+        const alpha = field.pixels[index * 4 + 3] || 0;
+        const byte = field.pixels[index * 4 + 2] || 127;
+        const angular = alpha > 0 ? (byte <= 127 ? byte / 127 - 1 : (byte - 127) / 128) : 0;
+        const velocity = field.crossVelocities[index] + angular * SHRED.flowAngularImpulseStrength * dt;
+        field.crossVelocities[index] = velocity * Math.exp(-SHRED.flowAngularDrag * dt);
+        field.crossAngles[index] += field.crossVelocities[index] * dt;
+    }
+}
+
+// @fix:4e9b2c71
+function advanceClientShredRotation(world, dt, field){
+    if( !world || !Number.isFinite(dt) || dt <= 0 ) return;
+    const seen = new Set();
+    for( const shred of world.shreds || [] ){
+        if( !shred?.pos || !Number.isFinite(shred.id) ) continue;
+        const id = shred.id;
+        seen.add(id);
+        const spin = clientShredSpin.get(id) || { angle: 0, velocity: 0 };
+        const impulse = field ? sampleAngularFlow(field, shred.pos) : 0;
+        spin.velocity += impulse * SHRED.flowAngularImpulseStrength * dt;
+        spin.velocity *= Math.exp(-SHRED.flowAngularDrag * dt);
+        spin.angle += spin.velocity * dt;
+        shred.renderRotation = spin.angle;
+        clientShredSpin.set(id, spin);
+    }
+    for( const id of clientShredSpin.keys() ) if( !seen.has(id) ) clientShredSpin.delete(id);
+}
+
+// @fix:4e9b2c71
+function sampleAngularFlow(field, position){
+    const cellSize = FISH.nominalStartDiameter / 4;
+    const gridX = position.x / cellSize - 0.5;
+    const gridY = position.y / cellSize - 0.5;
+    const x0 = Math.floor(gridX);
+    const y0 = Math.floor(gridY);
+    const tx = gridX - x0;
+    const ty = gridY - y0;
+    const at = (x, y) => {
+        const wrappedX = ((x % field.columns) + field.columns) % field.columns;
+        const wrappedY = ((y % field.rows) + field.rows) % field.rows;
+        const pixel = (wrappedY * field.columns + wrappedX) * 4;
+        if( (field.pixels[pixel + 3] || 0) === 0 ) return 0;
+        const byte = field.pixels[pixel + 2];
+        return byte <= 127 ? byte / 127 - 1 : (byte - 127) / 128;
+    };
+    return at(x0, y0) * (1 - tx) * (1 - ty)
+        + at(x0 + 1, y0) * tx * (1 - ty)
+        + at(x0, y0 + 1) * (1 - tx) * ty
+        + at(x0 + 1, y0 + 1) * tx * ty;
+}
+
+// @fix:4f8a2c71
+function sampleLinearFlow(field, position){
+    if( !field || !position || !field.columns || !field.rows || !field.pixels ) return { x: 0, y: 0 };
+    const cellSize = FISH.nominalStartDiameter / 4;
+    const gridX = position.x / cellSize - 0.5;
+    const gridY = position.y / cellSize - 0.5;
+    const x0 = Math.floor(gridX);
+    const y0 = Math.floor(gridY);
+    const tx = gridX - x0;
+    const ty = gridY - y0;
+    const at = (x, y) => {
+        const wrappedX = ((x % field.columns) + field.columns) % field.columns;
+        const wrappedY = ((y % field.rows) + field.rows) % field.rows;
+        const pixel = (wrappedY * field.columns + wrappedX) * 4;
+        const magnitude = (field.pixels[pixel + 3] || 0) / 255 * SHRED.flowMapMaxImpulse;
+        if( magnitude <= 1e-6 ) return { x: 0, y: 0 };
+        const encodedAngle = ((field.pixels[pixel] || 0) * 256) + (field.pixels[pixel + 1] || 0);
+        const angle = encodedAngle / 65535 * Math.PI * 2 - Math.PI;
+        return { x: Math.cos(angle) * magnitude, y: Math.sin(angle) * magnitude };
+    };
+    const a = at(x0, y0);
+    const b = at(x0 + 1, y0);
+    const c = at(x0, y0 + 1);
+    const d = at(x0 + 1, y0 + 1);
+    return {
+        x: a.x * (1 - tx) * (1 - ty) + b.x * tx * (1 - ty) + c.x * (1 - tx) * ty + d.x * tx * ty,
+        y: a.y * (1 - tx) * (1 - ty) + b.y * tx * (1 - ty) + c.y * (1 - tx) * ty + d.y * tx * ty,
     };
 }
 
 function extrapolateFish(fish, now, worldWidth, worldHeight){
     const elapsedSeconds = Math.max(0, (now - (fish._syncBaseAt ?? now)) / 1000);
+    const targetPos = {
+        x: wrapValue(fish.pos.x + (fish.vel?.x || 0) * elapsedSeconds, worldWidth),
+        y: wrapValue(fish.pos.y + (fish.vel?.y || 0) * elapsedSeconds, worldHeight),
+    };
     return {
         ...fish,
         syncOpacity: syncOpacityAt(fish, now),
-        pos: {
-            x: wrapValue(fish.pos.x + (fish.vel?.x || 0) * elapsedSeconds, worldWidth),
-            y: wrapValue(fish.pos.y + (fish.vel?.y || 0) * elapsedSeconds, worldHeight),
-        },
+        pos: smoothSyncedPosition(`fish:${fish.id}`, targetPos, now, worldWidth, worldHeight), // @fix:b3d7e9a2
     };
+}
+
+// @fix:b3d7e9a2
+function smoothSyncedPosition(key, target, now, worldWidth, worldHeight){
+    if( !target || !Number.isFinite(target.x) || !Number.isFinite(target.y) ) return target;
+    const previous = clientSyncRenderPositions.get(key);
+    if( !previous || previous.width !== worldWidth || previous.height !== worldHeight ){
+        clientSyncRenderPositions.set(key, { pos: { ...target }, lastAt: now, width: worldWidth, height: worldHeight });
+        return { ...target };
+    }
+    const elapsed = Math.max(0, Math.min(0.2, (now - previous.lastAt) / 1000));
+    const response = 1 - Math.exp(-SYNC.renderSmoothingRate * elapsed);
+    previous.pos.x = wrapValue(previous.pos.x + toroidalDelta(target.x - previous.pos.x, worldWidth) * response, worldWidth);
+    previous.pos.y = wrapValue(previous.pos.y + toroidalDelta(target.y - previous.pos.y, worldHeight) * response, worldHeight);
+    previous.lastAt = now;
+    return { ...previous.pos };
 }
 
 function wrapValue(value, size){
@@ -855,14 +1110,15 @@ function wrapValue(value, size){
 }
 
 // @ds:975ca168 @ds:bd354b7a @ds:3ddf8f67 @ds:a44b9d2c @fn:a9a3ed12 @ia:9c0d1e2f @ia:3a4b5c6e
-function applyClientFishDecor(world, bubbles, dt, rng){
-    const visibleFishIds = new Set((world.fish || []).map(fish => fish.id));
+function applyClientFishDecor(world, bubbles, finSparks, dt, rng){
+    const visibleFishIds = visibleDecorFishIds(world);
     for( const fishId of clientFishDecor.keys() ){
         if( !visibleFishIds.has(fishId) ) clientFishDecor.delete(fishId);
     }
     for( const fish of world.fish || [] ){
+        if( !visibleFishIds.has(fish.id) ) continue;
         const decor = clientFishDecor.get(fish.id) || makeClientDecor(fish);
-        updateClientDecorState(decor, fish, dt, bubbles, rng);
+        updateClientDecorState(decor, fish, dt, bubbles, finSparks, rng);
         clientFishDecor.set(fish.id, decor);
         fish.exhale = decor.exhale;
         fish.visualScale = decor.visualScale;
@@ -871,17 +1127,47 @@ function applyClientFishDecor(world, bubbles, dt, rng){
         fish.swimPhase = decor.swimPhase;
         fish.burstKick = decor.burstKick;
         fish.mouthOpen = decor.mouthOpen;
+        const inertialBraking = !fish.mode || fish.mode === 'cruise' && Number(fish.speedLevel || 0) === 0;
+        const targetTilt = inertialBraking ? 0 : visualFishTurnRadians(fish);
+        const tiltResponse = 1 - Math.exp(-SWIM.visualTiltResponse * Math.max(0, dt));
+        decor.visualTilt += (targetTilt - decor.visualTilt) * tiltResponse;
+        fish.visualTilt = decor.visualTilt;
         if( decor.shredBurstHold > 0 ) fish.mode = 'burst'; // @ds:a2d5936f
         if( decor.eatingCruiseHold > 0 ) fish.mode = 'cruise'; // @ds:975ca168
     }
 }
 
+// @fix:4f8a2c71
+function visibleDecorFishIds(world){
+    const fishes = world?.fish || [];
+    if( !fishes.length ) return new Set();
+    const followed = currentUserFish(world) || fishes[0];
+    const viewport = worldToViewport(world, followed, canvas, { viewportFishCapacity });
+    const halfWidth = canvas.width / Math.max(1e-6, viewport.scale) / 2;
+    const halfHeight = canvas.height / Math.max(1e-6, viewport.scale) / 2;
+    const margin = FISH.nominalStartDiameter * 2;
+    return new Set(fishes.filter(fish => {
+        if( (fish.syncOpacity ?? 1) <= 0 || !fish?.pos ) return false;
+        const dx = toroidalDelta(fish.pos.x - followed.pos.x, world.width);
+        const dy = toroidalDelta(fish.pos.y - followed.pos.y, world.height);
+        return Math.abs(dx) <= halfWidth + margin + (fish.radius || 0)
+            && Math.abs(dy) <= halfHeight + margin + (fish.radius || 0);
+    }).map(fish => fish.id));
+}
+
+function toroidalDelta(value, size){
+    if( !Number.isFinite(size) || size <= 0 ) return value;
+    return ((value + size * 0.5) % size + size) % size - size * 0.5;
+}
+
 function makeClientDecor(fish){
     return {
         swimPhase: 0,
+        visualTilt: 0, // @fix:6e2a9c41
         burstKick: 0,
         wasBurstSwimming: false,
         wasBurstActive: fish.mode === 'burst',
+        lastBurstSpeedLevel: fish.mode === 'burst' ? Math.floor(Number(fish.speedLevel) || 0) : 0, // @fix:4f8a2c71
         lastDirection: null,
         visualScale: fish.visualScale || 1,
         exhale: {
@@ -905,10 +1191,15 @@ function makeClientDecor(fish){
     };
 }
 
-function updateClientDecorState(decor, fish, dt, bubbles, rng){
+function updateClientDecorState(decor, fish, dt, bubbles, finSparks, rng){
     const speed = Math.hypot(fish.vel?.x || 0, fish.vel?.y || 0);
     const burstActive = fish.mode === 'burst';
     const burstSwimming = burstActive && speed > FISH.facingThreshold;
+    const burstSpeedLevel = Math.floor(Number(fish.speedLevel) || 0);
+    if( burstActive && burstSpeedLevel !== decor.lastBurstSpeedLevel ){
+        emitFinSparks(fish, finSparks, rng); // @fix:4f8a2c71
+    }
+    decor.lastBurstSpeedLevel = burstActive ? burstSpeedLevel : 0;
     if( burstActive !== decor.wasBurstActive ) emitMotionCueBubbles(fish, bubbles, rng); // @ds:3ddf8f67
     decor.wasBurstActive = burstActive;
     const direction = speed > FISH.facingThreshold ? normalize(fish.vel) : null;
@@ -945,6 +1236,60 @@ function updateClientDecorState(decor, fish, dt, bubbles, rng){
     const chaseOpen = burstSwimming && !closeForEating ? MOUTH.chaseOpenRatio : 0;
     const eatOpen = decor.mouthHold > 0 ? Math.min(1, decor.mouthEatenSize / Math.max(1, fish.size || 1)) : 0;
     decor.mouthOpen = closeForEating ? 0 : Math.max(chaseOpen, eatOpen);
+}
+
+// @fix:4f8a2c71
+function emitFinSparks(fish, finSparks, rng){
+    if( !Array.isArray(finSparks) || !fish?.pos || (fish.syncOpacity ?? 1) <= 0 ) return;
+    const tips = fishFinTipPositions(fish);
+    for( const tip of tips ){
+        if( rng() > SWIM.finSparkChance ) continue;
+        const sizePx = SWIM.finSparkMinSizePx + rng() * (SWIM.finSparkMaxSizePx - SWIM.finSparkMinSizePx);
+        const sizeRatio = (sizePx - SWIM.finSparkMinSizePx) / Math.max(1e-6, SWIM.finSparkMaxSizePx - SWIM.finSparkMinSizePx);
+        const life = SWIM.finSparkSmallLifeSeconds + (SWIM.finSparkLargeLifeSeconds - SWIM.finSparkSmallLifeSeconds) * sizeRatio;
+        finSparks.push({
+            id: `${fish.id}:${performance.now()}:${finSparks.length}`,
+            pos: { x: fish.pos.x + tip.offset.x, y: fish.pos.y + tip.offset.y },
+            vel: { x: 0, y: 0 },
+            age: 0,
+            life,
+            initialSizePx: sizePx,
+            shrinkDuration: life * 0.5 * sizeRatio,
+            sizePx,
+            alpha: SWIM.finSparkAlpha,
+        });
+    }
+}
+
+// @fix:4f8a2c71
+function advanceClientFinSparks(world, finSparks, dt, field){
+    if( !Array.isArray(finSparks) || !world || !Number.isFinite(dt) || dt <= 0 ) return;
+    for( let i = finSparks.length - 1; i >= 0; i-- ){
+        const spark = finSparks[i];
+        spark.age += dt;
+        if( spark.age >= spark.life ){
+            finSparks.splice(i, 1);
+            continue;
+        }
+        const flow = sampleLinearFlow(field, spark.pos);
+        spark.vel.x += flow.x * dt;
+        spark.vel.y += flow.y * dt;
+        const drag = Math.exp(-SHRED.dragMin * dt);
+        spark.vel.x *= drag;
+        spark.vel.y *= drag;
+        spark.pos.x = wrapValue(spark.pos.x + spark.vel.x * dt, world.width);
+        spark.pos.y = wrapValue(spark.pos.y + spark.vel.y * dt, world.height);
+        const shrinkDuration = Math.max(0, Number(spark.shrinkDuration) || 0);
+        if( shrinkDuration > 0 && spark.age < shrinkDuration ){
+            const shrinkProgress = spark.age / shrinkDuration;
+            spark.sizePx = spark.initialSizePx - (spark.initialSizePx - SWIM.finSparkMinSizePx) * shrinkProgress;
+            spark.alpha = SWIM.finSparkAlpha;
+        }else{
+            spark.sizePx = SWIM.finSparkMinSizePx;
+            const fadeDuration = Math.max(1e-6, spark.life - shrinkDuration);
+            spark.alpha = SWIM.finSparkAlpha * (1 - Math.max(0, spark.age - shrinkDuration) / fadeDuration);
+        }
+    }
 }
 
 // @ds:3ddf8f67 @ds:d6cebf86
@@ -1028,6 +1373,7 @@ function buildInputPayload(){
     const fish = currentUserFish();
     let accel = keySteer(input.keys);
     const keyboardAccel = Boolean(accel);
+    if( joystickBase ) joystickBase.classList.toggle('is-keyboard-control', keyboardAccel); // @fix:5d9e3a71
     if( !accel ){
         if( controlMode.active === 'pointer' && fish && input.pointer.active ){
             const worldPointer = viewportToWorld(input.pointer.pos, state.world, fish, canvas, { viewportFishCapacity });
@@ -1125,6 +1471,15 @@ function toggleGameMenu(){
 // @ds:59c118f5
 function toggleDebugMode(){
     debugMode = !debugMode;
+    syncSegmentsVisible = debugMode;
+    if( debugMode && entrySessionReady && net?.isJoined ){
+        worldMapVisible = true;
+        updateWorldMapUi();
+    }
+    if( syncSegmentsToggle ){
+        syncSegmentsToggle.setAttribute('aria-pressed', String(syncSegmentsVisible));
+        syncSegmentsToggle.classList.toggle('is-active', syncSegmentsVisible);
+    }
     syncDangerMapTransport();
     updateGameMenu();
 }
@@ -1252,7 +1607,9 @@ function formatThresholdSize(size){
 
 // @ds:cd1c5776 @ds:9772e9ac @ds:93b8abba
 function updateJoystickPanelVisibility(){
-    if( joystickPanel ) joystickPanel.hidden = !isJoystickPanelVisible();
+    const visible = isJoystickPanelVisible();
+    if( joystickPanel ) joystickPanel.hidden = !visible;
+    if( visible ) requestAnimationFrame(clampJoystickPositionToViewport); // @fix:f1c6a8d4
 }
 
 function isJoystickPanelVisible(){
@@ -1276,13 +1633,15 @@ function updateJoystickBurstAvailability(fish){
 
 function renderJoystickBurstRings(availableLevel){
     if( !joystickBurstRings ) return;
+    if( joystickBase ) joystickBase.style.setProperty('--cruise-base-diameter', `${speedLevelToControlMagnitude(REGIME.cruiseMaxSpeedLevel) * 100}%`);
+    if( joystickBurstBase ) joystickBurstBase.style.setProperty('--burst-base-diameter', `${speedLevelToControlMagnitude(REGIME.burstStartSpeedLevel) * 100}%`);
     const maxLevel = Math.max(1, Math.min(REGIME.speedLevels, Math.floor(Number(availableLevel) || 1)));
-    const ringLevels = [30, 43, 56, 69, 82, 99];
+    const ringLevels = [30, 31, 40, 50, 60, 70, 80, 90, 99]; // @fix:8c4f2a71
     const ringSpecs = ringLevels.map(level => ({
         level,
         diameter: speedLevelToControlMagnitude(level) * 100,
-        color: level <= maxLevel ? 'rgba(255, 228, 92, 0.24)' : 'rgba(150, 158, 164, 0.07)',
-        width: level === maxLevel ? 1.4 : 1,
+        color: level <= maxLevel ? 'rgba(210, 151, 76, 0.42)' : 'rgba(150, 158, 164, 0.12)',
+        width: 1,
     }));
     for( const level of ringLevels ){
         if( level === maxLevel ) return renderJoystickRingSpecs(ringSpecs);
@@ -1346,11 +1705,26 @@ function setupJoystickControls(){
     if( !joystickBase ) return;
     let activePointerId = null;
     const updateJoystick = e =>{
-        const rect = joystickBase.getBoundingClientRect();
-        const center = v(rect.left + rect.width / 2, rect.top + rect.height / 2);
-        const raw = v(e.clientX - center.x, e.clientY - center.y);
+        const pointer = v(e.clientX, e.clientY);
+        let rect = joystickBase.getBoundingClientRect();
+        let center = v(rect.left + rect.width / 2, rect.top + rect.height / 2);
+        let raw = v(pointer.x - center.x, pointer.y - center.y);
         const radius = Math.max(1, rect.width / 2);
-        const distance = Math.min(radius, Math.hypot(raw.x, raw.y));
+        const distanceFromCenter = Math.hypot(raw.x, raw.y);
+        let isAtOuterBoundary = false;
+        if( distanceFromCenter > radius ){
+            const outward = normalize(raw);
+            const overshoot = distanceFromCenter - radius;
+            const desiredCenter = v(center.x + outward.x * overshoot, center.y + outward.y * overshoot);
+            setJoystickCenter(clampJoystickCenter(desiredCenter, radius));
+            const movedRect = joystickBase.getBoundingClientRect();
+            center = v(movedRect.left + movedRect.width / 2, movedRect.top + movedRect.height / 2);
+            raw = v(pointer.x - center.x, pointer.y - center.y);
+            isAtOuterBoundary = true;
+        }
+        // A relocation puts the touch exactly on the outer boundary: this
+        // event therefore represents the maximum burst level.
+        const distance = isAtOuterBoundary ? radius : Math.min(radius, Math.hypot(raw.x, raw.y));
         const direction = normalize(raw);
         input.joystick.active = true;
         input.joystick.rawVector = scale(direction, distance / radius);
@@ -1375,6 +1749,50 @@ function setupJoystickControls(){
     });
     joystickBase.addEventListener('pointerup', resetJoystick);
     joystickBase.addEventListener('pointercancel', resetJoystick);
+}
+
+// @fix:f1c6a8d4
+function setJoystickCenter(center){
+    if( !joystickPanel || !joystickBase || !center ) return;
+    const panelRect = joystickPanel.getBoundingClientRect();
+    const baseRect = joystickBase.getBoundingClientRect();
+    const baseCenterOffsetX = baseRect.left + baseRect.width / 2 - panelRect.left;
+    const baseCenterOffsetY = baseRect.top + baseRect.height / 2 - panelRect.top;
+    // Position the panel from the base center; the base itself is inset inside
+    // the larger footprint on mobile.
+    joystickPanel.style.width = `${panelRect.width}px`;
+    joystickPanel.style.height = `${panelRect.height}px`;
+    joystickPanel.style.left = `${center.x - baseCenterOffsetX}px`;
+    joystickPanel.style.top = `${center.y - baseCenterOffsetY}px`;
+    joystickPanel.style.right = 'auto';
+    joystickPanel.style.bottom = 'auto';
+}
+
+// @fix:f1c6a8d4
+function clampJoystickCenter(center, outerRadius){
+    const knobRect = joystickKnob?.getBoundingClientRect();
+    const knobSize = Math.max(1, Number(knobRect?.width) || 0);
+    const inset = knobSize * JOYSTICK.edgeInsetKnobRatio;
+    const viewportWidth = Math.max(1, window.visualViewport?.width || window.innerWidth);
+    const viewportHeight = Math.max(1, window.visualViewport?.height || window.innerHeight);
+    const minX = outerRadius + inset;
+    const maxX = viewportWidth - outerRadius - inset;
+    const minY = outerRadius + inset;
+    const maxY = viewportHeight - outerRadius - inset;
+    return v(
+        minX > maxX ? viewportWidth / 2 : Math.max(minX, Math.min(maxX, center.x)),
+        minY > maxY ? viewportHeight / 2 : Math.max(minY, Math.min(maxY, center.y)),
+    );
+}
+
+// @fix:f1c6a8d4
+function clampJoystickPositionToViewport(){
+    if( !joystickBase || joystickPanel?.hidden ) return;
+    const rect = joystickBase.getBoundingClientRect();
+    if( rect.width <= 0 || rect.height <= 0 ) return;
+    const center = v(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    const clamped = clampJoystickCenter(center, Math.max(rect.width, rect.height) / 2);
+    if( Math.hypot(clamped.x - center.x, clamped.y - center.y) > 0.5 ) setJoystickCenter(clamped);
 }
 
 // @ds:727e9afe
