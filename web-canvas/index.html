@@ -80,6 +80,11 @@
             <button id="danger-map-toggle" type="button" aria-label="Danger map" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 1v3M23 12h-3M12 23v-3M1 12h3"/></svg></button>
         </div>
     </div>
+    <aside id="viewport-scale-widget" hidden aria-label="Viewport scale">
+        <span class="viewport-scale-label">max</span>
+        <span class="viewport-scale-track" aria-hidden="true"><span id="viewport-scale-marker"></span></span>
+        <span class="viewport-scale-label">5</span>
+    </aside>
     <!-- @ds:ab1e4f02 -->
     <aside id="game-menu" hidden>
         <div id="control-modes" class="menu-row" hidden>
@@ -101,6 +106,7 @@
                 <option value="10">10</option>
                 <option value="30">30</option>
                 <option value="max">max</option>
+                <option value="custom" hidden>текущий</option>
             </select>
         </label>
         <!-- @ds:cff27cd5 -->

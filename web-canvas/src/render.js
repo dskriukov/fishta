@@ -431,6 +431,7 @@ export function render(ctx, state){
         || state.player;
     const viewport = worldToViewport(world, followed, ctx.canvas, {
         viewportFishCapacity: state.viewportFishCapacity,
+        cameraZoom: state.cameraZoom,
         cameraPan: state.cameraPan,
     });
     const cameraFocus = followed ? {
@@ -446,7 +447,7 @@ export function render(ctx, state){
         bubbles: state.clientBubbles || world.bubbles || state.bubbles || [],
     }, cameraFocus, state.debug?.positionTraces || []);
 
-    updateWorldBackgroundCss(world, cameraFocus, state.viewportFishCapacity, ctx.canvas);
+    updateWorldBackgroundCss(world, cameraFocus, state.viewportFishCapacity, ctx.canvas, state.cameraZoom);
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
     ctx.save();
@@ -510,10 +511,10 @@ export function render(ctx, state){
 }
 
 // @ds:2b3e71e0 @fix:4bbc0692 @ia:3983084a
-export function updateWorldBackgroundCss(world, followed, viewportFishCapacity, canvas){
+export function updateWorldBackgroundCss(world, followed, viewportFishCapacity, canvas, cameraZoom = null){
     if( typeof document === 'undefined' || !document.documentElement ) return;
     const delta = backgroundCameraDelta(world, followed);
-    const scale = viewportScaleForFishCapacity(world, canvas, viewportFishCapacity);
+    const scale = viewportScaleForZoom(world, canvas, viewportFishCapacity, cameraZoom);
     const cameraDelta = {
         x: -delta.x * scale,
         y: -delta.y * scale,
@@ -580,7 +581,7 @@ function wrappedTileOffset(value, size){
 
 // @ds:7b9a7984 @ds:e001d967
 export function worldToViewport(world, followed, canvas, options = {}){
-    const scale = viewportScaleForFishCapacity(world, canvas, options.viewportFishCapacity) * (world?.scale || 1);
+    const scale = viewportScaleForZoom(world, canvas, options.viewportFishCapacity, options.cameraZoom) * (world?.scale || 1);
     const focus = followed ? followed.pos : { x: world.width / 2, y: world.height / 2 };
     const cameraPan = options.cameraPan || { x: 0, y: 0 };
     return {
@@ -608,6 +609,35 @@ export function viewportScaleForFishCapacity(world, canvas, value){
     const nominalDiameter = FISH.nominalStartDiameter * Math.sqrt(PLAYER.startSize);
     const numericScale = minScreenSide / (capacity * nominalDiameter);
     return Math.max(numericScale, maxScale);
+}
+
+// Continuous display-only zoom: 0 is the `max` view, 1 is five nominal fish
+// diameters, with no scale outside that supported interval.
+export function viewportScaleForZoom(world, canvas, value, zoom = null){
+    const selectedScale = viewportScaleForFishCapacity(world, canvas, value);
+    // `null` means that the discrete selector is active; only an explicit
+    // numeric zoom value should switch to the continuous custom scale.
+    if( zoom === null || zoom === undefined || !Number.isFinite(Number(zoom)) ) return selectedScale;
+    const minScale = viewportScaleForFishCapacity(world, canvas, 'max');
+    const maxScale = viewportScaleForFishCapacity(world, canvas, '5');
+    if( maxScale <= minScale + 1e-9 ) return minScale;
+    return minScale + (maxScale - minScale) * clamp(Number(zoom), 0, 1);
+}
+
+export function viewportZoomForCapacity(world, canvas, value){
+    const minScale = viewportScaleForFishCapacity(world, canvas, 'max');
+    const maxScale = viewportScaleForFishCapacity(world, canvas, '5');
+    if( maxScale <= minScale + 1e-9 ) return 0;
+    const selectedScale = viewportScaleForFishCapacity(world, canvas, value);
+    return clamp((selectedScale - minScale) / (maxScale - minScale), 0, 1);
+}
+
+export function viewportCapacityForZoom(world, canvas, zoom){
+    const scale = viewportScaleForZoom(world, canvas, 'max', zoom) * (world?.scale || 1);
+    const minScreenSide = Math.min(canvas?.width || 0, canvas?.height || 0);
+    const nominalDiameter = FISH.nominalStartDiameter * Math.sqrt(PLAYER.startSize);
+    if( scale <= 1e-9 || minScreenSide <= 0 || nominalDiameter <= 0 ) return 0;
+    return minScreenSide / (scale * nominalDiameter);
 }
 
 // @ds:7b9a7984 @ds:e001d967
@@ -1368,6 +1398,7 @@ function drawFish(ctx, f, currentUserFishId, viewport){
 
 // @fix:6e2a9c41 @fix:c13e07b3
 export function visualFishTurnRadians(fish){
+    if( fish?.mode !== 'burst' ) return 0; // @fix:ab4142d8
     const hasVisualDirection = Boolean(fish?.visualDirection);
     const direction = fish?.visualDirection || fish?.vel || { x: 0, y: 0 };
     const velocityX = Number(direction.x) || 0;

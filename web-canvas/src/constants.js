@@ -63,6 +63,7 @@ export const JOYSTICK = {
 
 export const CAMERA = {
     safeInsetShortSideRatio: 0.2, // user fish remains inside this screen-edge inset during map pan
+    pinchZoomSensitivity: 0.5, // normalized zoom change per logarithmic pinch distance — @fix:394756ee
 };
 
 export const SERVER = {
@@ -153,7 +154,7 @@ export const REGIME = {
     burstStartSpeedLevel: 31, // v31 is the first burst speed — @ds:8869f043
     enduranceReserveSeconds: 5, // @ds:07320d39
     enduranceSimulationStepSeconds: 0.1, // @ds:07320d39
-    npcMaxBurstLevel: 79,   // NPC target burst percent cap — @ds:703efd43
+    npcMaxBurstLevel: 68,   // NPC target burst percent cap — @ds:703efd43
 };
 
 export const GROWTH = {
@@ -165,7 +166,7 @@ export const ENERGY = {
     refSizes: 100,          // reference distance = refSizes * size ("100 размеров")
     minSize: 0.2,           // size floor so radius>0 & predation stays defined — ia:7c8d9e0f
     userMinSize: 0.36,      // > PREY.minSize * PREDATION.eatRatio (0.3 * 1.15) — @ds:6aa7c828
-    burstExtraSpendFactor: 20, // v31 x1, v99 x21 — @ds:f51831f5
+    burstExtraSpendFactor: 16, // v31 x1, v99 x21 — @ds:f51831f5
 };
 
 export const PREDATION = {

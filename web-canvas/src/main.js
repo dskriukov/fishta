@@ -5,11 +5,12 @@
 
 import { CAMERA, DEBUG, ENERGY, EXHALE, FISH, FLOW_MAP, JOYSTICK, LOOP, MOUTH, PLAYER, REGIME, SHRED, SIZE_DELTA_LABEL, SWIM, SYNC, VIEWPORT_FISH_CAPACITY, WORLD_MAP } from './constants.js';
 import { advanceBubbles, emitBubble, makeBubble, makeWorld } from './world.js';
+import { buildFlowField } from './flow.js'; // @fix:6a7b8c9d
 import { BURST_ENDURANCE_SIZE_THRESHOLDS, availableSpeedLevelForSize, burstEnergyFactorOf, requestExhale, runExhaleCycle, serializeFish, speedCapOf, technicalRadiusOf } from './fish.js';
 import { createControlModeState, createInput, keySteer, pointerSteer, joystickSteer, speedLevel, speedLevelToControlMagnitude } from './controls.js';
-import { buildToroidalRenderWorld, fishFinTipPositions, loadFishGeometry, loadShredGeometry, render, viewportToWorld, visualFishTurnRadians, worldToViewport } from './render.js';
+import { buildToroidalRenderWorld, fishFinTipPositions, loadFishGeometry, loadShredGeometry, render, viewportCapacityForZoom, viewportToWorld, viewportZoomForCapacity, visualFishTurnRadians, worldToViewport } from './render.js';
 import { dist, normalize, scale, v } from './vec.js';
-import { createClientNet, createDangerMapSocket, createFlowMapSocket } from './client-net.js';
+import { createClientNet, createDangerMapSocket } from './client-net.js';
 import { syncOpacityAt } from './protocol.js';
 
 const canvas = document.getElementById('game');
@@ -63,6 +64,9 @@ const controlModes = document.getElementById('control-modes');
 const controlModeButtons = [...document.querySelectorAll('[data-control-mode]')];
 const controlHelp = document.getElementById('control-help');
 const viewportFishCapacitySelect = document.getElementById('viewport-fish-capacity-select');
+const viewportScaleWidget = document.getElementById('viewport-scale-widget');
+const viewportScaleTrack = viewportScaleWidget?.querySelector('.viewport-scale-track');
+const viewportScaleMarker = document.getElementById('viewport-scale-marker');
 const burstEnduranceRows = document.getElementById('burst-endurance-rows');
 const joystickPanel = document.getElementById('joystick-panel');
 const joystickBase = document.getElementById('joystick-base');
@@ -84,9 +88,18 @@ const clientBubbles = [];
 const clientFinSparks = []; // @fix:4f8a2c71
 const clientBubbleEmitters = new Map();
 const clientFishDecor = new Map();
+const VIEWPORT_CAMERA_ZOOM_STORAGE_KEY = 'selfish-bait.viewport-camera-zoom'; // @fix:394756ee
 const cameraPan = { x: 0, y: 0 };
+let cameraZoom = loadCameraZoom(); // @fix:394756ee
 let cameraPanPointerId = null;
 let cameraPanLastPoint = null;
+let cameraGestureMode = null;
+let cameraGestureStartZoom = null;
+let cameraPointers = new Map();
+let pinchStartDistance = null;
+let viewportFishCapacityUiKey = null; // @fix:394756ee
+let viewportScaleWidgetKey = null; // @fix:394756ee
+let viewportScalePointerId = null; // @fix:394756ee
 let serializeKeyLatch = false;
 let lastSentInputKey = null;
 let lastInputFlushAt = 0;
@@ -100,14 +113,19 @@ let flowMapVisible = false; // @fix:6a7b8c9d
 let flowMapBitmap = null; // @fix:6a7b8c9d
 let flowMapField = null; // @fix:4e9b2c71
 let flowMapFrameSerial = 0; // @fix:4e9b2c71
-let flowMapTransportEnabled = false; // @fix:4e9b2c71
+let flowMapLocalEnabled = false; // @fix:6a7b8c9d
+let flowMapSurface = null; // @fix:6a7b8c9d
+let flowMapLastBuildAt = 0; // @fix:6a7b8c9d
+let flowMapBuildMs = 0; // @fix:6a7b8c9d
+let flowMapBuildFishCount = 0; // @fix:6a7b8c9d
+let flowMapMetricsLoggedAt = 0; // @fix:6a7b8c9d
+const FLOW_MAP_LOCAL_UPDATE_MS = 100; // @fix:6a7b8c9d
 let flowVectorsVisible = false; // @fix:5f2a8c71
 let flowVectorsResetPending = false; // @fix:5f2a8c71
 const clientShredSpin = new Map(); // @fix:4e9b2c71
 let dangerMapVisible = false;
 let dangerMapBitmap = null;
 const dangerMapNet = createDangerMapSocket(bitmap => { dangerMapBitmap?.close?.(); dangerMapBitmap = bitmap; });
-const flowMapNet = createFlowMapSocket(bitmap => { handleFlowMapFrame(bitmap); });
 let worldCalculationMs = null;
 let syncCycleMs = null;
 let lastMeasuredSyncCycle = null;
@@ -181,7 +199,6 @@ function getWorldMapTop(){
 const input = createInput(canvas);
 net = createClientNet({
     onSnapshot(message){
-        openFlowMapTransport(); // @fix:4e9b2c71
         if( state.currentUserFishId !== message.currentUserFishId ){ // @fix:32ef3d51
             lastSentInputKey = null;
             cameraPan.x = 0;
@@ -190,6 +207,7 @@ net = createClientNet({
         state.world = message.world;
         state.currentUserFishId = message.currentUserFishId;
         updateWorldSyncMetrics(message);
+        if( document.activeElement !== viewportFishCapacitySelect ) updateViewportFishCapacityUi(); // @fix:394756ee
         if( debugMode && Number.isInteger(message.syncDiagnostics?.cellX) && Number.isInteger(message.syncDiagnostics?.cellY) ){
             const key = `${message.syncDiagnostics.cellX}:${message.syncDiagnostics.cellY}`;
             debugReceivedQuadrants.set(key, {
@@ -355,7 +373,7 @@ canvas.addEventListener('click', e =>{
     const rect = canvas.getBoundingClientRect();
     const clickState = lastVisibleState || state;
     const followed = currentUserFish(clickState.world, clickState.currentUserFishId);
-    const clickPos = viewportToWorld(v(e.clientX - rect.left, e.clientY - rect.top), clickState.world, followed, canvas, { viewportFishCapacity, cameraPan });
+    const clickPos = viewportToWorld(v(e.clientX - rect.left, e.clientY - rect.top), clickState.world, followed, canvas, { viewportFishCapacity, cameraZoom, cameraPan });
     const renderWorld = buildToroidalRenderWorld(clickState.world, followed);
     const projectedFish = (renderWorld.fish || []).find(candidate => candidate && dist(clickPos, candidate.pos) <= candidate.radius);
     const fish = projectedFish ? (state.world.fish || []).find(candidate => candidate.id === projectedFish.id) : null;
@@ -580,8 +598,11 @@ function toggleFlowMap(){
 function toggleFlowVectors(){
     flowVectorsVisible = !flowVectorsVisible;
     if( flowVectorsVisible ){
+        openFlowMapTransport(); // @fix:6a7b8c9d
         flowVectorsResetPending = true;
         resetClientFlowCrosses();
+    }else if( !flowMapVisible ){
+        closeFlowMapTransport(); // @fix:6a7b8c9d
     }
     if( flowVectorsToggle ){
         flowVectorsToggle.setAttribute('aria-pressed', String(flowVectorsVisible));
@@ -603,24 +624,27 @@ function syncDiagnosticMapTransport(){
         dangerMapBitmap?.close?.();
         dangerMapBitmap = null;
     }
-    if( flowMapVisible ) openFlowMapTransport();
+    if( flowMapVisible || flowVectorsVisible ) openFlowMapTransport();
+    else closeFlowMapTransport();
 }
 
 // @fix:4e9b2c71
 function openFlowMapTransport(){
-    if( flowMapTransportEnabled ) return;
-    flowMapTransportEnabled = true;
-    flowMapNet.open();
+    if( flowMapLocalEnabled ) return;
+    flowMapLocalEnabled = true;
+    flowMapLastBuildAt = 0;
 }
 
 // @fix:4e9b2c71
 function closeFlowMapTransport(){
-    if( !flowMapTransportEnabled ) return;
-    flowMapTransportEnabled = false;
-    flowMapNet.close();
+    if( !flowMapLocalEnabled ) return;
+    flowMapLocalEnabled = false;
     flowMapBitmap?.close?.();
     flowMapBitmap = null;
     flowMapField = null;
+    flowMapSurface = null;
+    flowVelocitySamples.clear();
+    flowMapLastBuildAt = 0;
     flowMapFrameSerial++;
 }
 
@@ -633,6 +657,7 @@ if( debugModeToggle ){
     debugModeToggle.setAttribute('aria-pressed', 'false');
 }
 setupViewportFishCapacity();
+setupViewportScaleWidget(); // @fix:394756ee
 setupControlModes();
 setupCameraPan(); // @fix:32ef3d51
 setupJoystickControls();
@@ -679,6 +704,7 @@ function setJoinedUiState(joined, { showJoinForm = false, sessionReady = entrySe
     if( joinPanel ) joinPanel.hidden = !joinVisible;
     if( controlModes ) controlModes.hidden = !gameControlsVisible;
     if( controlHelp ) controlHelp.hidden = !gameControlsVisible;
+    if( viewportScaleWidget ) viewportScaleWidget.hidden = !gameControlsVisible;
     updateJoystickPanelVisibility();
     updatePlayerMetricsVisibility(currentUserFish());
     updateGameMenu();
@@ -703,10 +729,12 @@ function frame(now){
     dt = Math.min(dt, LOOP.maxDt);   // clamp — ecs-loop.dsr
 
     const visibleState = renderState(now);
+    updateViewportScaleWidget(); // @fix:394756ee
     clampCameraPanToSafeArea(); // @fix:32ef3d51
+    applyClientFishDecor(visibleState.world, clientBubbles, clientFinSparks, dt, Math.random); // @fix:4f8a2c71
+    updateClientFlowField(visibleState.world, now); // @fix:6a7b8c9d
     advanceClientShredRotation(visibleState.world, dt, flowMapField); // @fix:4e9b2c71
     if( flowVectorsVisible ) advanceClientFlowCrosses(flowMapField, dt); // @fix:5f2a8c71
-    applyClientFishDecor(visibleState.world, clientBubbles, clientFinSparks, dt, Math.random); // @fix:4f8a2c71
     advanceClientFinSparks(visibleState.world, clientFinSparks, dt, flowMapField); // @fix:4f8a2c71
     updateSizeDeltaLabels(visibleState.world, dt);
     lastVisibleState = visibleState;
@@ -715,6 +743,7 @@ function frame(now){
     render(ctx, {
         ...visibleState,
         viewportFishCapacity,
+        cameraZoom,
         cameraPan,
         clientBubbles,
         finSparks: clientFinSparks, // @fix:4f8a2c71
@@ -947,6 +976,96 @@ function extrapolateShred(shred, now, worldWidth, worldHeight){
     };
 }
 
+// @fix:6a7b8c9d
+function updateClientFlowField(world, now){
+    if( !flowMapLocalEnabled || (!flowMapVisible && !flowVectorsVisible) || !world?.fish?.length ) return;
+    if( cameraPointers.size > 0 ) return; // keep touch gestures free of flow rebuild work
+    if( flowMapLastBuildAt && now - flowMapLastBuildAt < FLOW_MAP_LOCAL_UPDATE_MS ) return;
+    const startedAt = performance.now();
+    const elapsedSeconds = flowMapLastBuildAt > 0
+        ? Math.max(0.016, (now - flowMapLastBuildAt) / 1000)
+        : 1 / 30;
+    const fish = world.fish.map(candidate => {
+        const previous = flowVelocitySamples.get(candidate.id);
+        const velocity = {
+            x: Number(candidate.vel?.x) || 0,
+            y: Number(candidate.vel?.y) || 0,
+        };
+        const prevAccel = previous
+            ? { x: (velocity.x - previous.x) / elapsedSeconds, y: (velocity.y - previous.y) / elapsedSeconds }
+            : (candidate.prevAccel || { x: 0, y: 0 });
+        flowVelocitySamples.set(candidate.id, velocity);
+        return { ...candidate, prevAccel };
+    });
+    const field = buildFlowField({ ...world, fish });
+    field.pixels = encodeClientFlowFieldPixels(field);
+    const fieldLength = field.columns * field.rows;
+    const sameGrid = flowMapField
+        && field.columns === flowMapField.columns
+        && field.rows === flowMapField.rows;
+    field.crossAngles = sameGrid && flowMapField.crossAngles?.length === fieldLength
+        ? flowMapField.crossAngles
+        : new Float32Array(fieldLength);
+    field.crossVelocities = sameGrid && flowMapField.crossVelocities?.length === fieldLength
+        ? flowMapField.crossVelocities
+        : new Float32Array(fieldLength);
+    flowMapField = field;
+    flowMapBitmap = updateClientFlowMapSurface(field);
+    flowMapLastBuildAt = now;
+    flowMapBuildMs = performance.now() - startedAt;
+    flowMapBuildFishCount = fish.length;
+    if( debugMode && now - flowMapMetricsLoggedAt >= 5000 ){
+        flowMapMetricsLoggedAt = now;
+        console.debug('[flow-map local]', {
+            fish: flowMapBuildFishCount,
+            buildMs: Number(flowMapBuildMs.toFixed(3)),
+            msPerFish: Number((flowMapBuildMs / Math.max(1, flowMapBuildFishCount)).toFixed(4)),
+            cells: field.columns * field.rows,
+            updateMs: FLOW_MAP_LOCAL_UPDATE_MS,
+        });
+    }
+}
+
+const flowVelocitySamples = new Map(); // @fix:6a7b8c9d
+
+// @fix:6a7b8c9d
+function encodeClientFlowFieldPixels(field){
+    const pixels = new Uint8ClampedArray(field.columns * field.rows * 4);
+    const maxImpulse = Math.max(1, Number(field.maxImpulse) || SHRED.flowMapMaxImpulse);
+    for( let index = 0; index < field.columns * field.rows; index++ ){
+        const x = field.flowX[index] || 0;
+        const y = field.flowY[index] || 0;
+        const magnitude = Math.hypot(x, y);
+        const angular = Math.max(-1, Math.min(1, Number(field.flowAngular?.[index]) || 0));
+        const offset = index * 4;
+        const angle = magnitude > 1e-6 ? (Math.atan2(y, x) + Math.PI) / (Math.PI * 2) : 0;
+        const encodedAngle = Math.max(0, Math.min(65535, Math.round(angle * 65535)));
+        pixels[offset] = encodedAngle >> 8;
+        pixels[offset + 1] = encodedAngle & 255;
+        pixels[offset + 2] = angular < 0
+            ? Math.max(0, Math.min(127, Math.round(127 + angular * 127)))
+            : Math.max(127, Math.min(255, Math.round(127 + angular * 128)));
+        pixels[offset + 3] = Math.max(0, Math.min(255, Math.round(magnitude / maxImpulse * 255)));
+    }
+    return pixels;
+}
+
+// @fix:6a7b8c9d
+function updateClientFlowMapSurface(field){
+    if( typeof document === 'undefined' || !field?.pixels ) return null;
+    if( !flowMapSurface || flowMapSurface.width !== field.columns || flowMapSurface.height !== field.rows ){
+        flowMapSurface = document.createElement('canvas');
+        flowMapSurface.width = field.columns;
+        flowMapSurface.height = field.rows;
+    }
+    const context = flowMapSurface.getContext('2d');
+    if( !context ) return flowMapSurface;
+    const imageData = context.createImageData(field.columns, field.rows);
+    imageData.data.set(field.pixels);
+    context.putImageData(imageData, 0, 0);
+    return flowMapSurface;
+}
+
 // @fix:4e9b2c71
 function handleFlowMapFrame(bitmap){
     const serial = ++flowMapFrameSerial;
@@ -1002,6 +1121,9 @@ function resetClientFlowCrosses(){
 // @fix:5f2a8c71
 function advanceClientFlowCrosses(field, dt){
     if( !field || !Number.isFinite(dt) || dt <= 0 ) return;
+    const length = field.columns * field.rows;
+    if( field.crossAngles?.length !== length ) field.crossAngles = new Float32Array(length);
+    if( field.crossVelocities?.length !== length ) field.crossVelocities = new Float32Array(length);
     const stride = Math.max(1, Math.floor(FLOW_MAP.vectorStrideCells));
     for( let y = 0; y < field.rows; y += stride ) for( let x = 0; x < field.columns; x += stride ){
         const index = y * field.columns + x;
@@ -1140,7 +1262,9 @@ function applyClientFishDecor(world, bubbles, finSparks, dt, rng){
         fish.mouthOpen = decor.mouthOpen;
         updateClientFishOrientation(decor, fish); // @fix:c13e07b3
         const inertialBraking = !fish.mode || fish.mode === 'cruise' && Number(fish.speedLevel || 0) === 0;
-        const targetTilt = inertialBraking ? 0 : visualFishTurnRadians(fish);
+        const targetTilt = fish.mode === 'burst' && !inertialBraking
+            ? visualFishTurnRadians(fish)
+            : 0; // @fix:ab4142d8
         const tiltResponse = 1 - Math.exp(-SWIM.visualTiltResponse * Math.max(0, dt));
         decor.visualTilt += (targetTilt - decor.visualTilt) * tiltResponse;
         fish.visualTilt = decor.visualTilt;
@@ -1154,7 +1278,7 @@ function visibleDecorFishIds(world){
     const fishes = world?.fish || [];
     if( !fishes.length ) return new Set();
     const followed = currentUserFish(world) || fishes[0];
-    const viewport = worldToViewport(world, followed, canvas, { viewportFishCapacity });
+    const viewport = worldToViewport(world, followed, canvas, { viewportFishCapacity, cameraZoom });
     const halfWidth = canvas.width / Math.max(1e-6, viewport.scale) / 2;
     const halfHeight = canvas.height / Math.max(1e-6, viewport.scale) / 2;
     const margin = FISH.nominalStartDiameter * 2;
@@ -1436,7 +1560,7 @@ function buildInputPayload(){
     if( joystickBase ) joystickBase.classList.toggle('is-keyboard-control', keyboardAccel); // @fix:5d9e3a71
     if( !accel ){
         if( controlMode.active === 'pointer' && fish && input.pointer.active ){
-            const worldPointer = viewportToWorld(input.pointer.pos, state.world, fish, canvas, { viewportFishCapacity, cameraPan });
+            const worldPointer = viewportToWorld(input.pointer.pos, state.world, fish, canvas, { viewportFishCapacity, cameraZoom, cameraPan });
             accel = pointerSteer(fish.pos, { active: true, pos: worldPointer });
         }else if( controlMode.active === 'touch' && fish && input.pointer.active && input.touchDown ){
             input.pointer.vector = controlVectorFromFish(fish, input.pointer.pos);
@@ -1505,7 +1629,7 @@ function inputPayloadKey(payload){
 }
 
 function currentUserFishViewportPos(fish){
-    const viewport = worldToViewport(state.world, fish, canvas, { viewportFishCapacity, cameraPan });
+    const viewport = worldToViewport(state.world, fish, canvas, { viewportFishCapacity, cameraZoom, cameraPan });
     return v(fish.pos.x * viewport.scale + viewport.offsetX, fish.pos.y * viewport.scale + viewport.offsetY);
 }
 
@@ -1572,8 +1696,85 @@ function updateGameMenu(){
 // @ds:e001d967 @fix:a64e9b31
 function setupViewportFishCapacity(){
     if( !viewportFishCapacitySelect ) return;
-    viewportFishCapacitySelect.value = viewportFishCapacity;
-    viewportFishCapacitySelect.addEventListener('change', () => setViewportFishCapacity(viewportFishCapacitySelect.value));
+    updateViewportFishCapacityUi();
+    const applySelection = () => setViewportFishCapacity(viewportFishCapacitySelect.value);
+    viewportFishCapacitySelect.addEventListener('change', applySelection);
+    viewportFishCapacitySelect.addEventListener('input', applySelection);
+}
+
+// @fix:394756ee
+function updateViewportFishCapacityUi(){
+    if( !viewportFishCapacitySelect ) return;
+    const customOption = viewportFishCapacitySelect.querySelector('option[value="custom"]');
+    let selectedValue = viewportFishCapacity;
+    let customLabel = 'текущий масштаб';
+    let customHidden = true;
+    if( Number.isFinite(cameraZoom) ){
+        const world = lastVisibleState?.world || state.world;
+        const capacity = world && canvas.width > 0 && canvas.height > 0
+            ? viewportCapacityForZoom(world, canvas, cameraZoom)
+            : null;
+        selectedValue = 'custom';
+        customHidden = false;
+        customLabel = capacity ? `текущий (${capacity.toFixed(1)})` : 'текущий масштаб';
+    }
+    const key = `${selectedValue}|${customLabel}|${customHidden}`;
+    if( key === viewportFishCapacityUiKey ) return;
+    viewportFishCapacityUiKey = key;
+    if( customOption ){
+        customOption.hidden = customHidden;
+        if( customOption.textContent !== customLabel ) customOption.textContent = customLabel;
+    }
+    if( viewportFishCapacitySelect.value !== selectedValue ) viewportFishCapacitySelect.value = selectedValue;
+}
+
+// @fix:394756ee
+function updateViewportScaleWidget(){
+    if( !viewportScaleWidget || !viewportScaleMarker ) return;
+    const world = lastVisibleState?.world || state.world;
+    const zoom = Number.isFinite(cameraZoom)
+        ? cameraZoom
+        : (world && canvas.width > 0 && canvas.height > 0
+            ? viewportZoomForCapacity(world, canvas, viewportFishCapacity)
+            : 0);
+    const position = Math.max(0, Math.min(1, Number(zoom) || 0));
+    const key = position.toFixed(4);
+    if( key === viewportScaleWidgetKey ) return;
+    viewportScaleWidgetKey = key;
+    viewportScaleMarker.style.top = `${(position * 100).toFixed(2)}%`;
+}
+
+// @fix:394756ee
+function setupViewportScaleWidget(){
+    if( !viewportScaleWidget || !viewportScaleTrack || !viewportScaleMarker ) return;
+    const setFromPointer = e =>{
+        const rect = viewportScaleTrack.getBoundingClientRect();
+        const position = Math.max(0, Math.min(1, (e.clientY - rect.top) / Math.max(1, rect.height)));
+        cameraZoom = position;
+        viewportScaleWidgetKey = null;
+        updateViewportScaleWidget();
+    };
+    viewportScaleWidget.addEventListener('pointerdown', e =>{
+        if( e.pointerType === 'mouse' && e.button !== 0 ) return;
+        viewportScalePointerId = e.pointerId;
+        cameraZoom = ensureCameraZoom();
+        viewportScaleWidget.setPointerCapture?.(e.pointerId);
+        setFromPointer(e);
+        e.preventDefault();
+    });
+    viewportScaleWidget.addEventListener('pointermove', e =>{
+        if( e.pointerId !== viewportScalePointerId ) return;
+        setFromPointer(e);
+        e.preventDefault();
+    });
+    const release = e =>{
+        if( e.pointerId !== viewportScalePointerId ) return;
+        saveCameraZoom();
+        updateViewportFishCapacityUi();
+        viewportScalePointerId = null;
+    };
+    viewportScaleWidget.addEventListener('pointerup', release);
+    viewportScaleWidget.addEventListener('pointercancel', release);
 }
 
 // @fix:a64e9b31
@@ -1588,14 +1789,42 @@ function loadViewportFishCapacity(){
     }
 }
 
+// @fix:394756ee
+function loadCameraZoom(){
+    try{
+        const stored = Number(window.localStorage.getItem(VIEWPORT_CAMERA_ZOOM_STORAGE_KEY));
+        return Number.isFinite(stored) ? Math.max(0, Math.min(1, stored)) : null;
+    }catch{
+        return null;
+    }
+}
+
+// @fix:394756ee
+function saveCameraZoom(){
+    if( !Number.isFinite(cameraZoom) ) return;
+    try{
+        window.localStorage.setItem(VIEWPORT_CAMERA_ZOOM_STORAGE_KEY, String(cameraZoom));
+    }catch{
+        // The in-memory zoom remains usable when storage is disabled.
+    }
+}
+
 // @ds:e001d967 @fix:a64e9b31
 function setViewportFishCapacity(value){
+    if( value === 'custom' ){
+        updateViewportFishCapacityUi();
+        return;
+    }
     viewportFishCapacity = VIEWPORT_FISH_CAPACITY.options.includes(value)
         ? value
         : VIEWPORT_FISH_CAPACITY.defaultValue;
-    if( viewportFishCapacitySelect ) viewportFishCapacitySelect.value = viewportFishCapacity;
+    cameraZoom = null;
+    viewportFishCapacityUiKey = null;
+    viewportScaleWidgetKey = null;
+    updateViewportFishCapacityUi();
     try{
         window.localStorage.setItem(VIEWPORT_FISH_CAPACITY_STORAGE_KEY, viewportFishCapacity);
+        window.localStorage.removeItem(VIEWPORT_CAMERA_ZOOM_STORAGE_KEY);
     }catch{
         // The in-memory display preference remains available when storage is disabled.
     }
@@ -1766,6 +1995,16 @@ function cameraPanEnabled(e){
 }
 
 // @fix:32ef3d51
+function ensureCameraZoom(){
+    if( Number.isFinite(cameraZoom) ) return cameraZoom;
+    const world = lastVisibleState?.world || state.world;
+    cameraZoom = world && canvas.width > 0 && canvas.height > 0
+        ? viewportZoomForCapacity(world, canvas, viewportFishCapacity)
+        : 0;
+    return cameraZoom;
+}
+
+// @fix:32ef3d51
 function clampCameraPanToSafeArea(){
     const fish = currentUserFish(lastVisibleState?.world || state.world, lastVisibleState?.currentUserFishId || state.currentUserFishId);
     if( !fish || canvas.width <= 0 || canvas.height <= 0 ){
@@ -1787,23 +2026,60 @@ function setupCameraPan(){
     if( !canvas ) return;
     canvas.addEventListener('pointerdown', e =>{
         if( !cameraPanEnabled(e) ) return;
-        cameraPanPointerId = e.pointerId;
-        cameraPanLastPoint = v(e.clientX, e.clientY);
+        cameraPointers.set(e.pointerId, v(e.clientX, e.clientY));
+        if( cameraPointers.size === 1 ){
+            cameraPanPointerId = e.pointerId;
+            cameraPanLastPoint = v(e.clientX, e.clientY);
+            cameraGestureMode = 'pan';
+        }else if( cameraPointers.size === 2 ){
+            const points = [...cameraPointers.values()];
+            pinchStartDistance = Math.max(1, Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y));
+            cameraGestureStartZoom = ensureCameraZoom();
+            cameraGestureMode = 'pinch';
+            cameraPanPointerId = null;
+            cameraPanLastPoint = null;
+        }
         canvas.setPointerCapture?.(e.pointerId);
         e.preventDefault();
     });
     canvas.addEventListener('pointermove', e =>{
-        if( e.pointerId !== cameraPanPointerId || !cameraPanLastPoint ) return;
-        cameraPan.x += e.clientX - cameraPanLastPoint.x;
-        cameraPan.y += e.clientY - cameraPanLastPoint.y;
-        cameraPanLastPoint = v(e.clientX, e.clientY);
-        clampCameraPanToSafeArea();
+        if( !cameraPointers.has(e.pointerId) ) return;
+        const point = v(e.clientX, e.clientY);
+        cameraPointers.set(e.pointerId, point);
+        if( cameraPointers.size >= 2 && cameraGestureMode === 'pinch' ){
+            const points = [...cameraPointers.values()];
+            const distance = Math.max(1, Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y));
+            const distanceRatio = distance / Math.max(1, pinchStartDistance);
+            cameraZoom = Math.max(0, Math.min(1,
+                cameraGestureStartZoom + Math.log(distanceRatio) * CAMERA.pinchZoomSensitivity));
+        }else if( cameraGestureMode === 'pan' && e.pointerId === cameraPanPointerId && cameraPanLastPoint ){
+            cameraPan.x += point.x - cameraPanLastPoint.x;
+            cameraPan.y += point.y - cameraPanLastPoint.y;
+            clampCameraPanToSafeArea();
+        }
+        if( e.pointerId === cameraPanPointerId ) cameraPanLastPoint = point;
         e.preventDefault();
     });
     const release = e =>{
-        if( e.pointerId !== cameraPanPointerId ) return;
-        cameraPanPointerId = null;
-        cameraPanLastPoint = null;
+        if( !cameraPointers.has(e.pointerId) ) return;
+        cameraPointers.delete(e.pointerId);
+        if( cameraGestureMode === 'pinch' && cameraPointers.size === 1 ){
+            const [remainingId, remainingPoint] = cameraPointers.entries().next().value;
+            cameraGestureMode = 'pan';
+            cameraPanPointerId = remainingId;
+            cameraPanLastPoint = remainingPoint;
+            saveCameraZoom();
+            updateViewportFishCapacityUi();
+        }else if( cameraPointers.size === 0 ){
+            if( cameraGestureMode === 'pinch' ) saveCameraZoom();
+            cameraPanPointerId = null;
+            cameraPanLastPoint = null;
+            cameraGestureStartZoom = null;
+            pinchStartDistance = null;
+            cameraGestureMode = null;
+            flowMapLastBuildAt = 0;
+            updateViewportFishCapacityUi();
+        }
     };
     canvas.addEventListener('pointerup', release);
     canvas.addEventListener('pointercancel', release);

@@ -22,6 +22,7 @@ ds/fix/flow-angular-impulse.fix#a690cf5e - 4e9b2c71
 ds/fix/flow-vector-overlay.fix#8f574af5 - 5f2a8c71
 ds/fix/debug-overlay-parity.fix#e6fec0fa - 9b6d2e41
 ds/fix/fish-visual-heading.fix#1c8bb49b - 6e2a9c41
+ds/fix/fish-cruise-horizontal-heading.fix#ab4142d8 - ab4142d8
 ds/fix/fish-fin-timing-bezier.fix#2e7a4c91 - 2e7a4c91
 ds/fix/fish-fin-sparks.fix#4f8a2c71 - 4f8a2c71
 ds/fix/sync-render-smoothing.fix#b3d7e9a2 - b3d7e9a2
@@ -31,6 +32,7 @@ ds/fix/joystick-follow-touch.fix#f1c6a8d4 - f1c6a8d4
 ds/fix/joystick-relocation-deadzone.fix#52cd6e6c - 52cd6e6c
 ds/fix/fish-reverse-steering.fix#77a2a457 - c13e07b3
 ds/fix/camera-touch-pan.fix#32ef3d51 - 32ef3d51
+ds/fix/camera-touch-zoom.fix#394756ee - 394756ee
 ds/fix/burst-energy-joystick.fix#8c4f2a71 - 8c4f2a71
 ds/fix/size-delta-label-scale.fix#4d8e2a71 - 4d8e2a71
 ds/fix/joystick-knob-keyboard-hide.fix#5d9e3a71 - 5d9e3a71
@@ -92,8 +94,10 @@ fix:controls.joystick-follow-touch - f1c6a8d4 f1c6a8d4
 fix:controls.joystick-relocation-deadzone - 52cd6e6c 52cd6e6c
 fix:fish.reverse-steering-marker - c13e07b3 c13e07b3
 fix:camera.touch-pan-safe-area - 32ef3d51 32ef3d51
+fix:controls.camera-touch-zoom - 394756ee 394756ee
 fix:ui.debug-overlay-parity - 9b6d2e41 9b6d2e41
 fix:fish.visual-heading - 6e2a9c41 6e2a9c41
+fix:fish.cruise-horizontal-heading - ab4142d8 ab4142d8
 fix:fish.fin-timing-bezier - 2e7a4c91 2e7a4c91
 fix:fish.burst-energy-joystick - 8c4f2a71 8c4f2a71
 fix:ui.size-delta-label-scale - 4d8e2a71 4d8e2a71
