@@ -317,7 +317,7 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onI
     // @ds:77faf734
     function acknowledgeGlobalAbsoluteCentralCell(syncDiagnostics){
         const cycle = syncDiagnostics?.cycle;
-        if( !syncDiagnostics?.absolute || !Number.isInteger(cycle) || cycle % SYNC.globalAbsoluteEvery !== 0 ) return;
+        if( !Number.isInteger(cycle) ) return;
         if( !(syncDiagnostics.fish || []).some(fish => fish.id === currentUserFishId) ) return;
         if( acknowledgedCycles.has(cycle) ) return;
         acknowledgedCycles.add(cycle);

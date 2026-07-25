@@ -406,6 +406,16 @@ function makeSyncPlan(encoded, cycle, forceAbsolute){
     for( const [socket, meta] of sockets ){
         const fish = findClientFish(meta);
         if( !fish || socket.readyState !== socket.OPEN ) continue;
+        if( cycle % SYNC.globalAbsoluteEvery === 0 ) meta.syncCycles?.clear();
+        if( Number.isInteger(meta.syncAckCycle) ){
+            const waitingMs = performance.now() - meta.syncAckSentAt;
+            if( waitingMs >= SYNC.clientCycleDeadlineMs ) performanceStatistics.skippedClientCycleCount++;
+            // Keep at most one unacknowledged world cycle per client. This
+            // replaces stale work with the newest cycle instead of queuing it.
+            performanceStatistics.skippedClientCycleCount++;
+            meta.syncSkippedCycle = cycle;
+            continue;
+        }
         const ownX = Math.floor(fish.pos.x / SYNC.cellSize);
         const ownY = Math.floor(fish.pos.y / SYNC.cellSize);
         matrix.forEach(([dx, dy], matrixIndex) => {
@@ -452,7 +462,7 @@ function runSyncPhases(plan){
 
 function sendPlanFragment(plan, entry){
     if( entry.socket.readyState !== entry.socket.OPEN ) return;
-    if( entry.socket.bufferedAmount > SYNC.maxSocketBufferedBytes ) return;
+    if( entry.meta.syncSkippedCycle === plan.cycle ) return;
     const absolute = plan.forceAbsolute || plan.cycle % SYNC.globalAbsoluteEvery === 0 || plan.phase === 0;
     const cell = plan.lookup.get(`${entry.x}:${entry.y}`);
     if( !cell ) return;
@@ -461,6 +471,10 @@ function sendPlanFragment(plan, entry){
     const message = `${prefix}${source.slice(absolute ? cell.absoluteStart : cell.relativeStart, absolute ? cell.absoluteEnd : cell.relativeEnd)}`;
     const sentAt = performance.now();
     entry.socket.send(message);
+    if( entry.central ){
+        entry.meta.syncAckCycle = plan.cycle;
+        entry.meta.syncAckSentAt = sentAt;
+    }
     if( entry.central && plan.cycle % SYNC.globalAbsoluteEvery === 0 ){
         // Throughput ACKs only refer to the latest global absolute central
         // fragment. Replacing the previous context prevents stale cycles from
@@ -483,6 +497,7 @@ function makePerformanceStatistics(){
         controlledObjectTotal: 0,
         preparedSyncCycleCount: 0,
         droppedFragmentCount: 0,
+        skippedClientCycleCount: 0,
         phaseCount: 0,
         phaseTotalMs: 0,
         syncAckCount: 0,
@@ -515,6 +530,7 @@ function reportPerformanceStatistics(){
         + `phase=${averagePhaseMs.toFixed(3)}ms; `
         + `objects=${averageControlledObjects.toFixed(1)}; `
         + `dropped=${averageDroppedFragments.toFixed(2)} fragments/cycle; acks=${performanceStatistics.syncAckCount}; `
+        + `skippedClients=${performanceStatistics.skippedClientCycleCount}; `
         + `rateMin=${performanceStatistics.activeClientRateMin === null ? '—' : `${performanceStatistics.activeClientRateMin} bytes/sec`}; `
         + `rateMax=${performanceStatistics.activeClientRateMax === null ? '—' : `${performanceStatistics.activeClientRateMax} bytes/sec`}`
     );
@@ -524,12 +540,17 @@ function reportPerformanceStatistics(){
     performanceStatistics.controlledObjectTotal = 0;
     performanceStatistics.preparedSyncCycleCount = 0;
     performanceStatistics.droppedFragmentCount = 0;
+    performanceStatistics.skippedClientCycleCount = 0;
     performanceStatistics.phaseCount = 0;
     performanceStatistics.phaseTotalMs = 0;
     performanceStatistics.syncAckCount = 0;
 }
 
 function handleSyncAck(socket, meta, message){
+    if( meta.syncAckCycle === message.cycle ){
+        meta.syncAckCycle = null;
+        meta.syncAckSentAt = 0;
+    }
     const stat = meta.syncCycles?.get(message.cycle);
     if( !stat?.centralSentAt || stat.rate !== undefined ) return;
     const ackAt = performance.now();

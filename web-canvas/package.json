@@ -10,7 +10,7 @@
     "load-hill": "node tools/load-hill.mjs",
     "flow-benchmark": "node tools/flow-benchmark.mjs",
     "load-test": "export CLIENTS=100; node tools/load-test.mjs",
-    "fishta-test": "export CLIENTS=50; export URL=http://fishta.staging.globalqb.com/; node tools/load-test.mjs"
+    "fishta-test": "export CLIENTS=20; export URL=http://fishta.staging.globalqb.com/; node tools/load-test.mjs"
   },
   "dependencies": {
     "ws": "^8.18.0"
