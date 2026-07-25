@@ -3505,6 +3505,15 @@ function setDualBurstLevel(level, active = true){
         Math.min(REGIME.speedLevels, Math.round(Number(level) || REGIME.burstStartSpeedLevel)));
 }
 
+// @fix:dual-burst-dynamic-gesture
+function dynamicBurstLevelFromNumberGesture(gesture, point){
+    const deltaY = point.y - gesture.start.y;
+    const level = REGIME.burstStartSpeedLevel
+        + (-deltaY / Math.max(1, JOYSTICK.burstDynamicRangePx))
+        * (REGIME.speedLevels - REGIME.burstStartSpeedLevel);
+    setDualBurstLevel(level, true);
+}
+
 // @fix:dual-burst-grip
 function burstPinCandidateFromGesture(gesture, point){
     if( !gesture || gesture.pinEligible === false ) return null;
@@ -3614,25 +3623,30 @@ function setupDualBurstJoystickControls(){
         const point = burstPointerPoint(e);
         const burst = input.burstJoystick;
         if( dualBurstGesture.type === 'number' ){
-            const candidate = burstPinCandidateFromGesture(dualBurstGesture, point);
-            dualBurstGesture.pinCandidate = candidate;
-            if( candidate ) setDualBurstLevel(candidate.level, true);
-            const deltaY = point.y - dualBurstGesture.start.y;
-            const level = REGIME.burstStartSpeedLevel
-                + (-deltaY / Math.max(1, JOYSTICK.burstDynamicRangePx))
-                * (REGIME.speedLevels - REGIME.burstStartSpeedLevel);
-            if( !candidate ){
+            // Once the gesture has crossed the dynamic-angle threshold, keep
+            // it dynamic for the rest of this touch. Re-evaluating the pin
+            // candidate while the finger returns can otherwise replace the
+            // vertical offset with a stale 40..41-style pin level.
+            if( dualBurstGesture.dynamic ){
+                dualBurstGesture.pinCandidate = null;
+                dualBurstGesture.pinEligible = false;
+                dynamicBurstLevelFromNumberGesture(dualBurstGesture, point);
+            }else{
+                const candidate = burstPinCandidateFromGesture(dualBurstGesture, point);
+                dualBurstGesture.pinCandidate = candidate;
+                if( candidate ) setDualBurstLevel(candidate.level, true);
                 const delta = v(point.x - dualBurstGesture.start.x, point.y - dualBurstGesture.start.y);
                 const outward = delta.x * dualBurstGesture.normal.x + delta.y * dualBurstGesture.normal.y;
                 const tangent = delta.x * dualBurstGesture.normal.y - delta.y * dualBurstGesture.normal.x;
                 const gestureAngle = Math.atan2(tangent, Math.max(1e-6, outward)) * 180 / Math.PI;
                 if( gestureAngle > 45 ){
                     dualBurstGesture.dynamic = true;
+                    dualBurstGesture.pinEligible = false;
                     if( burst.pinned ){
                         burst.pinned = false;
                         burst.pinnedLevel = 0;
                     }
-                    setDualBurstLevel(level, true);
+                    dynamicBurstLevelFromNumberGesture(dualBurstGesture, point);
                 }
             }
         }else if( dualBurstGesture.type === 'pinned-knob' ){
@@ -3648,23 +3662,28 @@ function setupDualBurstJoystickControls(){
                 setDualBurstLevel(burstLevelFromArcPoint(point), true);
             }
         }else if( dualBurstGesture.type === 'arc' ){
-            const candidate = burstPinCandidateFromGesture(dualBurstGesture, point);
-            dualBurstGesture.pinCandidate = candidate;
-            if( candidate ){
-                setDualBurstLevel(candidate.level, true);
-            }else{
-                const delta = v(point.x - dualBurstGesture.start.x, point.y - dualBurstGesture.start.y);
-                const gestureDistance = Math.hypot(delta.x, delta.y);
-                const outward = delta.x * dualBurstGesture.normal.x + delta.y * dualBurstGesture.normal.y;
-                const tangent = delta.x * dualBurstGesture.normal.y - delta.y * dualBurstGesture.normal.x;
-                const gestureAngle = Math.atan2(tangent, Math.max(1e-6, outward)) * 180 / Math.PI;
-                const pinDistance = JOYSTICK.burstKnobDiameterPx * JOYSTICK.burstPinDistanceKnobDiameters;
-                if( gestureDistance >= pinDistance && gestureAngle > 45 ){
-                    burst.pinned = false;
-                    burst.pinnedLevel = 0;
-                    dualBurstGesture.dynamic = true;
-                }
+            if( dualBurstGesture.dynamic ){
+                dualBurstGesture.pinCandidate = null;
                 setDualBurstLevel(burstLevelFromArcPoint(point), true);
+            }else{
+                const candidate = burstPinCandidateFromGesture(dualBurstGesture, point);
+                dualBurstGesture.pinCandidate = candidate;
+                if( candidate ){
+                    setDualBurstLevel(candidate.level, true);
+                }else{
+                    const delta = v(point.x - dualBurstGesture.start.x, point.y - dualBurstGesture.start.y);
+                    const gestureDistance = Math.hypot(delta.x, delta.y);
+                    const outward = delta.x * dualBurstGesture.normal.x + delta.y * dualBurstGesture.normal.y;
+                    const tangent = delta.x * dualBurstGesture.normal.y - delta.y * dualBurstGesture.normal.x;
+                    const gestureAngle = Math.atan2(tangent, Math.max(1e-6, outward)) * 180 / Math.PI;
+                    const pinDistance = JOYSTICK.burstKnobDiameterPx * JOYSTICK.burstPinDistanceKnobDiameters;
+                    if( gestureDistance >= pinDistance && gestureAngle > 45 ){
+                        burst.pinned = false;
+                        burst.pinnedLevel = 0;
+                        dualBurstGesture.dynamic = true;
+                    }
+                    setDualBurstLevel(burstLevelFromArcPoint(point), true);
+                }
             }
         }
         e.preventDefault();

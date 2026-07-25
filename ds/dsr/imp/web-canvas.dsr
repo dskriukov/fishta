@@ -817,6 +817,10 @@ logical values change; the pin connector opacity is written only when the previe
     position instead of jumping from the arc. While a pinned burst is temporarily overridden by a new touch, the pinned handle remains
     fixed and a separate white marker shows the temporary arc level; clearing that
     pin through the dynamic arc gesture also requires the same protective distance.
+    Once a number-zone gesture crosses the dynamic-angle threshold, it stays in
+    dynamic mode for the remainder of that touch: the level is recalculated from
+    the original touch point's vertical displacement on every move, including
+    the return below level 31, and pin candidates are ignored until release.
     The burst arc
     always uses its burst color while the current-speed number retains its cruise/burst
     color distinction. Keyboard
