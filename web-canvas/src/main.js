@@ -36,6 +36,7 @@ const worldSyncRateValue = document.getElementById('world-sync-rate');
 const worldDynamicRateValue = document.getElementById('world-dynamic-rate');
 const worldControlRateValue = document.getElementById('world-control-rate');
 const worldCalcMsValue = document.getElementById('world-calc-ms');
+const clientRenderMsValue = document.getElementById('client-render-ms');
 const worldSyncCycleMsValue = document.getElementById('world-sync-cycle-ms');
 const worldPingMsValue = document.getElementById('world-ping-ms');
 const worldTrafficIoValue = document.getElementById('world-traffic-io');
@@ -202,10 +203,12 @@ let dangerMapVisible = false;
 let dangerMapBitmap = null;
 const dangerMapNet = createDangerMapSocket(bitmap => { dangerMapBitmap?.close?.(); dangerMapBitmap = bitmap; });
 let worldCalculationMs = null;
+let clientRenderMs = null;
 let syncCycleMs = null;
 let lastMeasuredSyncCycle = null;
 let lastMeasuredSyncCycleAt = null;
 const syncCycleIntervalsMs = [];
+const clientRenderTimeSamplesMs = [];
 let debugPositionTraces = [];
 let debugReceivedQuadrants = new Map();
 const receivedQuadrantsByCycle = new Map();
@@ -974,6 +977,9 @@ function resetEntryScreenPanels(){
     dangerMapVisible = false;
     if( worldPingMsValue ) worldPingMsValue.textContent = '—';
     if( worldTrafficIoValue ) worldTrafficIoValue.textContent = '— / —';
+    clientRenderMs = null;
+    clientRenderTimeSamplesMs.length = 0;
+    if( clientRenderMsValue ) clientRenderMsValue.textContent = '—';
     flowVectorsResetPending = false;
     debugPositionTraces.length = 0;
     setInfoPanelMode('none');
@@ -1402,6 +1408,7 @@ function frame(now){
     advanceClientBubbles(clientBubbles, clientBubbleEmitters, visibleState.world, dt, Math.random);
     if( debugMode && !zenMode ) recordDebugPositionTraces(now, visibleState.world);
     const mapPosition = getWorldMapPosition(); // @fix:world-map-layout
+    const renderStartedAt = performance.now();
     render(ctx, {
         ...visibleState,
         viewportFishCapacity,
@@ -1431,6 +1438,7 @@ function frame(now){
         worldMapLeft: mapPosition.leftPx,
         worldMapTop: mapPosition.topPx,
     });
+    updateClientRenderMetrics(performance.now() - renderStartedAt);
     sendInputIfChanged(now);
 
     const serializePressed = input.keys.has('i') || input.keys.has('I');
@@ -1455,6 +1463,16 @@ function frame(now){
     if( fish ) hudStatus.textContent = fish.userTier === 'paid' ? 'paid' : 'free';
 
     requestAnimationFrame(frame);
+}
+
+// @ds:4d8c2f1a @ds:6e3b91c7
+function updateClientRenderMetrics(renderDurationMs){
+    const value = Number(renderDurationMs);
+    if( !Number.isFinite(value) || value < 0 ) return;
+    clientRenderTimeSamplesMs.push(value);
+    while( clientRenderTimeSamplesMs.length > 20 ) clientRenderTimeSamplesMs.shift();
+    clientRenderMs = clientRenderTimeSamplesMs.reduce((sum, sample) => sum + sample, 0) / clientRenderTimeSamplesMs.length;
+    if( clientRenderMsValue ) clientRenderMsValue.textContent = `${clientRenderMs.toFixed(2)} ms`;
 }
 
 // @ds:c5a92431 @ia:32288dfb

@@ -139,13 +139,13 @@ contract_map:
   debug.drawPositionTraces:                 render.js#drawDebugPositionTraces  # @ds:727e9afe
   debug.drawFishCollisionRadius:            render.js#drawDebugFishCollisionRadius  # @ds:6b4e90d2 @ds:a3e394a8
   ui.showAppVersion:                         server.js#appVersion main.js#showAppVersion index.html#app-version  # @ds:8d13f6a2
-  ui.worldSnapshotInfo:                      main.js#updateWorldSnapshotInfo main.js#updateWorldSyncMetrics index.html#world-info style.css#world-info  # @ds:e42a7c19 @ds:world.status-sync-metrics @fix:b8c4d9e2
+  ui.worldSnapshotInfo:                      main.js#updateWorldSnapshotInfo main.js#updateWorldSyncMetrics main.js#updateClientRenderMetrics index.html#world-info index.html#client-render-ms style.css#world-info  # @ds:e42a7c19 @ds:world.status-sync-metrics @fix:b8c4d9e2
   ui.infoPanels:                              main.js#setInfoPanelMode main.js#toggleInfoPanel main.js#updateFlowMetricsPanel main.js#updateRecordsPanel index.html#info-panel-toggle index.html#flow-info-panel index.html#records-panel style.css#.diagnostic-info-panel  # @fix:6a7b8c9d
   ui.zenMode:                                 main.js#toggleZenMode main.js#frame index.html#player-metrics style.css#zen-mode  # @fix:zen-mode
   ui.controlLayoutTools:                      main.js#toggleUiLayoutEditMode main.js#cycleControlLayoutMode main.js#setupJoystickControls main.js#setJoystickCenter index.html#viewport-left-controls index.html#viewport-scale-widget index.html#viewport-control-tools index.html#ui-layout-toggle index.html#control-layout-toggle style.css#viewport-left-controls style.css#viewport-scale-widget style.css#viewport-control-tools  # @fix:f1c6a8d4 @ds:70871bc5
   multiplayer.syncRateFeedback:              client-net.js#connect main.js#updateSyncRate index.html#world-sync-rate style.css#world-info  # @ds:e7c2a901
   multiplayer.clientEventRates:              protocol.js#applyWorldFragment client-net.js#connect client-net.js#input client-net.js#recordEvents client-net.js#getEventRates main.js#updateEventRates index.html#world-dynamic-rate index.html#world-control-rate style.css#world-info  # @ds:7c2d91e4
-  multiplayer.performanceMetrics:            server.js#broadcastWorldSync server.js#performanceStatistics client-net.js#connect main.js#updateWorldPerformanceMetrics main.js#updateWorldSyncMetrics index.html#world-calc-ms index.html#world-sync-cycle-ms style.css#world-info  # @ds:4d8c2f1a @ds:6e3b91c7
+  multiplayer.performanceMetrics:            server.js#broadcastWorldSync server.js#performanceStatistics client-net.js#connect main.js#updateWorldPerformanceMetrics main.js#updateWorldSyncMetrics main.js#updateClientRenderMetrics index.html#world-calc-ms index.html#client-render-ms index.html#world-sync-cycle-ms style.css#world-info  # @ds:4d8c2f1a @ds:6e3b91c7
   multiplayer.socketTrafficMetrics:          client-net.js#sendRaw client-net.js#connect main.js#formatTrafficBytes index.html#world-traffic-io style.css#world-info  # @fix:ws-traffic
   multiplayer.controlHeartbeat:              main.js#sendInputIfChanged client-net.js#input server.js#normalizeInput server.js#tick constants.js#SERVER.controlTimeoutMs  # @ds:4e6f8a12
   world.wrapPosition:                       world.js#wrapPosition  # @ds:c83f4c1e @ia:dd909d1a
@@ -503,9 +503,14 @@ implementation_instructions:
     session retries inside the three-second recovery grace window and reports
     connection-lost to main.js when that window expires so the entry screen is
     restored instead of leaving a dead game surface.
-    Each client p:<counter> heartbeat is echoed by the server as p:<counter>;
-    client-net measures the matching round-trip in milliseconds and exposes it
-    to the bottom world-info panel as Ping.
+    The liveness heartbeat uses the same game WebSocket as world state: server.js
+    marks each game socket alive on the WebSocket control `pong`, sends a native
+    control `ping` from its heartbeat interval, and terminates a socket that
+    misses the next control response. The application p:<counter> marker remains
+    a lightweight diagnostic RTT sample on that same socket; client-net sends it
+    only from idle() and excludes both marker directions from world traffic
+    accounting. Its measured round-trip is shown in the bottom panel as Ping,
+    but it is not used as the connection-liveness decision.
     main.js owns entrySessionReady and route presentation. It keeps the form and
     game controls hidden during the startup splash, shows the form after the
     splash reveal when the route is new, and shows game controls only after
@@ -703,16 +708,20 @@ implementation_instructions:
       - joystick: visible lower-right radial joystick controls direction and speed v=0..99 while keyboard stays active.
     #debug-mode-toggle toggles only debugMode and does not own menu visibility.
     #leave-game remains the explicit leave/enter command inside the menu and keeps the same joined-state behavior.  # @ds:ab1e4f02 @ds:8d13f6a2 @ds:59c118f5 @ds:70871bc5 @ds:fb11044e @ds:22fd3ab4
+    style.css applies a touch-first interaction surface to the game UI: body and
+    its descendants disable text/object selection, browser touch callouts, native
+    tap highlights, and visible focus outlines for buttons, role buttons, and the
+    scale select. Canvas/SVG/object assets are not draggable. The join name input
+    and textareas explicitly restore text selection so profile editing remains usable.
   world_map_ui: |
     The synchronization layer is drawn first, the flow-map bitmap second, and the danger-map grid/bitmap third. flow.js#buildFlowField uses the danger-raster cell size and accumulates directional wake, coasting wake, mouth suction, and signed side angular impulses into Float32 arrays. main.js#updateClientFlowField rebuilds the same full-resolution field locally from the fish currently known to the client, derives a short previous-velocity acceleration estimate, keeps raw flowX/flowY/flowAngular for client sampling, packs a display copy through main.js#encodeClientFlowFieldPixels, and refreshes a canvas surface through main.js#updateClientFlowMapSurface. The client updates this decorative field every FLOW_MAP_LOCAL_UPDATE_MS (100 ms) without opening the `/flow-map` WebSocket; active fin-sparks also request this short-lived local field while they are alive, independently of diagnostic overlay visibility. main.js#advanceClientFinSparks samples raw flowX/flowY directly when available, while the RGBA copy remains the visual representation for the minimap and gameplay overlay. main.js#logFlowCycleMetrics aggregates five-second averages for raw field build, RGB encoding, canvas surface refresh, raw fin-spark sampling, and the full cycle, publishes the latest snapshot to #flow-info-panel, and writes the same diagnostic object to the browser debug console without requiring Debug mode. The right-toolbar #info-panel-toggle cycles #world-info, #flow-info-panel, and #records-panel; only the selected panel is visible. #records-panel builds separate user-fish and NPC-fish tables from the latest synchronized world, sorts each block by descending size, and displays name/number, size, eaten count, and fish.age formatted as lifetime since map appearance. server.js#/flow-map and danger-map.js#encodeFlowMapPng remain available as compatibility/diagnostic endpoints but are not required for the active client path. flow.js#sampleFlowField uses toroidal bilinear interpolation of the four cell-centre samples for each shred; main.js#advanceClientShredRotation applies angular impulse only to visual shred rotation and damps angular velocity by SHRED.flowAngularDrag. The flow-map button opens the minimap, controls the locally generated flow bitmap there, and, when Debug is active, render.js#drawFlowMapUnderlay repeats it under gameplay objects. The flow-vectors button independently enables render.js#drawFlowVectorField on the gameplay canvas; main.js#advanceClientFlowCrosses updates per-cell cross angle/velocity, while the renderer draws white crosses and blue-left/green vectors using the alpha/R/G channels. tools/flow-benchmark.mjs and package.json#scripts provide repeatable absolute/relative build and PNG-size measurements. Danger-map rendering retains its black grid and diagnostic overlays above the flow layer.
     index.html contains #world-map-toggle in the right control toolbar and #world-map as a screen-space 200x200 px overlay. The map button is visible only while an active joined session exists, has the same toolbar button footprint as #game-menu-toggle, and independently toggles worldMapVisible without changing debugMode, world state, input, or socket messages. #world-map is hidden unless worldMapVisible is true. In every responsive breakpoint, #world-map-toggle uses the same breakpoint-specific width, height, border radius, and visual container as #game-menu-toggle, so the two large toolbar controls retain their alignment and neither can wrap below the toolbar.  # @ds:3a980720
     constants.js exports WORLD_MAP with the fixed 200px square size, 12px overlay gap, and a fallback left inset; do not reuse DEBUG minimap coordinates for player-facing map UI. main.js#getWorldMapPosition derives the default left edge from the right edge of #viewport-left-controls plus an equal left-screen inset, so the map clears the left toolbar by the same distance that the toolbar clears the viewport edge. The default top reads #hud and visible #player-metrics bounding rectangles every animation frame, taking the greater bottom edge and adding WORLD_MAP.overlayGapPx. In movable control-layout mode, a pointer drag on the visible map updates its clamped screen-space left/top position and persists the custom offsets locally; otherwise the default relation to the left toolbar is recomputed responsively. Pass the screen-space left/top coordinates, flowMapBitmap, flowMapVisible, dangerMapBitmap, syncSegmentsVisible, dangerMapVisible, and cellSyncAverages in the render state. render.js#drawWorldMap(ctx, world, currentUserFishId, top, left, inspection) runs after restoring the viewport transform, uses WORLD_MAP.sizePx with the supplied coordinates, validates positive world dimensions, draws the fixed square frame, then composites synchronization averages/grid, flow bitmap, and danger grid/bitmap in that order before mapping each canonical fish position into the square using clamped float coordinates without mutating fish.pos. NPC point diameter is derived from linear size sqrt(max(0, fish.size)): nominal PLAYER.startSize maps to 2px, every smaller value also maps to 2px, and the largest current fish maps to 5px; clamp the final diameter to [2, 5] and handle the no-range case without division by zero. Other user fish use a 3px inner point plus a 1px-gap, 1px-stroke outer circle; the current user uses a 5px inner point plus a 1px-gap, 2px-stroke outer circle. Keep the fish color resolution used by the existing minimap.  # @ds:3a980720 @ds:8f2c91ad @fix:6a7b8c9d @fix:world-map-layout
   world_snapshot_info_ui: |
-    index.html contains #world-info in the bottom-left overlay layer. It has twelve
-    value spans: #world-fish-count, #world-fish-area, #world-nutrient-count,
-    #world-nutrient-area, #world-scale, #world-sync, #world-sync-rate,
-    #world-dynamic-rate, #world-control-rate, #world-calc-ms, and
-    #world-sync-cycle-ms. The Scale value shows
+    index.html contains #world-info in the bottom-left overlay layer. It has
+    value spans for fish/nutrient counts and nutrition, scale/synchronization,
+    event rates, server world calculation, client render time, sync-cycle time,
+    ping, and socket traffic. The Scale value shows
     world.scale. The Sync value shows the latest received sync cycle and the
     rolling average number of distinct received quadrants per iteration over the
     last 20 completed cycles.
@@ -735,8 +744,12 @@ implementation_instructions:
     and "food nutrition"; formatNutrition keeps the compact integer/k notation.
     main.js#updateWorldPerformanceMetrics formats the latest server world calculation
     average and the client sync-cycle average as `X.XX ms`, leaving each placeholder
-    as `—` until a valid value exists. The lower panel keeps both metrics in the same
-    compact responsive layout as the existing status items.
+    as `—` until a valid value exists. main.js#frame measures the duration of the
+    complete render.js#render call for the current animation tick with
+    performance.now(); main.js#updateClientRenderMetrics keeps the latest 20 valid
+    samples, publishes their average as `Render time: X.XX ms` in #client-render-ms,
+    and clears the sample window when returning to the entry screen. The lower panel
+    keeps all metrics in the same compact responsive layout as the existing status items.
     style.css#world-info anchors the panel at bottom left, uses a compact
     translucent background, and leaves pointer-events disabled. #info-panel-toggle
     is a right-toolbar button visible during a joined session. The default information
@@ -1283,7 +1296,7 @@ logical values change; the pin connector opacity is written only when the previe
       - call updateSizeDeltaLabels(visibleState.world, dt) after decor and before render so labels use the same visible current-user size as the frame;
       - call advanceClientBubbles(clientBubbles, clientBubbleEmitters, visibleState.world, dt, clientRng);
       - call recordDebugPositionTraces(now, visibleState.world) only when debugMode is true;
-      - call render(ctx, { ...visibleState, clientBubbles, sizeDeltaLabels, debug: { enabled: debugMode, positionTraces: debugPositionTraces } });
+      - measure performance.now() immediately before and after render(ctx, { ...visibleState, clientBubbles, sizeDeltaLabels, debug: { enabled: debugMode, positionTraces: debugPositionTraces } }); and pass the elapsed duration to main.js#updateClientRenderMetrics;
       - call sendInputIfChanged(now) independently from render interpolation.
     updateSizeDeltaLabels(visibleWorld, dt):
       - main.js owns `sizeDeltaLabelState = { fishId, lastSize, remainder, labels }` outside state.world;
@@ -1420,7 +1433,7 @@ logical values change; the pin connector opacity is written only when the previe
       - use the elapsed time since the previous sync and the previous client velocity to predict the client-side current position at receive time;
       - print a compact console table with id, role, previous client position, predicted client position, absolute server position, elapsed ms, error dx/dy, and error distance;
       - skip rows with no previous client position.
-    server.js#tick compares transport identifiers before and after the authoritative step and immediately broadcasts x:${removalCycle}:${TRANSPORT_ID} for every removed fish or shred, where removalCycle is the latest prepared syncCycle. `broadcastWorldSync` calls encodeWorldCycle exactly once per sync interval, stores its shared strings/ranges and state, then only slices ranges into per-client ordered queues. State mods include a, bN, f, sN, gN, and
+    server.js#tick compares transport identifiers before and after the authoritative step and immediately broadcasts x:${removalCycle}:${TRANSPORT_ID} for every removed fish or shred, where removalCycle is the latest prepared syncCycle. `broadcastWorldSync` calls encodeWorldCycle exactly once per sync interval, stores its shared strings/ranges and state, then only slices ranges into per-client ordered queues. server.js#sendPlanFragment stores only the latest global-absolute central fragment needed for ACK throughput, replacing the previous context on each global absolute cycle; server.js#handleSyncAck deletes that context immediately after calculating the rate. State mods include a, bN, f, sN, gN, and
     lN. Names use base64url; colors use hex without #; type is u/p/n. State mods
     are domain/network facts only. Do not add protocol fields or mods for visual-
     only mouth, teeth, fin, swim phase, burst kick, or mouth hold state. main.js computes each object's sync opacity and cycle-clock extrapolation per frame; render.js applies syncOpacity around the complete fish or shred draw.  # @ds:839f8cd0 @ds:5a4d3d6d @ds:671e9773 @ds:4fad33f8 @ds:682570c7 @ds:c39827ed @ds:e047bbdf @ds:6c8c56e7 @ds:ea18a088 @ds:f51a5030 @ds:a16328a6 @ds:2afd71a0 @ds:9f50b1be @ds:0aaccaf8 @ds:28d9098a @ds:8c663384

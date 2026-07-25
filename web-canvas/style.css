@@ -37,6 +37,46 @@ html, body {
     background: #04263b;
     font-family: system-ui, -apple-system, sans-serif;
     overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+}
+
+/* The game surface is operated by touch/click gestures rather than text selection. */
+body,
+body * {
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+}
+
+/* Keep the join name editable while the game UI remains selection-free. */
+#join-form input[type="text"],
+#join-form textarea {
+    user-select: text;
+    -webkit-user-select: text;
+    -webkit-touch-callout: default;
+}
+
+img,
+svg,
+object,
+canvas {
+    -webkit-user-drag: none;
+}
+
+button,
+[role="button"],
+select {
+    -webkit-tap-highlight-color: transparent;
+}
+
+button:focus,
+button:focus-visible,
+[role="button"]:focus,
+[role="button"]:focus-visible,
+select:focus,
+select:focus-visible {
+    outline: none;
 }
 
 /* @ds:2b3e71e0 @ia:3983084a @fix:4bbc0692 */
@@ -2477,7 +2517,7 @@ body::after {
         min-width: 0;
         height: auto;
         display: grid;
-        grid-template-columns: repeat(7, minmax(0, 1fr));
+        grid-template-columns: repeat(8, minmax(0, 1fr));
         gap: clamp(2px, 0.45vw, 6px);
         align-items: stretch;
         padding: 1px 4px max(1px, env(safe-area-inset-bottom));

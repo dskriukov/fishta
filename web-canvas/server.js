@@ -149,21 +149,35 @@ function addTestFish(requested){
 // @ds e6d3b9a1
 const wss = new WebSocketServer({ server });
 wss.on('connection', (socket, request) =>{
-    if( new URL(request.url, 'http://localhost').pathname === '/danger-map' ){
+    const pathname = new URL(request.url, 'http://localhost').pathname;
+    if( pathname === '/danger-map' ){
         dangerMapSockets.add(socket);
         socket.on('close', () => dangerMapSockets.delete(socket));
         return;
     }
-    if( new URL(request.url, 'http://localhost').pathname === '/flow-map' ){
+    if( pathname === '/flow-map' ){
         flowMapSockets.add(socket);
         socket.on('close', () => flowMapSockets.delete(socket));
         return;
     }
+    // WebSocket control ping/pong is the liveness heartbeat for the same
+    // world-state socket.  It is independent from application messages and
+    // does not enter the world-sync protocol.
+    socket.isAlive = true;
+    socket.on('pong', () => { socket.isAlive = true; });
     const clientId = `c${nextClientId++}`;
     sockets.set(socket, { clientId, fishId: null, temporaryConnectionCode: null });
 
     socket.on('message', data =>{
-        const message = parseClientMessage(data.toString());
+        const raw = data.toString();
+        // Keep the application RTT marker on the same socket for the
+        // diagnostic panel, but dispatch it before parsing any world input.
+        if( raw.startsWith('p:') ){
+            const counter = Number(raw.slice(2));
+            if( Number.isFinite(counter) ) send(socket, encodeClientPing(counter));
+            return;
+        }
+        const message = parseClientMessage(raw);
         const meta = sockets.get(socket);
         if( !meta ) return;
         if( message.type === 'join' ) handleJoin(socket, meta, message);
@@ -174,10 +188,6 @@ wss.on('connection', (socket, request) =>{
         }
         if( message.type === 'leave' ) handleLeaveGame(socket, meta);
         if( message.type === 'syncAck' ) handleSyncAck(socket, meta, message);
-        if( message.type === 'ping' ){
-            send(socket, encodeClientPing(message.n));
-            return;
-        }
     });
 
     socket.on('close', () =>{
@@ -451,14 +461,17 @@ function sendPlanFragment(plan, entry){
     const message = `${prefix}${source.slice(absolute ? cell.absoluteStart : cell.relativeStart, absolute ? cell.absoluteEnd : cell.relativeEnd)}`;
     const sentAt = performance.now();
     entry.socket.send(message);
-    entry.meta.syncCycles ??= new Map();
-    const stat = entry.meta.syncCycles.get(plan.cycle) || { firstSentAt: sentAt, bytes: 0 };
-    stat.bytes += Buffer.byteLength(message);
-    if( entry.central && plan.cycle % SYNC.globalAbsoluteEvery === 0 && cell ){
-        stat.centralSentAt = sentAt;
-        stat.centralBytes = Buffer.byteLength(message);
+    if( entry.central && plan.cycle % SYNC.globalAbsoluteEvery === 0 ){
+        // Throughput ACKs only refer to the latest global absolute central
+        // fragment. Replacing the previous context prevents stale cycles from
+        // accumulating and keeps an old ACK from affecting current feedback.
+        entry.meta.syncCycles ??= new Map();
+        entry.meta.syncCycles.clear();
+        entry.meta.syncCycles.set(plan.cycle, {
+            centralSentAt: sentAt,
+            centralBytes: Buffer.byteLength(message),
+        });
     }
-    entry.meta.syncCycles.set(plan.cycle, stat);
 }
 
 // @ds:61245206
@@ -527,6 +540,7 @@ function handleSyncAck(socket, meta, message){
     stat.rate = rate;
     meta.syncRate = rate;
     performanceStatistics.syncAckCount++;
+    meta.syncCycles.delete(message.cycle);
     send(socket, `v:${message.cycle}:${rate}`);
 }
 
@@ -603,6 +617,17 @@ setInterval(broadcastWorldSync, 1000 / SYNC.snapshotHz);
 setInterval(broadcastDangerMap, 1000 / SYNC.snapshotHz);
 setInterval(broadcastFlowMap, 1000 / SYNC.snapshotHz);
 setInterval(reportPerformanceStatistics, SERVER.performanceStatisticsIntervalMs);
+setInterval(() =>{
+    for( const socket of sockets.keys() ){
+        if( socket.readyState !== socket.OPEN ) continue;
+        if( socket.isAlive === false ){
+            socket.terminate();
+            continue;
+        }
+        socket.isAlive = false;
+        socket.ping();
+    }
+}, RECONNECT.pingIntervalMs);
 
 server.listen(port, () =>{
     console.log(`Fish Eat Fish server: http://localhost:${port}`);

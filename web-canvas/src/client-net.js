@@ -67,7 +67,6 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onI
     window.setInterval(() => publishEventRates(performance.now()), 250);
     window.setInterval(() => publishTraffic(), 250);
     window.setInterval(() => checkConnectionHealth(performance.now()), RECONNECT.watchdogIntervalMs);
-    window.setInterval(() => sendPing(performance.now()), RECONNECT.pingIntervalMs);
     const world = makeWorld();
     const transportState = { currentCycle: null, cycleStartedAt: null, tombstones: new Map() };
 
@@ -148,9 +147,12 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onI
         });
         connection.addEventListener('message', event =>{
             if( socket !== connection ) return;
-            trafficBytes.input += byteLengthOf(event.data);
-            lastInboundAt = performance.now();
             const text = String(event.data || '');
+            // Application ping markers are diagnostic only; keep them out of
+            // world-dynamics traffic accounting while still refreshing the
+            // same-socket liveness timestamp.
+            if( !text.startsWith('p:') ) trafficBytes.input += byteLengthOf(event.data);
+            lastInboundAt = performance.now();
             if( text[0] === 'i' ){
                 const message = parseIdentity(text);
                 joined = true;
@@ -463,11 +465,16 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onI
 
     function sendPing(now){
         if( !joined || now - lastPingSentAt < RECONNECT.pingIntervalMs * 0.5 ) return;
+        if( !socket || socket.readyState !== WebSocket.OPEN ) return;
         const counter = ++pingCounter;
-        if( sendRaw(encodeClientPing(counter)) ){
+        try{
+            socket.send(encodeClientPing(counter));
             lastPingSentAt = now;
             pendingPings.set(counter, now);
             while( pendingPings.size > 8 ) pendingPings.delete(pendingPings.keys().next().value);
+        }catch{
+            // The socket close/error path owns reconnection; an interrupted
+            // diagnostic ping must not affect input or traffic accounting.
         }
     }
 
