@@ -25,9 +25,9 @@
     --top-info-panel-gap: 10px;
     --hud-row-top-padding: 30px; /* @fix:6a7b8c9d */
     --hud-row-right-padding: 28px; /* @fix:6a7b8c9d */
-    --viewport-scale-menu-gap: 18px;
+    --hud-control-gap: 18px; /* @fix:6a7b8c9d */
+    --player-metrics-radius: 26px; /* @fix:zen-mode */
     --viewport-scale-widget-height: 164px;
-    --viewport-control-gap: 18px;
 }
 
 html, body {
@@ -206,6 +206,10 @@ body::after {
     padding: 0 16px;
 }
 
+#hud .hud-row > #player-metrics {
+    grid-column: 2;
+}
+
 /* @fix:6a7b8c9d */
 #hud-right-controls {
     position: fixed;
@@ -220,7 +224,7 @@ body::after {
     max-height: calc(100dvh - var(--top-info-panel-top) - var(--hud-row-top-padding) - 8px);
     flex-direction: column;
     align-items: flex-end;
-    gap: 18px;
+    gap: var(--hud-control-gap);
     overflow-x: hidden;
     overflow-y: auto;
     padding: 0 0 6px;
@@ -1003,6 +1007,7 @@ body::after {
     gap: 18px;
     min-width: 0;
     padding: 10px 14px;
+    border-radius: var(--player-metrics-radius);
     color: #edf8ff;
     font-size: 15px;
     font-weight: 700;
@@ -1122,7 +1127,7 @@ body::after {
     grid-template-columns: auto;
     gap: 1px;
     align-items: center;
-    justify-items: center;
+    justify-items: start;
     min-width: 24px;
 }
 
@@ -1137,7 +1142,7 @@ body::after {
     font-weight: 800;
     font-variant-numeric: tabular-nums;
     line-height: 1;
-    text-align: center;
+    text-align: left;
 }
 
 #world-info em {
@@ -1341,21 +1346,34 @@ body::after {
 #viewport-left-controls {
     position: fixed;
     z-index: 4;
-    top: calc(var(--top-info-panel-top) + var(--top-info-panel-height) + var(--viewport-scale-menu-gap));
+    top: calc(var(--top-info-panel-top) + var(--hud-row-top-padding));
     left: 32px;
     display: flex;
+    flex: 0 0 auto;
+    min-width: 0;
+    min-height: 0;
     flex-direction: column;
     align-items: flex-start;
-    gap: var(--viewport-control-gap);
-    max-height: calc(100vh - var(--top-info-panel-top) - var(--top-info-panel-height) - var(--viewport-scale-menu-gap) - 8px);
-    max-height: calc(100dvh - var(--top-info-panel-top) - var(--top-info-panel-height) - var(--viewport-scale-menu-gap) - 8px);
+    gap: var(--hud-control-gap);
+    max-height: calc(100vh - var(--top-info-panel-top) - var(--hud-row-top-padding) - 8px);
+    max-height: calc(100dvh - var(--top-info-panel-top) - var(--hud-row-top-padding) - 8px);
     overflow-x: hidden;
     overflow-y: auto;
-    padding-right: 2px;
+    padding: 0 0 6px;
     pointer-events: auto;
     scrollbar-width: none;
     overscroll-behavior: contain;
     touch-action: pan-y;
+}
+
+#viewport-left-controls > #game-menu-toggle {
+    flex: 0 0 auto;
+    align-self: flex-start;
+}
+
+#viewport-left-controls > #viewport-scale-widget,
+#viewport-left-controls > #viewport-control-tools {
+    flex: 0 0 auto;
 }
 
 #viewport-left-controls[hidden] {
@@ -1410,7 +1428,7 @@ body::after {
     top: auto;
     left: auto;
     display: grid;
-    gap: var(--viewport-control-gap);
+    gap: var(--hud-control-gap);
     max-height: none;
     overflow: visible;
     padding-right: 0;
@@ -1884,7 +1902,7 @@ body::after {
     min-height: 94px;
     padding: 14px 20px;
     border: 0;
-    border-radius: 26px;
+    border-radius: var(--player-metrics-radius);
     background: linear-gradient(100deg, rgba(5, 53, 76, 0.52), rgba(2, 36, 61, 0.58));
     box-shadow: 0 8px 22px rgba(0, 8, 24, 0.14);
     backdrop-filter: blur(5px);
@@ -2015,7 +2033,7 @@ body::after {
     font-size: 12px;
     font-weight: 740;
     letter-spacing: -0.04em;
-    text-align: right;
+    text-align: left;
 }
 
 #game-menu {
@@ -2118,9 +2136,9 @@ body::after {
 @media (max-width: 720px) {
     :root {
         --joystick-knob-size: 48px;
-        --viewport-scale-menu-gap: 28px;
         --hud-row-top-padding: 15px;
         --hud-row-right-padding: 15px;
+        --hud-control-gap: 10px;
     }
 
     #hud {
@@ -2134,7 +2152,7 @@ body::after {
     }
 
     #hud-right-controls {
-        gap: 10px;
+        gap: var(--hud-control-gap);
         right: max(15px, env(safe-area-inset-right));
     }
 
@@ -2165,7 +2183,7 @@ body::after {
         gap: 8px;
         min-height: 58px;
         padding: 8px 10px;
-        border-radius: 17px;
+        --player-metrics-radius: 17px;
     }
 
     #player-color-indicator {
@@ -2294,7 +2312,6 @@ body::after {
 
 @media (orientation: portrait) {
     #viewport-left-controls {
-        top: calc(var(--top-info-panel-top) + max(73px, var(--top-info-panel-height)) + var(--viewport-scale-menu-gap));
         left: clamp(16px, 2vw, 32px);
     }
 
@@ -2318,6 +2335,7 @@ body::after {
         --top-info-panel-gap: clamp(5px, 1vh, 10px);
         --hud-row-top-padding: clamp(8px, 3vh, 24px);
         --hud-row-right-padding: clamp(14px, 2vw, 28px);
+        --hud-control-gap: clamp(8px, 1.8vh, 18px);
     }
 
     #hud {
@@ -2331,7 +2349,7 @@ body::after {
     }
 
     #hud-right-controls {
-        gap: clamp(8px, 1.8vh, 18px);
+        gap: var(--hud-control-gap);
         right: max(var(--hud-row-right-padding), env(safe-area-inset-right));
     }
 
@@ -2366,7 +2384,7 @@ body::after {
         gap: clamp(8px, 1.8vh, 18px);
         min-height: clamp(54px, 11vh, 94px);
         padding: clamp(8px, 1.8vh, 14px) clamp(10px, 2vw, 20px);
-        border-radius: clamp(16px, 3.2vh, 26px);
+        --player-metrics-radius: clamp(16px, 3.2vh, 26px);
     }
 
     #player-color-indicator {
@@ -2459,7 +2477,7 @@ body::after {
         min-width: 0;
         height: auto;
         display: grid;
-        grid-template-columns: repeat(12, minmax(0, 1fr));
+        grid-template-columns: repeat(7, minmax(0, 1fr));
         gap: clamp(2px, 0.45vw, 6px);
         align-items: stretch;
         padding: 1px 4px max(1px, env(safe-area-inset-bottom));
@@ -2498,7 +2516,7 @@ body::after {
     #world-info .world-info-item {
         display: grid;
         grid-template-columns: auto;
-        justify-items: center;
+        justify-items: start;
         align-content: center;
         gap: 1px;
         min-height: 0;
@@ -2524,5 +2542,140 @@ body::after {
     #world-info strong,
     #world-info em {
         font-size: clamp(6px, 0.7vw, 8px);
+        text-align: left;
+    }
+}
+
+/* @fix:zen-mode */
+#hud-right-controls,
+#viewport-left-controls {
+    transition:
+        transform 440ms cubic-bezier(.16, 1, .3, 1),
+        opacity 440ms cubic-bezier(.16, 1, .3, 1);
+    will-change: transform, opacity;
+}
+
+#player-metrics {
+    transition: border-radius 480ms cubic-bezier(.16, 1, .3, 1);
+    will-change: border-radius;
+}
+
+#game-menu {
+    transition:
+        transform 440ms cubic-bezier(.16, 1, .3, 1),
+        opacity 440ms cubic-bezier(.16, 1, .3, 1);
+    will-change: transform, opacity;
+}
+
+#world-info,
+#flow-info-panel,
+#records-panel {
+    transition: opacity 440ms cubic-bezier(.16, 1, .3, 1);
+    will-change: opacity;
+}
+
+body.is-zen-mode #hud-right-controls {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(50%);
+}
+
+body.is-zen-mode #viewport-left-controls {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(-50%);
+}
+
+body.is-zen-mode #game-menu {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-12px);
+}
+
+body.is-zen-mode #world-info,
+body.is-zen-mode #flow-info-panel,
+body.is-zen-mode #records-panel {
+    opacity: 0;
+    pointer-events: none;
+}
+
+body.is-zen-mode #player-metrics {
+    position: fixed;
+    z-index: 6;
+    top: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-width: none;
+    box-sizing: border-box;
+    transform: none;
+    border-radius: 0;
+    cursor: pointer;
+}
+
+body.is-zen-mode #player-metrics.is-zen-leaving {
+    border-radius: var(--player-metrics-radius);
+}
+
+#player-metrics {
+    cursor: pointer;
+}
+
+#player-metrics.is-zen-entering {
+    animation: zenMetricsEnter 480ms cubic-bezier(.16, 1, .3, 1) both;
+}
+
+#player-metrics.is-zen-leaving {
+    animation: zenMetricsLeave 480ms cubic-bezier(.16, 1, .3, 1) both;
+}
+
+@keyframes zenMetricsEnter {
+    from {
+        position: fixed;
+        left: var(--zen-start-left);
+        right: auto;
+        top: var(--zen-start-top);
+        width: var(--zen-start-width);
+        transform: var(--zen-start-transform);
+    }
+    to {
+        position: fixed;
+        left: 0;
+        right: 0;
+        top: 0;
+        width: 100%;
+        transform: none;
+    }
+}
+
+@keyframes zenMetricsLeave {
+    from {
+        position: fixed;
+        left: 0;
+        right: 0;
+        top: 0;
+        width: 100%;
+        transform: none;
+    }
+    to {
+        position: fixed;
+        left: var(--zen-end-left);
+        right: auto;
+        top: var(--zen-end-top);
+        width: var(--zen-end-width);
+        transform: var(--zen-end-transform);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #hud-right-controls,
+    #viewport-left-controls,
+    #game-menu,
+    #world-info,
+    #flow-info-panel,
+    #records-panel,
+    #player-metrics {
+        transition-duration: 1ms;
+        animation-duration: 1ms !important;
     }
 }

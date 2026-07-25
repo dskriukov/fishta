@@ -75,7 +75,7 @@ export const JOYSTICK = {
     burstNumberHitRadiusPx: 112,
     burstArcHitInnerRadiusPx: 118,
     burstArcHitOuterRadiusPx: 193,
-    burstPinDistanceKnobDiameters: 1.5,
+    burstPinDistanceKnobDiameters: 1.5, // protective distance for pin and unpin gestures
     burstDynamicRangePx: 150,
 };
 
@@ -129,7 +129,7 @@ export const DEBUG = {
 
 export const WORLD_MAP = {
     sizePx: 200,            // @ds:3a980720 @ds:8f2c91ad
-    leftPx: 12,             // @ds:3a980720
+    leftPx: 12,             // fallback left inset when the left toolbar is unavailable — @ds:3a980720 @fix:world-map-layout
     overlayGapPx: 12,       // @ds:3a980720
 };
 
@@ -161,6 +161,11 @@ export const SIZE_DELTA_LABEL = {
 
 export const RECONNECT = {
     graceSeconds: 3,        // @ds:93a64773
+    retryDelayMs: 350,       // @fix:ws-recovery
+    connectAttemptTimeoutMs: 3000, // @fix:ws-recovery
+    watchdogIntervalMs: 250, // @fix:ws-recovery
+    idleTimeoutMs: 1000,     // @fix:ws-recovery
+    pingIntervalMs: 1000,    // @fix:ws-recovery
 };
 
 export const LEAVE = {

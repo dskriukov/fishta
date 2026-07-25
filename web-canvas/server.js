@@ -25,6 +25,7 @@ import {
     encodeWorldScale,
     encodeWorldSize,
     encodeWorldCycle,
+    encodeClientPing,
     parseClientMessage,
 } from './src/protocol.js';
 
@@ -173,6 +174,10 @@ wss.on('connection', (socket, request) =>{
         }
         if( message.type === 'leave' ) handleLeaveGame(socket, meta);
         if( message.type === 'syncAck' ) handleSyncAck(socket, meta, message);
+        if( message.type === 'ping' ){
+            send(socket, encodeClientPing(message.n));
+            return;
+        }
     });
 
     socket.on('close', () =>{

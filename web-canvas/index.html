@@ -60,9 +60,8 @@
     </div>
     <div id="hud">
         <div class="hud-row">
-            <button id="game-menu-toggle" type="button" aria-label="Menu" aria-controls="game-menu" aria-expanded="false"><span></span><span></span><span></span></button>
             <!-- @ds:2e91f6d4 @ds:b9136c2e @ds:c5a92431 @ia:32288dfb -->
-            <div id="player-metrics" aria-label="player metrics" hidden>
+            <div id="player-metrics" role="button" tabindex="0" aria-label="player metrics; toggle zen mode" aria-pressed="false" hidden>
                 <span id="player-color-indicator" aria-hidden="true"></span>
                 <span id="player-life">
                     <strong id="player-name">-</strong>
@@ -85,6 +84,7 @@
         </div>
     </div>
     <div id="viewport-left-controls" hidden aria-label="Viewport and control tools">
+        <button id="game-menu-toggle" type="button" aria-label="Menu" aria-controls="game-menu" aria-expanded="false"><span></span><span></span><span></span></button>
         <aside id="viewport-scale-widget" aria-label="Viewport scale">
             <span class="viewport-scale-label">max</span>
             <span class="viewport-scale-track" aria-hidden="true"><span id="viewport-scale-marker"></span></span>
@@ -146,6 +146,8 @@
         <span class="world-info-item"><span>Control</span><strong id="world-control-rate">0 Ev/s</strong></span>
         <span class="world-info-item"><span>World calc</span><strong id="world-calc-ms">—</strong></span>
         <span class="world-info-item"><span>Sync cycle</span><strong id="world-sync-cycle-ms">—</strong></span>
+        <span class="world-info-item"><span>Ping</span><strong id="world-ping-ms">—</strong></span>
+        <span class="world-info-item"><span>Traffic I/O</span><strong id="world-traffic-io">— / —</strong></span>
     </div>
     <section id="flow-info-panel" class="diagnostic-info-panel" aria-label="flow map timings" hidden>
         <header><strong>flow map timings</strong><span id="flow-metric-window">waiting for 5 s window</span></header>

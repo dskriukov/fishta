@@ -494,6 +494,7 @@ export function render(ctx, state){
         world,
         state.currentUserFishId,
         state.worldMapTop,
+        state.worldMapLeft,
         {
             flowMapBitmap: state.flowMapVisible ? state.flowMapBitmap : null,
             flowMapVisible: state.flowMapVisible,
@@ -975,9 +976,8 @@ function traceAlpha(trace, now){
 }
 
 // @ds:8f2c91ad @ds:3a980720 @ds:f3a1c7d9 @ds:e6d3b9a1 @ds:9a6e4c31
-function drawWorldMap(ctx, world, currentUserFishId, top, inspection = {}){
+function drawWorldMap(ctx, world, currentUserFishId, top, left = WORLD_MAP.leftPx, inspection = {}){
     const size = WORLD_MAP.sizePx;
-    const left = WORLD_MAP.leftPx;
     if( !Number.isFinite(world.width) || !Number.isFinite(world.height) || world.width <= 0 || world.height <= 0 ) return;
     const maxLinearSize = (world.fish || []).reduce((max, fish) => Math.max(max, linearMapFishSize(fish)), 0);
     const nominalLinearSize = Math.sqrt(PLAYER.startSize);

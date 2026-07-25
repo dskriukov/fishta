@@ -37,6 +37,8 @@ const worldDynamicRateValue = document.getElementById('world-dynamic-rate');
 const worldControlRateValue = document.getElementById('world-control-rate');
 const worldCalcMsValue = document.getElementById('world-calc-ms');
 const worldSyncCycleMsValue = document.getElementById('world-sync-cycle-ms');
+const worldPingMsValue = document.getElementById('world-ping-ms');
+const worldTrafficIoValue = document.getElementById('world-traffic-io');
 const startupSplash = document.getElementById('startup-splash');
 const joinPanel = document.getElementById('join');
 const joinForm = document.getElementById('join-form');
@@ -146,9 +148,12 @@ let lastInputFlushAt = 0;
 const CONTROL_HEARTBEAT_MS = 900; // @ds:multiplayer.control-heartbeat
 const VIEWPORT_FISH_CAPACITY_STORAGE_KEY = 'selfish-bait.viewport-fish-capacity'; // @fix:a64e9b31
 const CONTROL_LAYOUT_POSITION_STORAGE_KEY = 'selfish-bait.control-layout-positions'; // @fix:control-viewport-layout
+const WORLD_MAP_POSITION_STORAGE_KEY = 'selfish-bait.world-map-position'; // @fix:world-map-layout
 const controlLayoutPositions = loadControlLayoutPositions(); // @fix:control-viewport-layout
 let gameMenuOpen = false;
 let worldMapVisible = false;
+let zenMode = false; // @fix:zen-mode
+let cancelZenAnimation = null; // @fix:zen-mode
 let debugMode = false;
 let syncSegmentsVisible = false;
 let flowMapVisible = false; // @fix:6a7b8c9d
@@ -169,6 +174,10 @@ let recordsPanelKey = ''; // @fix:6a7b8c9d
 const recordFirstSeenAt = new Map(); // @fix:6a7b8c9d
 let uiLayoutEditMode = false; // @fix:f1c6a8d4
 let joystickRelocationLocked = false; // @fix:52cd6e6c
+const worldMapPosition = loadWorldMapPosition(); // @fix:world-map-layout
+let worldMapDefaultLeft = null; // @fix:world-map-layout
+let worldMapDragPointerId = null; // @fix:world-map-layout
+let worldMapDragOffset = null; // @fix:world-map-layout
 const CONTROL_LAYOUT_MODES = ['joystick', 'dual-joystick', 'touch']; // @fix:70871bc5
 let controlLayoutMode = 'joystick'; // @fix:70871bc5
 let controlLayoutToastTimer = 0; // @fix:70871bc5
@@ -236,13 +245,13 @@ function loadControlLayoutPositions(){
         const parsed = JSON.parse(window.localStorage.getItem(CONTROL_LAYOUT_POSITION_STORAGE_KEY) || '{}');
         for( const key of ['joystick', 'dualRight', 'dualBurst', 'touchSpeed'] ){
             const position = parsed?.[key];
-            const dualEdgePosition = key === 'dualRight'
+            const rightEdgePosition = key === 'joystick' || key === 'dualRight'
                 ? Number.isFinite(position?.rightPx) && Number.isFinite(position?.bottomPx)
-                : key === 'dualBurst'
-                    ? Number.isFinite(position?.leftPx) && Number.isFinite(position?.bottomPx)
-                    : false;
-            if( dualEdgePosition ){
-                result[key] = key === 'dualRight'
+                : false;
+            const leftEdgePosition = key === 'dualBurst'
+                && Number.isFinite(position?.leftPx) && Number.isFinite(position?.bottomPx);
+            if( rightEdgePosition || leftEdgePosition ){
+                result[key] = rightEdgePosition
                     ? {
                         rightPx: Math.max(0, Number(position.rightPx)),
                         bottomPx: Math.max(0, Number(position.bottomPx)),
@@ -277,23 +286,115 @@ function controlViewportSize(){
     };
 }
 
+// @fix:world-map-layout
+function loadWorldMapPosition(){
+    try{
+        const parsed = JSON.parse(window.localStorage.getItem(WORLD_MAP_POSITION_STORAGE_KEY) || 'null');
+        return Number.isFinite(parsed?.leftPx) && Number.isFinite(parsed?.topPx)
+            ? { leftPx: Number(parsed.leftPx), topPx: Number(parsed.topPx), custom: true }
+            : { custom: false };
+    }catch{
+        return { custom: false };
+    }
+}
+
+// @fix:world-map-layout
+function saveWorldMapPosition(){
+    if( !worldMapPosition.custom ) return;
+    try{
+        window.localStorage.setItem(WORLD_MAP_POSITION_STORAGE_KEY, JSON.stringify({
+            leftPx: worldMapPosition.leftPx,
+            topPx: worldMapPosition.topPx,
+        }));
+    }catch{
+        // The in-memory position remains usable when storage is unavailable.
+    }
+}
+
+// @fix:world-map-layout
+function clampWorldMapPosition(leftPx, topPx){
+    const viewport = controlViewportSize();
+    const size = WORLD_MAP.sizePx;
+    return {
+        leftPx: Math.max(0, Math.min(Math.max(0, viewport.width - size), Number(leftPx) || 0)),
+        topPx: Math.max(0, Math.min(Math.max(0, viewport.height - size), Number(topPx) || 0)),
+    };
+}
+
+// @fix:world-map-layout
+function getWorldMapPosition(){
+    const defaultTop = getWorldMapTop();
+    if( worldMapPosition.custom ){
+        const clamped = clampWorldMapPosition(worldMapPosition.leftPx, worldMapPosition.topPx);
+        worldMapPosition.leftPx = clamped.leftPx;
+        worldMapPosition.topPx = clamped.topPx;
+        return clamped;
+    }
+    if( !Number.isFinite(worldMapDefaultLeft) ){
+        const leftPanel = viewportLeftControls?.getBoundingClientRect();
+        const leftInset = leftPanel && leftPanel.width > 0
+            ? Math.max(0, leftPanel.left)
+            : WORLD_MAP.leftPx;
+        worldMapDefaultLeft = leftPanel && leftPanel.width > 0
+            ? leftPanel.right + leftInset
+            : WORLD_MAP.leftPx;
+    }
+    return clampWorldMapPosition(worldMapDefaultLeft, defaultTop);
+}
+
+// @fix:world-map-layout
+function worldMapRect(){
+    const position = getWorldMapPosition();
+    return {
+        left: position.leftPx,
+        top: position.topPx,
+        width: WORLD_MAP.sizePx,
+        height: WORLD_MAP.sizePx,
+    };
+}
+
+// @fix:world-map-layout
+function worldMapCanBeDragged(){
+    return worldMapVisible && (controlLayoutMode === 'joystick'
+        ? !joystickRelocationLocked
+        : uiLayoutEditMode);
+}
+
+// @fix:world-map-layout
+function worldMapContainsPoint(clientX, clientY){
+    if( !worldMapCanBeDragged() ) return false;
+    const rect = worldMapRect();
+    return clientX >= rect.left && clientX <= rect.left + rect.width
+        && clientY >= rect.top && clientY <= rect.top + rect.height;
+}
+
+// @fix:world-map-layout
+function moveWorldMap(leftPx, topPx){
+    const clamped = clampWorldMapPosition(leftPx, topPx);
+    worldMapPosition.leftPx = clamped.leftPx;
+    worldMapPosition.topPx = clamped.topPx;
+    worldMapPosition.custom = true;
+}
+
 // @fix:control-viewport-layout
 function rememberControlCenter(key, center){
     const viewport = controlViewportSize();
-    if( key === 'dualRight' || key === 'dualBurst' ){
-        // Dual grips are edge-anchored. Store the actual CSS-pixel margin,
+    if( key === 'joystick' || key === 'dualRight' || key === 'dualBurst' ){
+        // Joystick grips are edge-anchored. Store the actual CSS-pixel margin,
         // not a viewport percentage, so a rotation keeps the same side/bottom
-        // placement while the 30vmin footprint is recalculated by CSS.
-        const panel = key === 'dualRight' ? dualRightJoystickPanel : dualBurstPanel;
+        // placement while the responsive footprint is recalculated by CSS.
+        const panel = key === 'joystick'
+            ? joystickPanel
+            : key === 'dualRight' ? dualRightJoystickPanel : dualBurstPanel;
         const rect = panel?.getBoundingClientRect();
         if( rect && rect.width > 0 && rect.height > 0 ){
-            controlLayoutPositions[key] = key === 'dualRight'
+            controlLayoutPositions[key] = key === 'dualBurst'
                 ? {
-                    rightPx: Math.max(0, viewport.width - rect.right),
+                    leftPx: Math.max(0, rect.left),
                     bottomPx: Math.max(0, viewport.height - rect.bottom),
                 }
                 : {
-                    leftPx: Math.max(0, rect.left),
+                    rightPx: Math.max(0, viewport.width - rect.right),
                     bottomPx: Math.max(0, viewport.height - rect.bottom),
                 };
             return;
@@ -326,12 +427,22 @@ function rememberedControlCenter(key){
     const position = controlLayoutPositions[key];
     if( !position ) return null;
     const viewport = controlViewportSize();
-    if( key === 'dualRight' && Number.isFinite(position.rightPx) && Number.isFinite(position.bottomPx) ){
-        const rect = dualRightJoystickPanel?.getBoundingClientRect();
+    if( (key === 'joystick' || key === 'dualRight')
+        && Number.isFinite(position.rightPx) && Number.isFinite(position.bottomPx) ){
+        const panel = key === 'joystick' ? joystickPanel : dualRightJoystickPanel;
+        const rect = panel?.getBoundingClientRect();
         if( rect && rect.width > 0 && rect.height > 0 ){
+            const base = key === 'joystick' ? joystickBase : dualRightJoystickBase;
+            const baseRect = base?.getBoundingClientRect();
+            const baseOffsetX = baseRect && baseRect.width > 0
+                ? baseRect.left - rect.left + baseRect.width / 2
+                : rect.width / 2;
+            const baseOffsetY = baseRect && baseRect.height > 0
+                ? baseRect.top - rect.top + baseRect.height / 2
+                : rect.height / 2;
             return v(
-                viewport.width - position.rightPx - rect.width / 2,
-                viewport.height - position.bottomPx - rect.height / 2,
+                viewport.width - position.rightPx - rect.width + baseOffsetX,
+                viewport.height - position.bottomPx - rect.height + baseOffsetY,
             );
         }
     }
@@ -362,6 +473,7 @@ function rememberCurrentControlCenter(key, element){
 
 // ds:b28b7af6 @fix:c7e2a914
 function resize(){
+    worldMapDefaultLeft = null;
     const rect = canvas.getBoundingClientRect();
     const width = Math.max(1, Math.round(rect.width || window.innerWidth));
     const height = Math.max(1, Math.round(rect.height || window.innerHeight));
@@ -440,6 +552,19 @@ net = createClientNet({
     },
     onPerformanceMetrics(metrics){
         updateWorldPerformanceMetrics(metrics.worldCalculationMs, syncCycleMs);
+    },
+    onPing(message){
+        if( worldPingMsValue && Number.isFinite(message?.rttMs) ) worldPingMsValue.textContent = `${message.rttMs.toFixed(1)} ms`;
+    },
+    onTraffic(message){
+        if( worldTrafficIoValue ) worldTrafficIoValue.textContent = `${formatTrafficBytes(message?.inputBytes)} / ${formatTrafficBytes(message?.outputBytes)}`;
+    },
+    onConnectionLost(){
+        closeFlowMapTransport();
+        state.currentUserFishId = null;
+        lastSentInputKey = null;
+        lastInputFlushAt = 0;
+        showNewJoinForm();
     },
     onEvent(message){
         hudStatus.textContent = message.status || message.event || 'event';
@@ -523,6 +648,22 @@ function updateWorldPerformanceMetrics(worldMs, syncMs){
         syncCycleMs = syncValue;
         if( worldSyncCycleMsValue ) worldSyncCycleMsValue.textContent = `${syncValue.toFixed(2)} ms`;
     }
+}
+
+// @fix:ws-traffic
+function formatTrafficBytes(bytes){
+    const value = Number(bytes);
+    if( !Number.isFinite(value) || value < 0 ) return '—';
+    const units = ['b', 'kb', 'mb', 'gb', 'tb'];
+    let unitIndex = 0;
+    let scaled = value;
+    while( scaled >= 1024 && unitIndex < units.length - 1 ){
+        scaled /= 1024;
+        unitIndex++;
+    }
+    if( unitIndex === 0 ) return `${Math.round(scaled)} ${units[unitIndex]}`;
+    const rounded = Math.round(scaled * 10) / 10;
+    return `${rounded} ${units[unitIndex]}`;
 }
 
 function recordDebugSyncCell(cycle, cellX, cellY){
@@ -810,13 +951,29 @@ function toggleInfoPanel(){
 // @fix:entry-screen-reset
 function resetEntryScreenPanels(){
     gameMenuOpen = false;
+    worldMapDragPointerId = null;
+    worldMapDragOffset = null;
     infoPanelMode = 'none';
+    zenMode = false;
+    cancelZenAnimation?.();
+    cancelZenAnimation = null;
+    document.body.classList.remove('is-zen-mode');
+    playerMetrics?.setAttribute('aria-pressed', 'false');
+    playerMetrics?.classList.remove('is-zen-entering', 'is-zen-leaving');
+    for( const name of ['start', 'end'] ){
+        for( const property of ['left', 'top', 'width', 'transform'] ){
+            playerMetrics?.style.removeProperty(`--zen-${name}-${property}`);
+        }
+    }
+    worldInfo?.setAttribute('aria-hidden', 'false');
     debugMode = false;
     syncSegmentsVisible = false;
     worldMapVisible = false;
     flowMapVisible = false;
     flowVectorsVisible = false;
     dangerMapVisible = false;
+    if( worldPingMsValue ) worldPingMsValue.textContent = '—';
+    if( worldTrafficIoValue ) worldTrafficIoValue.textContent = '— / —';
     flowVectorsResetPending = false;
     debugPositionTraces.length = 0;
     setInfoPanelMode('none');
@@ -839,6 +996,73 @@ function resetEntryScreenPanels(){
     }
     syncDiagnosticMapTransport();
     updateGameMenu();
+}
+
+// @fix:zen-mode
+function toggleZenMode(){
+    if( !entrySessionReady || !net?.isJoined ) return;
+    zenMode = !zenMode;
+    playerMetrics?.setAttribute('aria-pressed', String(zenMode));
+    worldInfo?.setAttribute('aria-hidden', String(zenMode));
+    animateZenPlayerMetrics(zenMode);
+}
+
+// @fix:zen-mode
+function animateZenPlayerMetrics(entering){
+    if( !playerMetrics ){
+        document.body.classList.toggle('is-zen-mode', entering);
+        return;
+    }
+    cancelZenAnimation?.();
+    cancelZenAnimation = null;
+    playerMetrics.classList.remove('is-zen-entering', 'is-zen-leaving');
+    for( const name of ['start', 'end'] ){
+        for( const property of ['left', 'top', 'width', 'transform'] ){
+            playerMetrics.style.removeProperty(`--zen-${name}-${property}`);
+        }
+    }
+    const current = playerMetrics.getBoundingClientRect();
+    const setGeometry = (name, rect) =>{
+        playerMetrics.style.setProperty(`--zen-${name}-left`, `${rect.left}px`);
+        playerMetrics.style.setProperty(`--zen-${name}-top`, `${rect.top}px`);
+        playerMetrics.style.setProperty(`--zen-${name}-width`, `${rect.width}px`);
+        // rect already contains any normal-layout transform. Reapplying it in
+        // the fixed animation would offset the panel a second time.
+        playerMetrics.style.setProperty(`--zen-${name}-transform`, 'none');
+    };
+    const finish = () =>{
+        playerMetrics.classList.remove('is-zen-entering', 'is-zen-leaving');
+        for( const name of ['start', 'end'] ){
+            for( const property of ['left', 'top', 'width', 'transform'] ){
+                playerMetrics.style.removeProperty(`--zen-${name}-${property}`);
+            }
+        }
+    };
+    const animationName = entering ? 'zenMetricsEnter' : 'zenMetricsLeave';
+    const onAnimationEnd = event =>{
+        if( event.animationName !== animationName ) return;
+        playerMetrics.removeEventListener('animationend', onAnimationEnd);
+        cancelZenAnimation = null;
+        if( !entering ) document.body.classList.remove('is-zen-mode');
+        finish();
+    };
+    playerMetrics.addEventListener('animationend', onAnimationEnd);
+    cancelZenAnimation = () => playerMetrics.removeEventListener('animationend', onAnimationEnd);
+    if( entering ){
+        setGeometry('start', current);
+        document.body.classList.add('is-zen-mode');
+        playerMetrics.classList.add('is-zen-entering');
+    }else{
+        document.body.classList.remove('is-zen-mode');
+        const target = playerMetrics.getBoundingClientRect();
+        document.body.classList.add('is-zen-mode');
+        // Establish the zero-radius zen state before applying the returning
+        // class, otherwise both styles can be coalesced into one frame.
+        playerMetrics.getBoundingClientRect();
+        setGeometry('start', current);
+        setGeometry('end', target);
+        playerMetrics.classList.add('is-zen-leaving');
+    }
 }
 
 // @fix:4f8a2c71
@@ -1062,6 +1286,14 @@ if( flowMapToggle ) flowMapToggle.addEventListener('click', toggleFlowMap);
 if( flowVectorsToggle ) flowVectorsToggle.addEventListener('click', toggleFlowVectors);
 if( dangerMapToggle ) dangerMapToggle.addEventListener('click', toggleDangerMapUnderlay);
 if( infoPanelToggle ) infoPanelToggle.addEventListener('click', toggleInfoPanel);
+if( playerMetrics ){
+    playerMetrics.addEventListener('click', toggleZenMode);
+    playerMetrics.addEventListener('keydown', event =>{
+        if( event.key !== 'Enter' && event.key !== ' ' ) return;
+        event.preventDefault();
+        toggleZenMode();
+    });
+}
 if( decorativeSparksTestToggle ) decorativeSparksTestToggle.addEventListener('click', queueDecorativeTestSparks);
 if( uiLayoutToggle ) uiLayoutToggle.addEventListener('click', toggleUiLayoutEditMode);
 if( controlLayoutToggle ) controlLayoutToggle.addEventListener('click', cycleControlLayoutMode);
@@ -1125,6 +1357,7 @@ function setJoinedUiState(joined, { showJoinForm = false, sessionReady = entrySe
     if( controlModes ) controlModes.hidden = !gameControlsVisible;
     if( controlHelp ) controlHelp.hidden = !gameControlsVisible;
     if( viewportLeftControls ) viewportLeftControls.hidden = !gameControlsVisible;
+    worldMapDefaultLeft = null;
     if( !gameControlsVisible ){
         uiLayoutEditMode = false;
         resetDualRightJoystick();
@@ -1161,13 +1394,14 @@ function frame(now){
     applyClientFishDecor(visibleState.world, clientBubbles, clientFinSparks, dt, Math.random); // @fix:4f8a2c71
     updateClientFlowField(visibleState.world, now); // @fix:6a7b8c9d
     advanceClientShredRotation(visibleState.world, dt, flowMapField); // @fix:4e9b2c71
-    if( flowVectorsVisible ) advanceClientFlowCrosses(flowMapField, dt); // @fix:5f2a8c71
+    if( flowVectorsVisible && !zenMode ) advanceClientFlowCrosses(flowMapField, dt); // @fix:5f2a8c71
     advanceClientFinSparks(visibleState.world, clientFinSparks, dt, flowMapField); // @fix:4f8a2c71
     logFlowCycleMetrics(); // @fix:6a7b8c9d
     updateSizeDeltaLabels(visibleState.world, dt);
     lastVisibleState = visibleState;
     advanceClientBubbles(clientBubbles, clientBubbleEmitters, visibleState.world, dt, Math.random);
-    if( debugMode ) recordDebugPositionTraces(now, visibleState.world);
+    if( debugMode && !zenMode ) recordDebugPositionTraces(now, visibleState.world);
+    const mapPosition = getWorldMapPosition(); // @fix:world-map-layout
     render(ctx, {
         ...visibleState,
         viewportFishCapacity,
@@ -1177,24 +1411,25 @@ function frame(now){
         finSparks: clientFinSparks, // @fix:4f8a2c71
         sizeDeltaLabels: sizeDeltaLabelState.labels,
         debug: {
-            enabled: debugMode,
-            dangerMapUnderlay: debugMode && dangerMapVisible,
-            flowMapUnderlay: debugMode && flowMapVisible, // @fix:6a7b8c9d
+            enabled: debugMode && !zenMode,
+            dangerMapUnderlay: debugMode && !zenMode && dangerMapVisible,
+            flowMapUnderlay: debugMode && !zenMode && flowMapVisible, // @fix:6a7b8c9d
             positionTraces: debugPositionTraces,
             receivedQuadrants: [...debugReceivedQuadrants.values()],
             cellSyncAverages: debugSyncCellAverages(),
             now,
         },
         cellSyncAverages: debugSyncCellAverages(),
-        syncSegmentsVisible,
+        syncSegmentsVisible: syncSegmentsVisible && !zenMode,
         flowMapVisible,
         flowMapBitmap: flowMapVisible ? flowMapBitmap : null,
-        flowVectorsVisible,
-        flowVectorField: flowVectorsVisible ? flowMapField : null,
+        flowVectorsVisible: flowVectorsVisible && !zenMode,
+        flowVectorField: flowVectorsVisible && !zenMode ? flowMapField : null,
         dangerMapVisible,
         dangerMapBitmap: dangerMapVisible ? dangerMapBitmap : null,
         worldMapVisible,
-        worldMapTop: getWorldMapTop(),
+        worldMapLeft: mapPosition.leftPx,
+        worldMapTop: mapPosition.topPx,
     });
     sendInputIfChanged(now);
 
@@ -2864,7 +3099,7 @@ function renderJoystickKnob(vector){
 
 // @fix:32ef3d51
 function cameraPanEnabled(e){
-    return e.pointerType === 'touch'
+    return (e.pointerType !== 'mouse' || e.button === 0)
         && controlMode.active !== 'touch'
         && controlMode.active !== 'pointer'
         && !controlLayoutIsFixed();
@@ -2906,6 +3141,14 @@ function clampCameraPanToSafeArea(){
 function setupCameraPan(){
     if( !canvas ) return;
     canvas.addEventListener('pointerdown', e =>{
+        if( worldMapContainsPoint(e.clientX, e.clientY) && worldMapDragPointerId === null ){
+            const rect = worldMapRect();
+            worldMapDragPointerId = e.pointerId;
+            worldMapDragOffset = v(e.clientX - rect.left, e.clientY - rect.top);
+            canvas.setPointerCapture?.(e.pointerId);
+            e.preventDefault();
+            return;
+        }
         if( !cameraPanEnabled(e) ) return;
         cameraPointers.set(e.pointerId, v(e.clientX, e.clientY));
         if( cameraPointers.size === 1 ){
@@ -2924,6 +3167,11 @@ function setupCameraPan(){
         e.preventDefault();
     });
     canvas.addEventListener('pointermove', e =>{
+        if( e.pointerId === worldMapDragPointerId && worldMapDragOffset ){
+            moveWorldMap(e.clientX - worldMapDragOffset.x, e.clientY - worldMapDragOffset.y);
+            e.preventDefault();
+            return;
+        }
         if( !cameraPointers.has(e.pointerId) ) return;
         const point = v(e.clientX, e.clientY);
         cameraPointers.set(e.pointerId, point);
@@ -2942,6 +3190,13 @@ function setupCameraPan(){
         e.preventDefault();
     });
     const release = e =>{
+        if( e.pointerId === worldMapDragPointerId ){
+            worldMapDragPointerId = null;
+            worldMapDragOffset = null;
+            saveWorldMapPosition();
+            e.preventDefault();
+            return;
+        }
         if( !cameraPointers.has(e.pointerId) ) return;
         cameraPointers.delete(e.pointerId);
         if( cameraGestureMode === 'pinch' && cameraPointers.size === 1 ){
@@ -3365,7 +3620,8 @@ function setupDualBurstJoystickControls(){
         }else if( dualBurstGesture.type === 'pinned-knob' ){
             const delta = v(point.x - dualBurstGesture.start.x, point.y - dualBurstGesture.start.y);
             const inward = delta.x * dualBurstGesture.normal.x + delta.y * dualBurstGesture.normal.y;
-            if( inward < -JOYSTICK.burstKnobDiameterPx ){
+            const unpinDistance = JOYSTICK.burstKnobDiameterPx * JOYSTICK.burstPinDistanceKnobDiameters;
+            if( inward < -unpinDistance ){
                 burst.pinned = false;
                 burst.pinnedLevel = 0;
                 dualBurstGesture.type = 'arc';
@@ -3380,10 +3636,12 @@ function setupDualBurstJoystickControls(){
                 setDualBurstLevel(candidate.level, true);
             }else{
                 const delta = v(point.x - dualBurstGesture.start.x, point.y - dualBurstGesture.start.y);
+                const gestureDistance = Math.hypot(delta.x, delta.y);
                 const outward = delta.x * dualBurstGesture.normal.x + delta.y * dualBurstGesture.normal.y;
                 const tangent = delta.x * dualBurstGesture.normal.y - delta.y * dualBurstGesture.normal.x;
                 const gestureAngle = Math.atan2(tangent, Math.max(1e-6, outward)) * 180 / Math.PI;
-                if( gestureAngle > 45 ){
+                const pinDistance = JOYSTICK.burstKnobDiameterPx * JOYSTICK.burstPinDistanceKnobDiameters;
+                if( gestureDistance >= pinDistance && gestureAngle > 45 ){
                     burst.pinned = false;
                     burst.pinnedLevel = 0;
                     dualBurstGesture.dynamic = true;
@@ -3544,12 +3802,15 @@ function setJoystickCenter(center, { remember = true } = {}){
     const baseRect = joystickBase.getBoundingClientRect();
     const baseCenterOffsetX = baseRect.left + baseRect.width / 2 - panelRect.left;
     const baseCenterOffsetY = baseRect.top + baseRect.height / 2 - panelRect.top;
-    // Position the panel from the base center; the base itself is inset inside
-    // the larger footprint on mobile.
-    joystickPanel.style.left = `${center.x - baseCenterOffsetX}px`;
-    joystickPanel.style.top = `${center.y - baseCenterOffsetY}px`;
-    joystickPanel.style.right = 'auto';
-    joystickPanel.style.bottom = 'auto';
+    const viewport = controlViewportSize();
+    const rightPx = Math.max(0, viewport.width - center.x - panelRect.width + baseCenterOffsetX);
+    const bottomPx = Math.max(0, viewport.height - center.y - panelRect.height + baseCenterOffsetY);
+    // Position the panel from its right/bottom edge; the base itself is inset
+    // inside the larger footprint on mobile.
+    joystickPanel.style.left = 'auto';
+    joystickPanel.style.top = 'auto';
+    joystickPanel.style.right = `${rightPx}px`;
+    joystickPanel.style.bottom = `${bottomPx}px`;
     if( remember ){
         rememberControlCenter('joystick', center);
         markControlPositionCustom('joystick');
@@ -3673,7 +3934,7 @@ function applyDefaultDualGripAnchors(){
     const leftBlock = viewportControlTools?.getBoundingClientRect();
     const leftEdge = leftBlock && leftBlock.width > 0
         ? leftBlock.right
-        : Math.max(0, Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--viewport-control-gap')) || 0);
+        : Math.max(0, Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hud-control-gap')) || 0);
     if( !controlLayoutPositions.dualBurstCustom ){
         const defaultBurstCenter = clampControlRectCenter(
             v(leftEdge + burstKnobDiameter + burstRect.width / 2, burstCenterY),

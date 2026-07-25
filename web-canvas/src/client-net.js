@@ -14,7 +14,7 @@ import {
     parseIdentity,
 } from './protocol.js';
 import { makeWorld } from './world.js';
-import { SYNC, WORLD } from './constants.js';
+import { SYNC, WORLD, RECONNECT } from './constants.js';
 import { technicalRadiusOf } from './fish.js';
 
 // @ds b9e5d274 e6d3b9a1
@@ -45,7 +45,7 @@ function createDiagnosticMapSocket(path, onFrame){
 }
 
 // @ds:a14c7e52 @ds:b6e39d14 @ia:4a8d0f72
-export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onInitialCommunication, onSyncRate, onEventRates, onPerformanceMetrics, initialConnectionCode = '' }){
+export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onInitialCommunication, onSyncRate, onEventRates, onPerformanceMetrics, onPing, onTraffic, onConnectionLost, initialConnectionCode = '' }){
     let socket = null;
     let currentUserFishId = null;
     let temporaryConnectionCode = String(initialConnectionCode || '');
@@ -54,9 +54,20 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onI
     let pingCounter = 0;
     let lastSyncAt = null;
     let initialCommunicationSettled = false;
+    let reconnectTimer = null;
+    let connectAttemptTimer = null;
+    let connectionAttemptStartedAt = 0;
+    let recoveryDeadlineAt = null;
+    let lastInboundAt = performance.now();
+    let lastPingSentAt = 0;
+    const pendingPings = new Map();
+    const trafficBytes = { input: 0, output: 0 };
     const acknowledgedCycles = new Set();
     const eventTimes = { dynamic: [], control: [] };
     window.setInterval(() => publishEventRates(performance.now()), 250);
+    window.setInterval(() => publishTraffic(), 250);
+    window.setInterval(() => checkConnectionHealth(performance.now()), RECONNECT.watchdogIntervalMs);
+    window.setInterval(() => sendPing(performance.now()), RECONNECT.pingIntervalMs);
     const world = makeWorld();
     const transportState = { currentCycle: null, cycleStartedAt: null, tombstones: new Map() };
 
@@ -71,14 +82,46 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onI
         if( onInitialCommunication ) onInitialCommunication({ kind });
     }
 
+    function hasRecoverableSession(){
+        return Boolean(temporaryConnectionCode || pendingJoinProfile);
+    }
+
+    // A first manual join is still waiting for the server to accept the
+    // profile. It must keep retrying even when the browser is slowed by an
+    // open DevTools window; the three-second deadline applies to an already
+    // established session only.
+    function isInitialJoinPending(){
+        return Boolean(pendingJoinProfile && !joined && !temporaryConnectionCode);
+    }
+
     function connect(){
-        if( socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) ) return;
+        if( !hasRecoverableSession() ) return;
+        if( socket && socket.readyState === WebSocket.OPEN ) return;
+        if( socket && socket.readyState === WebSocket.CONNECTING ) return;
+        const now = performance.now();
+        const initialJoinPending = isInitialJoinPending();
+        if( !initialJoinPending && recoveryDeadlineAt === null ) recoveryDeadlineAt = now + RECONNECT.graceSeconds * 1000;
+        if( !initialJoinPending && now >= recoveryDeadlineAt ){
+            failConnection('timeout');
+            return;
+        }
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const connection = new WebSocket(`${protocol}//${window.location.host}`);
         socket = connection;
+        const attemptStartedAt = now;
+        connectionAttemptStartedAt = attemptStartedAt;
         status('connecting');
+        connectAttemptTimer = window.setTimeout(() =>{
+            if( socket === connection && connection.readyState === WebSocket.CONNECTING ) connection.close();
+        }, RECONNECT.connectAttemptTimeoutMs);
         connection.addEventListener('open', () =>{
             if( socket !== connection ) return;
+            if( connectAttemptTimer ) window.clearTimeout(connectAttemptTimer);
+            connectAttemptTimer = null;
+            trafficBytes.input = 0;
+            trafficBytes.output = 0;
+            publishTraffic();
+            lastInboundAt = performance.now();
             status('connected');
             if( temporaryConnectionCode ){
                 sendRaw(encodeClientReconnect(temporaryConnectionCode));
@@ -90,12 +133,23 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onI
         });
         connection.addEventListener('close', () =>{
             if( socket !== connection ) return;
+            if( connectAttemptTimer ) window.clearTimeout(connectAttemptTimer);
+            connectAttemptTimer = null;
             socket = null;
+            pendingPings.clear();
+            lastPingSentAt = 0;
             status('disconnected');
-            if( temporaryConnectionCode || pendingJoinProfile ) window.setTimeout(connect, 600);
+            if( hasRecoverableSession() ) scheduleReconnect();
+        });
+        connection.addEventListener('error', () =>{
+            // The close event owns recovery; this listener makes sure a browser
+            // that only reports an error still leaves a stuck CONNECTING state.
+            if( socket === connection && connection.readyState === WebSocket.CONNECTING ) connection.close();
         });
         connection.addEventListener('message', event =>{
             if( socket !== connection ) return;
+            trafficBytes.input += byteLengthOf(event.data);
+            lastInboundAt = performance.now();
             const text = String(event.data || '');
             if( text[0] === 'i' ){
                 const message = parseIdentity(text);
@@ -103,6 +157,7 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onI
                 currentUserFishId = message.currentUserFishId;
                 temporaryConnectionCode = message.temporaryConnectionCode;
                 pendingJoinProfile = null;
+                recoveryDeadlineAt = null;
                 settleInitialCommunication('restored');
                 if( onIdentity ) onIdentity(message);
                 return;
@@ -139,6 +194,13 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onI
                 if( Number.isFinite(worldCalculationMs) && worldCalculationMs >= 0 && onPerformanceMetrics ) onPerformanceMetrics({ worldCalculationMs });
                 return;
             }
+            if( text.startsWith('p:') ){
+                const counter = Number(text.slice(2));
+                const sentAt = pendingPings.get(counter);
+                pendingPings.delete(counter);
+                if( Number.isFinite(sentAt) && onPing ) onPing({ counter, rttMs: Math.max(0, performance.now() - sentAt) });
+                return;
+            }
             if( text.startsWith('v:') ){
                 const [, cycleText, rateText] = text.split(':');
                 const cycle = Number(cycleText);
@@ -172,6 +234,76 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onI
                 publishSnapshot(syncDiagnostics.cycleStartedAt, syncDiagnostics);
             }
         });
+    }
+
+    function scheduleReconnect(){
+        if( !hasRecoverableSession() || reconnectTimer ) return;
+        const now = performance.now();
+        const initialJoinPending = isInitialJoinPending();
+        if( !initialJoinPending && recoveryDeadlineAt === null ) recoveryDeadlineAt = now + RECONNECT.graceSeconds * 1000;
+        const remaining = initialJoinPending ? Infinity : recoveryDeadlineAt - now;
+        if( !initialJoinPending && remaining <= 0 ){
+            failConnection('timeout');
+            return;
+        }
+        reconnectTimer = window.setTimeout(() =>{
+            reconnectTimer = null;
+            if( !hasRecoverableSession() ) return;
+            if( !isInitialJoinPending() && performance.now() >= recoveryDeadlineAt ){
+                failConnection('timeout');
+                return;
+            }
+            connect();
+        }, Math.min(RECONNECT.retryDelayMs, remaining));
+    }
+
+    function checkConnectionHealth(now){
+        if( !hasRecoverableSession() ) return;
+        if( recoveryDeadlineAt !== null && now >= recoveryDeadlineAt ){
+            failConnection('timeout');
+            return;
+        }
+        if( socket?.readyState === WebSocket.CONNECTING ){
+            if( now - connectionAttemptStartedAt >= RECONNECT.connectAttemptTimeoutMs ) socket.close();
+            return;
+        }
+        const inboundTimeout = isInitialJoinPending()
+            ? RECONNECT.connectAttemptTimeoutMs
+            : RECONNECT.idleTimeoutMs;
+        if( socket?.readyState === WebSocket.OPEN && now - lastInboundAt >= inboundTimeout ){
+            // A black-holed socket does not emit close. Close it explicitly and
+            // keep the three-second deadline measured from the last heartbeat.
+            recoveryDeadlineAt = lastInboundAt + RECONNECT.graceSeconds * 1000;
+            const connection = socket;
+            socket = null;
+            pendingPings.clear();
+            lastPingSentAt = 0;
+            if( connection.readyState < WebSocket.CLOSING ) connection.close();
+            scheduleReconnect();
+        }
+    }
+
+    function failConnection(reason){
+        const hadSession = hasRecoverableSession();
+        clearReconnectTimers();
+        closeIdleSocket();
+        temporaryConnectionCode = '';
+        currentUserFishId = null;
+        joined = false;
+        pendingJoinProfile = null;
+        recoveryDeadlineAt = null;
+        lastPingSentAt = 0;
+        pendingPings.clear();
+        status('connection-lost');
+        if( hadSession && onConnectionLost ) onConnectionLost({ reason });
+        settleInitialCommunication('new');
+    }
+
+    function clearReconnectTimers(){
+        if( reconnectTimer ) window.clearTimeout(reconnectTimer);
+        if( connectAttemptTimer ) window.clearTimeout(connectAttemptTimer);
+        reconnectTimer = null;
+        connectAttemptTimer = null;
     }
 
     function applyTechnicalScale(){
@@ -266,7 +398,19 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onI
     function sendRaw(message){
         if( !socket || socket.readyState !== WebSocket.OPEN ) return false;
         socket.send(message);
+        trafficBytes.output += byteLengthOf(message);
         return true;
+    }
+
+    function byteLengthOf(value){
+        if( typeof value === 'string' ) return new TextEncoder().encode(value).byteLength;
+        if( value instanceof ArrayBuffer ) return value.byteLength;
+        if( ArrayBuffer.isView(value) ) return value.byteLength;
+        return 0;
+    }
+
+    function publishTraffic(){
+        if( onTraffic ) onTraffic({ inputBytes: trafficBytes.input, outputBytes: trafficBytes.output });
     }
 
     function recordEvents(kind, count = 1, now = performance.now()){
@@ -293,10 +437,14 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onI
 
     // @ds:93a64773 @ds:eba75588
     function clearSessionBinding(){
+        clearReconnectTimers();
         temporaryConnectionCode = '';
         currentUserFishId = null;
         joined = false;
         pendingJoinProfile = null;
+        recoveryDeadlineAt = null;
+        lastPingSentAt = 0;
+        pendingPings.clear();
         closeIdleSocket();
     }
 
@@ -311,6 +459,16 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onI
         if( fishId !== currentUserFishId ) return false;
         clearSessionBinding();
         return true;
+    }
+
+    function sendPing(now){
+        if( !joined || now - lastPingSentAt < RECONNECT.pingIntervalMs * 0.5 ) return;
+        const counter = ++pingCounter;
+        if( sendRaw(encodeClientPing(counter)) ){
+            lastPingSentAt = now;
+            pendingPings.set(counter, now);
+            while( pendingPings.size > 8 ) pendingPings.delete(pendingPings.keys().next().value);
+        }
     }
 
     if( temporaryConnectionCode ) connect();
@@ -333,10 +491,9 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onI
         },
         // @ds:671e9773
         idle(){
-            if( !joined ) return;
-            sendRaw(encodeClientPing(++pingCounter));
+            sendPing(performance.now());
         },
-        // @ds:9772e9ac
+        // @ds:671e9773
         leave(){
             sendRaw('q');
         },

@@ -85,8 +85,10 @@ export function speedLevel(input, activeControlMode = null){
     // Direction keys steer the right grip in dual mode, but they must not
     // release an already active or pinned burst from the left grip.
     if( mode === 'dual-joystick' ){
-        if( input.burstJoystick?.pinned ) return input.burstJoystick.pinnedLevel || REGIME.burstStartSpeedLevel;
+        // A live touch temporarily overrides the pinned level. The pinned
+        // level remains the fallback after that touch is released.
         if( input.burstJoystick?.active ) return input.burstJoystick.level || REGIME.burstStartSpeedLevel;
+        if( input.burstJoystick?.pinned ) return input.burstJoystick.pinnedLevel || REGIME.burstStartSpeedLevel;
     }
     if( keyboardMovementActive(input.keys || new Set()) ) return REGIME.cruiseMaxSpeedLevel;
     if( mode === 'keyboard' ) return 0;
