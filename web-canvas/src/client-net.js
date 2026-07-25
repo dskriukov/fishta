@@ -230,7 +230,7 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onI
                 if( !syncDiagnostics ) return;
                 recordEvents('dynamic', syncDiagnostics.dynamicEvents || 0, receivedAt);
                 applyTechnicalScale();
-                acknowledgeGlobalAbsoluteCentralCell(syncDiagnostics);
+                acknowledgeSyncCycle(syncDiagnostics);
                 logAbsolutePositionDrift(syncDiagnostics, elapsedSeconds);
                 lastSyncAt = receivedAt;
                 publishSnapshot(syncDiagnostics.cycleStartedAt, syncDiagnostics);
@@ -315,7 +315,7 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onI
     }
 
     // @ds:77faf734
-    function acknowledgeGlobalAbsoluteCentralCell(syncDiagnostics){
+    function acknowledgeSyncCycle(syncDiagnostics){
         const cycle = syncDiagnostics?.cycle;
         if( !Number.isInteger(cycle) ) return;
         if( !(syncDiagnostics.fish || []).some(fish => fish.id === currentUserFishId) ) return;

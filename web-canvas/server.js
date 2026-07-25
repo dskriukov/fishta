@@ -373,6 +373,7 @@ function broadcastWorldPerformanceMetric(){
     const message = `m:${average.toFixed(3)}`;
     for( const [socket, meta] of sockets ){
         if( socket.readyState !== socket.OPEN || !findClientFish(meta) ) continue;
+        if( Number.isInteger(meta.syncAckCycle) ) continue;
         socket.send(message);
     }
 }
@@ -409,21 +410,23 @@ function makeSyncPlan(encoded, cycle, forceAbsolute){
         if( cycle % SYNC.globalAbsoluteEvery === 0 ) meta.syncCycles?.clear();
         if( Number.isInteger(meta.syncAckCycle) ){
             const waitingMs = performance.now() - meta.syncAckSentAt;
-            if( waitingMs >= SYNC.clientCycleDeadlineMs ) performanceStatistics.skippedClientCycleCount++;
             // Keep at most one unacknowledged world cycle per client. This
             // replaces stale work with the newest cycle instead of queuing it.
             performanceStatistics.skippedClientCycleCount++;
+            if( waitingMs >= SYNC.clientCycleDeadlineMs ) performanceStatistics.slowClientCycleCount++;
             meta.syncSkippedCycle = cycle;
             continue;
         }
         const ownX = Math.floor(fish.pos.x / SYNC.cellSize);
         const ownY = Math.floor(fish.pos.y / SYNC.cellSize);
+        let ackAnchorAssigned = false;
         matrix.forEach(([dx, dy], matrixIndex) => {
             const phaseIndex = matrixIndex === 0 ? 0 : matrixIndex < 3 ? 1 : matrixIndex < 5 ? 2 : 3;
             const x = (ownX + dx + columns) % columns;
             const y = (ownY + dy + rows) % rows;
             if( !lookup.has(`${x}:${y}`) ) return;
-            phases[phaseIndex].push({ socket, meta, x, y, central: matrixIndex === 0 });
+            phases[phaseIndex].push({ socket, meta, x, y, central: !ackAnchorAssigned });
+            ackAnchorAssigned = true;
         });
     }
     return { cycle, encoded, forceAbsolute, phases, phase: 0, entryIndex: 0, remaining: phases.reduce((total, phase) => total + phase.length, 0), lookup, cancelled: false };
@@ -498,6 +501,7 @@ function makePerformanceStatistics(){
         preparedSyncCycleCount: 0,
         droppedFragmentCount: 0,
         skippedClientCycleCount: 0,
+        slowClientCycleCount: 0,
         phaseCount: 0,
         phaseTotalMs: 0,
         syncAckCount: 0,
@@ -530,7 +534,7 @@ function reportPerformanceStatistics(){
         + `phase=${averagePhaseMs.toFixed(3)}ms; `
         + `objects=${averageControlledObjects.toFixed(1)}; `
         + `dropped=${averageDroppedFragments.toFixed(2)} fragments/cycle; acks=${performanceStatistics.syncAckCount}; `
-        + `skippedClients=${performanceStatistics.skippedClientCycleCount}; `
+        + `skippedClientCycles=${performanceStatistics.skippedClientCycleCount}; slowClientCycles=${performanceStatistics.slowClientCycleCount}; `
         + `rateMin=${performanceStatistics.activeClientRateMin === null ? '—' : `${performanceStatistics.activeClientRateMin} bytes/sec`}; `
         + `rateMax=${performanceStatistics.activeClientRateMax === null ? '—' : `${performanceStatistics.activeClientRateMax} bytes/sec`}`
     );
@@ -541,6 +545,7 @@ function reportPerformanceStatistics(){
     performanceStatistics.preparedSyncCycleCount = 0;
     performanceStatistics.droppedFragmentCount = 0;
     performanceStatistics.skippedClientCycleCount = 0;
+    performanceStatistics.slowClientCycleCount = 0;
     performanceStatistics.phaseCount = 0;
     performanceStatistics.phaseTotalMs = 0;
     performanceStatistics.syncAckCount = 0;
@@ -550,6 +555,7 @@ function handleSyncAck(socket, meta, message){
     if( meta.syncAckCycle === message.cycle ){
         meta.syncAckCycle = null;
         meta.syncAckSentAt = 0;
+        performanceStatistics.syncAckCount++;
     }
     const stat = meta.syncCycles?.get(message.cycle);
     if( !stat?.centralSentAt || stat.rate !== undefined ) return;
@@ -560,7 +566,6 @@ function handleSyncAck(socket, meta, message){
     stat.bufferedAmount = socket.bufferedAmount;
     stat.rate = rate;
     meta.syncRate = rate;
-    performanceStatistics.syncAckCount++;
     meta.syncCycles.delete(message.cycle);
     send(socket, `v:${message.cycle}:${rate}`);
 }
