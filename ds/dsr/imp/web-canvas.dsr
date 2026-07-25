@@ -1522,7 +1522,7 @@ new_or_changed_constants:
   PERCEPTION.dangerStampRadiusFactor: 1.50 # @ds:9a6e4c31 @fix:3a7c9e21
   PERCEPTION.dangerRasterMotionTicks: 3 # current tick plus two extrapolated ticks — @fix:7f3c9a21
   SYNC.snapshotHz: 10                 # @ds:e559831a @ds:682570c7
-  SYNC.clientCycleDeadlineMs: 100     # one snapshot interval for a client ACK — @fix:sync-cycle-timing
+  SYNC.clientCycleDeadlineMs: 190     # allow one following snapshot interval for a client ACK — @fix:sync-cycle-timing
   SYNC.maxExtrapolationMs: 180        # @ds:e559831a @ds:7b9a7984
   RECONNECT.graceSeconds: 3           # @ds:93a64773
   LEAVE.attackWindowSeconds: 2        # @ds:8917ad63
