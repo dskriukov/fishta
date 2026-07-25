@@ -25,15 +25,20 @@ export function buildFlowField(world){
             const wakeRadius = Math.max(cellSize, fish.radius * SHRED.flowWakeRadiusRatio);
             stampFishWake(flowX, flowY, flowAngular, columns, rows, cellSize, world, fish, heading, speed, accelerationMagnitude, wakeRadius);
         }
-        if( (fish.mouthOpen || 0) > 0 ){
+        if( (fish.mouthSuctionImpulse || 0) > 0 ){
             const mouth = {
                 x: fish.pos.x + heading.x * fish.radius * SHRED.mouthPositionRadiusRatio,
                 y: fish.pos.y + heading.y * fish.radius * SHRED.mouthPositionRadiusRatio,
             };
             const mouthRadius = Math.max(cellSize, fish.radius * SHRED.mouthSuctionRadiusRatio);
-            stampMouthSuction(flowX, flowY, columns, rows, cellSize, world, mouth, mouthRadius, fish.mouthOpen);
+            stampMouthSuction(flowX, flowY, columns, rows, cellSize, world, mouth, mouthRadius, fish.mouthSuctionImpulse);
         }
     }
+
+    // Add the local curl of the linear field to the angular field.  The
+    // four-neighbour stencil keeps this contribution continuous with the
+    // bilinear flow sampling used by client-side decorative objects.
+    stampFlowVorticity(flowAngular, flowX, flowY, columns, rows, cellSize);
 
     return {
         cellSize,
@@ -45,6 +50,24 @@ export function buildFlowField(world){
         maxImpulse: SHRED.flowMapMaxImpulse,
         maxAngularImpulse: 1,
     };
+}
+
+// @fix:4e9b2c71
+function stampFlowVorticity(flowAngular, flowX, flowY, columns, rows, cellSize){
+    const denominator = Math.max(EPSILON, 2 * cellSize);
+    const shoulder = Number(SHRED.flowVorticityShoulder) || 0;
+    if( Math.abs(shoulder) <= EPSILON ) return;
+    for( let y = 0; y < rows; y++ ) for( let x = 0; x < columns; x++ ){
+        const center = y * columns + x;
+        const top = ((y - 1 + rows) % rows) * columns + x;
+        const bottom = ((y + 1) % rows) * columns + x;
+        const left = y * columns + ((x - 1 + columns) % columns);
+        const right = y * columns + ((x + 1) % columns);
+        // Screen-space clockwise curl: d(flowY)/dx - d(flowX)/dy.
+        const curl = ((flowY[right] || 0) - (flowY[left] || 0)
+            - ((flowX[bottom] || 0) - (flowX[top] || 0))) / denominator;
+        flowAngular[center] += curl * shoulder;
+    }
 }
 
 export function sampleFlowField(field, position, world){
@@ -67,6 +90,11 @@ function stampFishWake(flowX, flowY, flowAngular, columns, rows, cellSize, world
     const strengthVelocity = speed + accelerationMagnitude * SHRED.flowAccelerationLeadSeconds;
     if( strengthVelocity <= EPSILON ) return;
     const activelyControlled = accelerationMagnitude > EPSILON;
+    const previousSpeed = Number(fish.previousSpeed);
+    const speedDecreasing = fish.speedDecreasing === true
+        || (Number.isFinite(previousSpeed)
+            && speed < previousSpeed - Math.max(EPSILON, SHRED.flowSpeedDropEpsilon));
+    const inertialBraking = speedDecreasing && !fish.reverseFacing;
     const centerX = Math.floor(fish.pos.x / cellSize);
     const centerY = Math.floor(fish.pos.y / cellSize);
     const span = Math.ceil(radius / cellSize);
@@ -81,19 +109,44 @@ function stampFishWake(flowX, flowY, flowAngular, columns, rows, cellSize, world
         const weight = proximity * proximity;
         const index = cellY * columns + cellX;
         stampAngularImpulse(flowAngular, index, fish.radius, radius, delta, heading, speed, distance);
+        const behind = delta.x * heading.x + delta.y * heading.y < 0;
+        if( inertialBraking ){
+            const impulse = strengthVelocity * SHRED.flowBrakingCoreStrength * weight;
+            flowX[index] += heading.x * impulse;
+            flowY[index] += heading.y * impulse;
+            const longitudinal = delta.x * heading.x + delta.y * heading.y;
+            const lateralX = delta.x - heading.x * longitudinal;
+            const lateralY = delta.y - heading.y * longitudinal;
+            const lateralDistance = Math.hypot(lateralX, lateralY);
+            if( lateralDistance > EPSILON ){
+                const sideWeight = brakingSideWeight(longitudinal, lateralDistance, fish.radius);
+                const inwardImpulse = strengthVelocity * SHRED.flowBrakingInwardStrength * weight * sideWeight;
+                flowX[index] -= lateralX / lateralDistance * inwardImpulse;
+                flowY[index] -= lateralY / lateralDistance * inwardImpulse;
+            }
+            continue;
+        }
         if( !activelyControlled ){
             const impulse = speed * SHRED.wakeStrength * weight;
             flowX[index] += heading.x * impulse;
             flowY[index] += heading.y * impulse;
             continue;
         }
-        const behind = delta.x * heading.x + delta.y * heading.y < 0;
         const direction = behind ? -1 : 1;
-        const strength = behind ? SHRED.flowRearStrength : SHRED.flowFrontStrength;
+        const cruiseFrontFactor = fish.mode === 'cruise'
+            ? SHRED.flowCruiseFrontStrengthFactor
+            : 1;
+        const strength = behind
+            ? SHRED.flowRearStrength
+            : SHRED.flowFrontStrength * cruiseFrontFactor;
+        const frontRadialWeight = behind
+            ? 1
+            : smoothFrontRadialWeight(distance, fish.radius);
         const rearVelocity = behind && fish.mode === 'cruise'
             ? Math.min(strengthVelocity, speed)
             : strengthVelocity;
-        const impulse = (behind ? rearVelocity : strengthVelocity) * strength * weight * direction;
+        const impulse = (behind ? rearVelocity : strengthVelocity)
+            * strength * weight * frontRadialWeight * direction;
         flowX[index] += heading.x * impulse;
         flowY[index] += heading.y * impulse;
         if( behind ){
@@ -109,6 +162,24 @@ function stampFishWake(flowX, flowY, flowAngular, columns, rows, cellSize, world
             }
         }
     }
+}
+
+function brakingSideWeight(longitudinal, lateralDistance, fishRadius){
+    const radius = Math.max(EPSILON, fishRadius);
+    const sidePosition = Math.max(0, Math.min(1, lateralDistance / radius));
+    const endPosition = Math.max(0, Math.min(1, Math.abs(longitudinal) / radius));
+    const sideRise = sidePosition * sidePosition * (3 - 2 * sidePosition);
+    const endFade = 1 - endPosition * endPosition * (3 - 2 * endPosition);
+    return sideRise * endFade;
+}
+
+function smoothFrontRadialWeight(distance, fishRadius){
+    const normalizedDistance = distance / Math.max(EPSILON, fishRadius);
+    const deadZone = Math.max(0, Math.min(1, SHRED.flowFrontDeadZoneRadiusRatio));
+    if( normalizedDistance <= deadZone ) return 0;
+    if( normalizedDistance >= 1 ) return 1;
+    const t = (normalizedDistance - deadZone) / Math.max(EPSILON, 1 - deadZone);
+    return t * t * (3 - 2 * t);
 }
 
 // @fix:4e9b2c71

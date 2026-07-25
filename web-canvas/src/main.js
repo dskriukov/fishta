@@ -5,7 +5,7 @@
 
 import { CAMERA, DEBUG, ENERGY, EXHALE, FISH, FLOW_MAP, JOYSTICK, LOOP, MOUTH, PLAYER, REGIME, SHRED, SIZE_DELTA_LABEL, SWIM, SYNC, VIEWPORT_FISH_CAPACITY, WORLD_MAP } from './constants.js';
 import { advanceBubbles, emitBubble, makeBubble, makeWorld } from './world.js';
-import { buildFlowField } from './flow.js'; // @fix:6a7b8c9d
+import { buildFlowField, sampleFlowField } from './flow.js'; // @fix:6a7b8c9d
 import { BURST_ENDURANCE_SIZE_THRESHOLDS, availableSpeedLevelForSize, burstEnergyFactorOf, requestExhale, runExhaleCycle, serializeFish, speedCapOf, technicalRadiusOf } from './fish.js';
 import { createControlModeState, createInput, keySteer, pointerSteer, joystickSteer, speedLevel, speedLevelToControlMagnitude } from './controls.js';
 import { buildToroidalRenderWorld, fishFinTipPositions, loadFishGeometry, loadShredGeometry, render, viewportCapacityForZoom, viewportToWorld, viewportZoomForCapacity, visualFishTurnRadians, worldToViewport } from './render.js';
@@ -58,7 +58,21 @@ const syncSegmentsToggle = document.getElementById('sync-segments-toggle');
 const flowMapToggle = document.getElementById('flow-map-toggle');
 const flowVectorsToggle = document.getElementById('flow-vectors-toggle');
 const dangerMapToggle = document.getElementById('danger-map-toggle');
+const infoPanelToggle = document.getElementById('info-panel-toggle');
+const decorativeSparksTestToggle = document.getElementById('decorative-sparks-test-toggle');
 const worldMap = document.getElementById('world-map');
+const worldInfo = document.getElementById('world-info');
+const flowInfoPanel = document.getElementById('flow-info-panel');
+const recordsPanel = document.getElementById('records-panel');
+const flowMetricWindow = document.getElementById('flow-metric-window');
+const flowMetricBuild = document.getElementById('flow-metric-build');
+const flowMetricRgb = document.getElementById('flow-metric-rgb');
+const flowMetricSurface = document.getElementById('flow-metric-surface');
+const flowMetricSample = document.getElementById('flow-metric-sample');
+const flowMetricCycle = document.getElementById('flow-metric-cycle');
+const flowMetricShape = document.getElementById('flow-metric-shape');
+const userRecordRows = document.getElementById('user-record-rows');
+const npcRecordRows = document.getElementById('npc-record-rows');
 const debugModeToggle = document.getElementById('debug-mode-toggle');
 const controlModes = document.getElementById('control-modes');
 const controlModeButtons = [...document.querySelectorAll('[data-control-mode]')];
@@ -67,15 +81,41 @@ const viewportFishCapacitySelect = document.getElementById('viewport-fish-capaci
 const viewportScaleWidget = document.getElementById('viewport-scale-widget');
 const viewportScaleTrack = viewportScaleWidget?.querySelector('.viewport-scale-track');
 const viewportScaleMarker = document.getElementById('viewport-scale-marker');
+const viewportLeftControls = document.getElementById('viewport-left-controls'); // @fix:6a7b8c9d
+const viewportControlTools = document.getElementById('viewport-control-tools');
+const uiLayoutToggle = document.getElementById('ui-layout-toggle');
+const controlLayoutToggle = document.getElementById('control-layout-toggle');
+const controlLayoutToast = document.getElementById('control-layout-toast');
 const burstEnduranceRows = document.getElementById('burst-endurance-rows');
 const joystickPanel = document.getElementById('joystick-panel');
+const touchSpeedMetric = document.getElementById('touch-speed-metric');
+const touchSpeedValue = document.getElementById('touch-speed-value');
+const touchSpeedMode = document.getElementById('touch-speed-mode');
 const joystickBase = document.getElementById('joystick-base');
 const joystickBurstBase = document.getElementById('joystick-burst-base');
 const joystickBurstRings = document.getElementById('joystick-burst-rings');
 const joystickKnob = document.getElementById('joystick-knob');
 const joystickCurrentBurstRing = document.getElementById('joystick-current-burst-ring');
+const dualRightJoystickPanel = document.getElementById('dual-right-joystick-panel');
+const dualRightJoystickBase = document.getElementById('dual-right-joystick-base');
+const dualRightJoystickVector = document.getElementById('dual-right-joystick-vector');
+const dualRightJoystickKnob = document.getElementById('dual-right-joystick-knob');
+const dualBurstPanel = document.getElementById('dual-burst-panel');
+const dualBurstSurface = document.getElementById('dual-burst-surface');
+const dualBurstArcMuted = document.getElementById('dual-burst-arc-muted');
+const dualBurstArcBase = document.getElementById('dual-burst-arc-base');
+const dualBurstArcActiveClipSector = document.getElementById('dual-burst-active-clip-sector');
+const dualBurstPinLine = document.getElementById('dual-burst-pin-line');
+const dualBurstNumber = document.getElementById('dual-burst-number');
+const dualBurstPreviewMarker = document.getElementById('dual-burst-preview-marker');
+const dualBurstHandle = document.getElementById('dual-burst-handle');
+const dualBurstHandleLevel = document.getElementById('dual-burst-handle-level');
+const dualBurstNumberHit = document.getElementById('dual-burst-number-hit'); // @fix:dual-burst-grip
+const dualBurstArcHit = document.getElementById('dual-burst-arc-hit'); // @fix:dual-burst-grip
 let joystickAvailableLevel = REGIME.speedLevels;
 let joystickRenderedAvailabilityLevel = null;
+let joystickCurrentBurstRingLevel = null;
+let touchSpeedMetricUiKey = null;
 const appVersion = document.getElementById('app-version');
 
 let state = { world: makeWorld(), currentUserFishId: null };
@@ -105,6 +145,8 @@ let lastSentInputKey = null;
 let lastInputFlushAt = 0;
 const CONTROL_HEARTBEAT_MS = 900; // @ds:multiplayer.control-heartbeat
 const VIEWPORT_FISH_CAPACITY_STORAGE_KEY = 'selfish-bait.viewport-fish-capacity'; // @fix:a64e9b31
+const CONTROL_LAYOUT_POSITION_STORAGE_KEY = 'selfish-bait.control-layout-positions'; // @fix:control-viewport-layout
+const controlLayoutPositions = loadControlLayoutPositions(); // @fix:control-viewport-layout
 let gameMenuOpen = false;
 let worldMapVisible = false;
 let debugMode = false;
@@ -118,11 +160,35 @@ let flowMapSurface = null; // @fix:6a7b8c9d
 let flowMapLastBuildAt = 0; // @fix:6a7b8c9d
 let flowMapBuildMs = 0; // @fix:6a7b8c9d
 let flowMapBuildFishCount = 0; // @fix:6a7b8c9d
-let flowMapMetricsLoggedAt = 0; // @fix:6a7b8c9d
+const flowCycleMetrics = { windowStartedAt: 0, cycles: 0, totalMs: 0, buildMs: 0, rgbEncodeMs: 0, surfaceMs: 0, rawSampleMs: 0, rawSampleCount: 0 }; // @fix:6a7b8c9d
+let flowMetricsSnapshot = null; // @fix:6a7b8c9d
+const INFO_PANEL_MODES = ['world', 'flow', 'records', 'none']; // @fix:6a7b8c9d
+let infoPanelMode = 'none'; // @fix:6a7b8c9d
+let recordsPanelUpdatedAt = 0; // @fix:6a7b8c9d
+let recordsPanelKey = ''; // @fix:6a7b8c9d
+const recordFirstSeenAt = new Map(); // @fix:6a7b8c9d
+let uiLayoutEditMode = false; // @fix:f1c6a8d4
+let joystickRelocationLocked = false; // @fix:52cd6e6c
+const CONTROL_LAYOUT_MODES = ['joystick', 'dual-joystick', 'touch']; // @fix:70871bc5
+let controlLayoutMode = 'joystick'; // @fix:70871bc5
+let controlLayoutToastTimer = 0; // @fix:70871bc5
+let touchSpeedPointerId = null; // @fix:f1c6a8d4
+let touchSpeedDragOffset = null; // @fix:f1c6a8d4
+let dualRightJoystickPointerId = null; // @fix:dual-right-grip
+let dualRightJoystickLayoutDragOffset = null; // @fix:dual-right-grip
+let dualBurstPointerId = null; // @fix:dual-burst-grip
+let dualBurstLayoutDragOffset = null; // @fix:control-viewport-layout
+let dualBurstGesture = null; // @fix:dual-burst-grip
+let dualBurstArcAvailabilityLevel = null; // @fix:dual-burst-grip
+let dualBurstScale = null; // @fix:dual-burst-grip
+let dualBurstPinLineOpacity = null; // @fix:dual-burst-grip
+let dualBurstVisualKey = null; // @fix:dual-burst-grip
 const FLOW_MAP_LOCAL_UPDATE_MS = 100; // @fix:6a7b8c9d
 let flowVectorsVisible = false; // @fix:5f2a8c71
 let flowVectorsResetPending = false; // @fix:5f2a8c71
 const clientShredSpin = new Map(); // @fix:4e9b2c71
+const clientShredLayerStates = new Map(); // @fix:4f8a2c71
+const clientShredEatCueCounters = new Map(); // @fix:4f8a2c71
 let dangerMapVisible = false;
 let dangerMapBitmap = null;
 const dangerMapNet = createDangerMapSocket(bitmap => { dangerMapBitmap?.close?.(); dangerMapBitmap = bitmap; });
@@ -143,6 +209,8 @@ let lastDebugTraceAt = 0;
 let lastVisibleState = state;
 let entrySessionReady = false;
 let startupSplashReady = false;
+let decorativeSparkTestTapCount = 0;
+let decorativeSparkTestTapTimer = 0;
 let burstEnduranceTableKey = '';
 let viewportFishCapacity = loadViewportFishCapacity(); // @fix:a64e9b31
 let net = null;
@@ -161,16 +229,150 @@ async function init(){
     await loadShredGeometry();
 }
 
+// @fix:control-viewport-layout
+function loadControlLayoutPositions(){
+    const result = {};
+    try{
+        const parsed = JSON.parse(window.localStorage.getItem(CONTROL_LAYOUT_POSITION_STORAGE_KEY) || '{}');
+        for( const key of ['joystick', 'dualRight', 'dualBurst', 'touchSpeed'] ){
+            const position = parsed?.[key];
+            const dualEdgePosition = key === 'dualRight'
+                ? Number.isFinite(position?.rightPx) && Number.isFinite(position?.bottomPx)
+                : key === 'dualBurst'
+                    ? Number.isFinite(position?.leftPx) && Number.isFinite(position?.bottomPx)
+                    : false;
+            if( dualEdgePosition ){
+                result[key] = key === 'dualRight'
+                    ? {
+                        rightPx: Math.max(0, Number(position.rightPx)),
+                        bottomPx: Math.max(0, Number(position.bottomPx)),
+                    }
+                    : {
+                        leftPx: Math.max(0, Number(position.leftPx)),
+                        bottomPx: Math.max(0, Number(position.bottomPx)),
+                    };
+            }else if( Number.isFinite(position?.x) && Number.isFinite(position?.y) ){
+                // Keep the old normalized form readable for one migration pass;
+                // the first restore converts it to edge-pixel anchors.
+                result[key] = {
+                    x: Math.max(0, Math.min(1, Number(position.x))),
+                    y: Math.max(0, Math.min(1, Number(position.y))),
+                };
+            }
+            if( result[key] ){
+                result[`${key}Custom`] = parsed?.[`${key}Custom`] === true;
+            }
+        }
+    }catch{
+        // In-memory defaults remain usable when storage is unavailable.
+    }
+    return result;
+}
+
+// @fix:control-viewport-layout
+function controlViewportSize(){
+    return {
+        width: Math.max(1, window.visualViewport?.width || window.innerWidth),
+        height: Math.max(1, window.visualViewport?.height || window.innerHeight),
+    };
+}
+
+// @fix:control-viewport-layout
+function rememberControlCenter(key, center){
+    const viewport = controlViewportSize();
+    if( key === 'dualRight' || key === 'dualBurst' ){
+        // Dual grips are edge-anchored. Store the actual CSS-pixel margin,
+        // not a viewport percentage, so a rotation keeps the same side/bottom
+        // placement while the 30vmin footprint is recalculated by CSS.
+        const panel = key === 'dualRight' ? dualRightJoystickPanel : dualBurstPanel;
+        const rect = panel?.getBoundingClientRect();
+        if( rect && rect.width > 0 && rect.height > 0 ){
+            controlLayoutPositions[key] = key === 'dualRight'
+                ? {
+                    rightPx: Math.max(0, viewport.width - rect.right),
+                    bottomPx: Math.max(0, viewport.height - rect.bottom),
+                }
+                : {
+                    leftPx: Math.max(0, rect.left),
+                    bottomPx: Math.max(0, viewport.height - rect.bottom),
+                };
+            return;
+        }
+    }
+    const normalizedX = center.x / viewport.width;
+    const normalizedY = center.y / viewport.height;
+    controlLayoutPositions[key] = {
+        x: Math.max(0, Math.min(1, key === 'dualRight' ? 1 - normalizedX : normalizedX)),
+        y: Math.max(0, Math.min(1, key === 'dualRight' || key === 'dualBurst' ? 1 - normalizedY : normalizedY)),
+    };
+}
+
+// @fix:control-viewport-layout
+function markControlPositionCustom(key){
+    controlLayoutPositions[`${key}Custom`] = true;
+}
+
+// @fix:control-viewport-layout
+function persistControlLayoutPositions(){
+    try{
+        window.localStorage.setItem(CONTROL_LAYOUT_POSITION_STORAGE_KEY, JSON.stringify(controlLayoutPositions));
+    }catch{
+        // The current in-memory position remains active for this session.
+    }
+}
+
+// @fix:control-viewport-layout
+function rememberedControlCenter(key){
+    const position = controlLayoutPositions[key];
+    if( !position ) return null;
+    const viewport = controlViewportSize();
+    if( key === 'dualRight' && Number.isFinite(position.rightPx) && Number.isFinite(position.bottomPx) ){
+        const rect = dualRightJoystickPanel?.getBoundingClientRect();
+        if( rect && rect.width > 0 && rect.height > 0 ){
+            return v(
+                viewport.width - position.rightPx - rect.width / 2,
+                viewport.height - position.bottomPx - rect.height / 2,
+            );
+        }
+    }
+    if( key === 'dualBurst' && Number.isFinite(position.leftPx) && Number.isFinite(position.bottomPx) ){
+        const rect = dualBurstPanel?.getBoundingClientRect();
+        if( rect && rect.width > 0 && rect.height > 0 ){
+            return v(
+                position.leftPx + rect.width / 2,
+                viewport.height - position.bottomPx - rect.height / 2,
+            );
+        }
+    }
+    return v(
+        (key === 'dualRight' ? 1 - position.x : position.x) * viewport.width,
+        (key === 'dualRight' || key === 'dualBurst' ? 1 - position.y : position.y) * viewport.height,
+    );
+}
+
+// @fix:control-viewport-layout
+function rememberCurrentControlCenter(key, element){
+    if( !element || element.hidden ) return;
+    const rect = element.getBoundingClientRect();
+    if( rect.width <= 0 || rect.height <= 0 ) return;
+    if( !controlLayoutPositions[key] ){
+        rememberControlCenter(key, v(rect.left + rect.width / 2, rect.top + rect.height / 2));
+    }
+}
+
 // ds:b28b7af6 @fix:c7e2a914
 function resize(){
     const rect = canvas.getBoundingClientRect();
     const width = Math.max(1, Math.round(rect.width || window.innerWidth));
     const height = Math.max(1, Math.round(rect.height || window.innerHeight));
-    if( canvas.width === width && canvas.height === height ) return;
-    canvas.width = width;
-    canvas.height = height;
-    clampJoystickPositionToViewport(); // @fix:f1c6a8d4
-    clampCameraPanToSafeArea(); // @fix:32ef3d51
+    const changed = canvas.width !== width || canvas.height !== height;
+    if( changed ){
+        canvas.width = width;
+        canvas.height = height;
+        clampCameraPanToSafeArea(); // @fix:32ef3d51
+    }
+    dualBurstScale = null; // @fix:dual-burst-grip
+    restoreControlLayoutPositions(); // @fix:control-viewport-layout
 }
 
 // @fix:c7e2a914
@@ -206,6 +408,7 @@ net = createClientNet({
         }
         state.world = message.world;
         state.currentUserFishId = message.currentUserFishId;
+        trackRecordFishAppearance(message.world, message.receivedAt ?? performance.now()); // @fix:6a7b8c9d
         updateWorldSyncMetrics(message);
         if( document.activeElement !== viewportFishCapacitySelect ) updateViewportFishCapacityUi(); // @fix:394756ee
         if( debugMode && Number.isInteger(message.syncDiagnostics?.cellX) && Number.isInteger(message.syncDiagnostics?.cellY) ){
@@ -581,6 +784,212 @@ function toggleDangerMapUnderlay(){
 }
 
 // @fix:6a7b8c9d
+function setInfoPanelMode(mode){
+    infoPanelMode = INFO_PANEL_MODES.includes(mode) ? mode : 'none';
+    if( worldInfo ) worldInfo.hidden = infoPanelMode !== 'world';
+    if( flowInfoPanel ) flowInfoPanel.hidden = infoPanelMode !== 'flow';
+    if( recordsPanel ) recordsPanel.hidden = infoPanelMode !== 'records';
+    if( infoPanelToggle ){
+        const secondaryPanelActive = infoPanelMode === 'flow' || infoPanelMode === 'records';
+        infoPanelToggle.setAttribute('aria-pressed', String(secondaryPanelActive));
+        infoPanelToggle.setAttribute('aria-label', infoPanelMode === 'none'
+            ? 'Show information panel'
+            : `Information panel: ${infoPanelMode}`);
+        infoPanelToggle.classList.toggle('is-active', secondaryPanelActive);
+    }
+    if( infoPanelMode === 'flow' ) updateFlowMetricsPanel();
+    if( infoPanelMode === 'records' ) updateRecordsPanel(lastVisibleState?.world || state.world, true);
+}
+
+// @fix:6a7b8c9d
+function toggleInfoPanel(){
+    const index = INFO_PANEL_MODES.indexOf(infoPanelMode);
+    setInfoPanelMode(INFO_PANEL_MODES[(index + 1) % INFO_PANEL_MODES.length]);
+}
+
+// @fix:entry-screen-reset
+function resetEntryScreenPanels(){
+    gameMenuOpen = false;
+    infoPanelMode = 'none';
+    debugMode = false;
+    syncSegmentsVisible = false;
+    worldMapVisible = false;
+    flowMapVisible = false;
+    flowVectorsVisible = false;
+    dangerMapVisible = false;
+    flowVectorsResetPending = false;
+    debugPositionTraces.length = 0;
+    setInfoPanelMode('none');
+    updateWorldMapUi();
+    if( syncSegmentsToggle ){
+        syncSegmentsToggle.setAttribute('aria-pressed', 'false');
+        syncSegmentsToggle.classList.remove('is-active');
+    }
+    if( flowMapToggle ){
+        flowMapToggle.setAttribute('aria-pressed', 'false');
+        flowMapToggle.classList.remove('is-active');
+    }
+    if( flowVectorsToggle ){
+        flowVectorsToggle.setAttribute('aria-pressed', 'false');
+        flowVectorsToggle.classList.remove('is-active');
+    }
+    if( dangerMapToggle ){
+        dangerMapToggle.setAttribute('aria-pressed', 'false');
+        dangerMapToggle.classList.remove('is-active');
+    }
+    syncDiagnosticMapTransport();
+    updateGameMenu();
+}
+
+// @fix:4f8a2c71
+function queueDecorativeTestSparks(){
+    decorativeSparkTestTapCount = Math.min(3, decorativeSparkTestTapCount + 1);
+    if( decorativeSparkTestTapTimer ) window.clearTimeout(decorativeSparkTestTapTimer);
+    decorativeSparkTestTapTimer = window.setTimeout(() => {
+        const tapCount = decorativeSparkTestTapCount;
+        decorativeSparkTestTapCount = 0;
+        decorativeSparkTestTapTimer = 0;
+        const multiplier = tapCount >= 3 ? 4 : tapCount === 2 ? 2 : 1;
+        spawnDecorativeTestSparks(multiplier);
+    }, Math.max(100, Number(DEBUG.decorativeSparkTestTapWindowMs) || 350));
+}
+
+function spawnDecorativeTestSparks(multiplier = 1){
+    const visibleState = lastVisibleState || state;
+    const world = visibleState?.world || state.world;
+    const followed = currentUserFish(world, visibleState?.currentUserFishId || state.currentUserFishId)
+        || world?.fish?.[0];
+    if( !world || !followed || !canvas || canvas.width <= 0 || canvas.height <= 0 ) return;
+
+    for( let i = clientFinSparks.length - 1; i >= 0; i-- ){
+        if( clientFinSparks[i]?.kind === 'decorative-test-grid' ) clientFinSparks.splice(i, 1);
+    }
+
+    const topLeft = viewportToWorld(
+        { x: 0, y: 0 },
+        world,
+        followed,
+        canvas,
+        { viewportFishCapacity, cameraZoom, cameraPan },
+    );
+    const bottomRight = viewportToWorld(
+        { x: canvas.width, y: canvas.height },
+        world,
+        followed,
+        canvas,
+        { viewportFishCapacity, cameraZoom, cameraPan },
+    );
+    const width = Math.max(1e-6, bottomRight.x - topLeft.x);
+    const height = Math.max(1e-6, bottomRight.y - topLeft.y);
+    const count = Math.max(1, Math.floor(Number(DEBUG.decorativeSparkTestCount) || 1000))
+        * Math.max(1, Math.min(4, Number(multiplier) || 1));
+    const columns = Math.max(1, Math.ceil(Math.sqrt(count * width / height)));
+    const rows = Math.max(1, Math.ceil(count / columns));
+    const life = Math.max(0.1, Number(DEBUG.decorativeSparkTestLifeSeconds) || 20);
+    const now = performance.now();
+
+    for( let index = 0; index < count; index++ ){
+        const column = index % columns;
+        const row = Math.floor(index / columns);
+        const sizePx = 1 + Math.random() * 2;
+        clientFinSparks.push({
+            id: `decorative-test:${now}:${index}`,
+            kind: 'decorative-test-grid',
+            pos: {
+                x: wrapValue(topLeft.x + (column + 0.5) / columns * width, world.width),
+                y: wrapValue(topLeft.y + (row + 0.5) / rows * height, world.height),
+            },
+            vel: { x: 0, y: 0 },
+            age: 0,
+            life,
+            initialSizePx: sizePx,
+            minSizePx: sizePx,
+            shrinkDuration: 0,
+            sizePx,
+            alphaScale: 1,
+            shape: ['circle', 'square', 'triangle'][Math.floor(Math.random() * 3)],
+            alpha: 0,
+        });
+    }
+}
+
+// @fix:f1c6a8d4
+function updateControlLayoutToolsUi(announce = false){
+    const labels = {
+        joystick: 'Control mode: one joystick',
+        touch: 'Control mode: touch',
+        'dual-joystick': 'Control mode: two grips',
+    };
+    const names = {
+        joystick: 'Joystick',
+        touch: 'Touch',
+        'dual-joystick': 'Two grips',
+    };
+    const icons = {
+        joystick: '<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>',
+        touch: '<path d="M8 11V6a2 2 0 0 1 4 0v5M12 10V5a2 2 0 0 1 4 0v7M16 10V7a2 2 0 0 1 4 0v7c0 4-2 7-7 7h-1c-3 0-5-2-7-5l-2-3a2 2 0 0 1 3-2l2 2"/>',
+        'dual-joystick': '<circle cx="7" cy="12" r="4"/><circle cx="17" cy="12" r="4"/><path d="M7 5v3M7 16v3M2 12h3M9 12h-2M17 5v3M17 16v3M14 12h3M22 12h-3"/>',
+    };
+    if( uiLayoutToggle ){
+        const toolActive = controlLayoutMode === 'joystick' ? joystickRelocationLocked : uiLayoutEditMode;
+        uiLayoutToggle.setAttribute('aria-pressed', String(toolActive));
+        uiLayoutToggle.classList.toggle('is-active', toolActive);
+        uiLayoutToggle.setAttribute('aria-label', controlLayoutMode === 'joystick'
+            ? (joystickRelocationLocked ? 'Unlock joystick position' : 'Lock joystick position')
+            : (uiLayoutEditMode ? 'Finish moving controls' : 'Move controls'));
+        const svg = uiLayoutToggle.querySelector('svg');
+        if( svg ) svg.innerHTML = controlLayoutMode === 'joystick'
+            ? (joystickRelocationLocked
+                ? '<rect x="6" y="10" width="12" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>'
+                : '<rect x="6" y="10" width="12" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 7.2-2.4"/>')
+            : '<path d="M12 3v18M3 12h18"/><path d="m12 3-2 3M12 3l2 3M12 21l-2-3M12 21l2-3M3 12l3-2M3 12l3 2M21 12l-3-2M21 12l-3 2"/>';
+    }
+    if( controlLayoutToggle ){
+        controlLayoutToggle.setAttribute('aria-label', labels[controlLayoutMode]);
+        controlLayoutToggle.setAttribute('aria-pressed', String(controlLayoutMode !== 'joystick'));
+        controlLayoutToggle.setAttribute('data-control-layout', controlLayoutMode);
+        controlLayoutToggle.classList.toggle('is-active', controlLayoutMode !== 'joystick');
+        const svg = controlLayoutToggle.querySelector('svg');
+        if( svg ) svg.innerHTML = icons[controlLayoutMode];
+    }
+    if( touchSpeedMetric ){
+        touchSpeedMetric.style.pointerEvents = controlLayoutMode === 'touch' && uiLayoutEditMode ? 'auto' : 'none';
+        touchSpeedMetric.classList.toggle('is-editable', controlLayoutMode === 'touch' && uiLayoutEditMode);
+    }
+    if( announce && controlLayoutToast ){
+        controlLayoutToast.textContent = names[controlLayoutMode];
+        controlLayoutToast.classList.add('is-visible');
+        window.clearTimeout(controlLayoutToastTimer);
+        controlLayoutToastTimer = window.setTimeout(() => controlLayoutToast.classList.remove('is-visible'), 2000);
+    }
+}
+
+// @fix:f1c6a8d4
+function toggleUiLayoutEditMode(){
+    if( controlLayoutMode === 'joystick' ){
+        joystickRelocationLocked = !joystickRelocationLocked;
+        if( joystickRelocationLocked ){
+            uiLayoutEditMode = false;
+            input.joystick.active = false;
+            input.joystick.vector = v(0, 0);
+            input.joystick.rawVector = v(0, 0);
+            if( joystickKnob ) joystickKnob.style.transform = 'translate(-50%, -50%)';
+        }
+    }else{
+        uiLayoutEditMode = !uiLayoutEditMode;
+    }
+    updateControlLayoutToolsUi();
+}
+
+// @fix:70871bc5
+function cycleControlLayoutMode(){
+    const index = CONTROL_LAYOUT_MODES.indexOf(controlLayoutMode);
+    controlLayoutMode = CONTROL_LAYOUT_MODES[(index + 1) % CONTROL_LAYOUT_MODES.length];
+    setControlMode(controlLayoutMode === 'touch' ? 'touch' : 'joystick', { announce: false, preserveLayoutMode: true });
+    updateControlLayoutToolsUi(true);
+}
+
+// @fix:6a7b8c9d
 function toggleFlowMap(){
     flowMapVisible = !flowMapVisible;
     if( flowMapVisible ){
@@ -652,15 +1061,24 @@ if( syncSegmentsToggle ) syncSegmentsToggle.addEventListener('click', toggleSync
 if( flowMapToggle ) flowMapToggle.addEventListener('click', toggleFlowMap);
 if( flowVectorsToggle ) flowVectorsToggle.addEventListener('click', toggleFlowVectors);
 if( dangerMapToggle ) dangerMapToggle.addEventListener('click', toggleDangerMapUnderlay);
+if( infoPanelToggle ) infoPanelToggle.addEventListener('click', toggleInfoPanel);
+if( decorativeSparksTestToggle ) decorativeSparksTestToggle.addEventListener('click', queueDecorativeTestSparks);
+if( uiLayoutToggle ) uiLayoutToggle.addEventListener('click', toggleUiLayoutEditMode);
+if( controlLayoutToggle ) controlLayoutToggle.addEventListener('click', cycleControlLayoutMode);
 if( debugModeToggle ){
     debugModeToggle.addEventListener('click', toggleDebugMode);
     debugModeToggle.setAttribute('aria-pressed', 'false');
 }
 setupViewportFishCapacity();
 setupViewportScaleWidget(); // @fix:394756ee
+setupTouchSpeedMetricDrag(); // @fix:f1c6a8d4
 setupControlModes();
 setupCameraPan(); // @fix:32ef3d51
 setupJoystickControls();
+setupDualRightJoystickControls(); // @fix:dual-right-grip
+setupDualBurstJoystickControls(); // @fix:dual-burst-grip
+setInfoPanelMode('none'); // @fix:6a7b8c9d
+updateControlLayoutToolsUi(); // @fix:f1c6a8d4
 window.addEventListener('keydown', e =>{
     if( e.key === '`' || e.key === '~' ){
         e.preventDefault();
@@ -692,7 +1110,9 @@ function setJoinedUiState(joined, { showJoinForm = false, sessionReady = entrySe
     const gameControlsVisible = entrySessionReady && joined;
     if( gameMenuToggle ) gameMenuToggle.hidden = !entrySessionReady;
     if( worldMapToggle ) worldMapToggle.hidden = !gameControlsVisible;
-    if( !gameControlsVisible ) worldMapVisible = false;
+    if( infoPanelToggle ) infoPanelToggle.hidden = !gameControlsVisible;
+    if( decorativeSparksTestToggle ) decorativeSparksTestToggle.hidden = !gameControlsVisible;
+    if( !gameControlsVisible ) resetEntryScreenPanels(); // @fix:entry-screen-reset
     if( !entrySessionReady ){
         gameMenuOpen = false;
         if( gameMenu ) gameMenu.hidden = true;
@@ -704,8 +1124,15 @@ function setJoinedUiState(joined, { showJoinForm = false, sessionReady = entrySe
     if( joinPanel ) joinPanel.hidden = !joinVisible;
     if( controlModes ) controlModes.hidden = !gameControlsVisible;
     if( controlHelp ) controlHelp.hidden = !gameControlsVisible;
-    if( viewportScaleWidget ) viewportScaleWidget.hidden = !gameControlsVisible;
+    if( viewportLeftControls ) viewportLeftControls.hidden = !gameControlsVisible;
+    if( !gameControlsVisible ){
+        uiLayoutEditMode = false;
+        resetDualRightJoystick();
+        resetDualBurstJoystick();
+        updateControlLayoutToolsUi();
+    }
     updateJoystickPanelVisibility();
+    updateTouchSpeedMetric(null, 0);
     updatePlayerMetricsVisibility(currentUserFish());
     updateGameMenu();
     updateWorldMapUi();
@@ -736,6 +1163,7 @@ function frame(now){
     advanceClientShredRotation(visibleState.world, dt, flowMapField); // @fix:4e9b2c71
     if( flowVectorsVisible ) advanceClientFlowCrosses(flowMapField, dt); // @fix:5f2a8c71
     advanceClientFinSparks(visibleState.world, clientFinSparks, dt, flowMapField); // @fix:4f8a2c71
+    logFlowCycleMetrics(); // @fix:6a7b8c9d
     updateSizeDeltaLabels(visibleState.world, dt);
     lastVisibleState = visibleState;
     advanceClientBubbles(clientBubbles, clientBubbleEmitters, visibleState.world, dt, Math.random);
@@ -783,9 +1211,11 @@ function frame(now){
     updatePlayerSpeedMetric(fish);
     updatePlayerMetricsVisibility(fish);
     updateJoystickBurstAvailability(fish);
+    updateDualBurstJoystickVisual(fish, now); // @fix:dual-burst-grip
     hudEaten.textContent = `${fish ? fish.eatenFishCount : 0}`;
     updatePlayerLifetimeBar(fish);
     updateWorldSnapshotInfo(state.world);
+    updateRecordsPanel(state.world);
     updateGameMenu();
     if( fish ) hudStatus.textContent = fish.userTier === 'paid' ? 'paid' : 'free';
 
@@ -818,6 +1248,7 @@ function updatePlayerSpeedMetric(fish){
     if( !fish || level <= 0 ){
         playerSpeedPercent.textContent = '0';
         playerSpeedPercent.style.color = '#11b8ee';
+        updateTouchSpeedMetric(fish, level);
         return;
     }
 
@@ -825,6 +1256,24 @@ function updatePlayerSpeedMetric(fish){
     playerSpeedPercent.style.color = level > REGIME.cruiseMaxSpeedLevel
         ? burstSpeedColor(level)
         : '#11b8ee';
+    updateTouchSpeedMetric(fish, level);
+}
+
+// @ds:c656f0ec
+function updateTouchSpeedMetric(fish, level = Math.max(0, Math.min(REGIME.speedLevels, Math.floor(Number(fish?.speedLevel) || 0)))){
+    if( !touchSpeedMetric || !touchSpeedValue || !touchSpeedMode ) return;
+    const visible = Boolean(entrySessionReady && net?.isJoined && controlMode.active === 'touch' && fish);
+    const burst = level > REGIME.cruiseMaxSpeedLevel;
+    const editable = controlLayoutMode === 'touch' && uiLayoutEditMode;
+    const key = `${visible}|${level}|${editable}`;
+    if( key === touchSpeedMetricUiKey ) return;
+    touchSpeedMetricUiKey = key;
+    touchSpeedMetric.hidden = !visible;
+    touchSpeedMetric.classList.toggle('is-burst', burst);
+    touchSpeedMetric.style.pointerEvents = editable ? 'auto' : 'none';
+    touchSpeedValue.textContent = String(level);
+    touchSpeedMode.textContent = burst ? 'burst' : 'cruise';
+    touchSpeedValue.style.color = burst ? burstSpeedColor(level) : '#11b8ee';
 }
 
 function burstSpeedColor(percent){
@@ -889,9 +1338,81 @@ function updateWorldSnapshotInfo(world){
     const fishItems = world?.fish || [];
     const nutrientItems = world?.shreds || [];
     if( worldFishCount ) worldFishCount.textContent = formatCount(fishItems.length);
-    if( worldFishArea ) worldFishArea.textContent = formatArea(sumFishArea(fishItems));
+    if( worldFishArea ) worldFishArea.textContent = formatNutrition(sumFishNutrition(fishItems));
     if( worldNutrientCount ) worldNutrientCount.textContent = formatCount(nutrientItems.length);
-    if( worldNutrientArea ) worldNutrientArea.textContent = formatArea(sumNutrientArea(nutrientItems));
+    if( worldNutrientArea ) worldNutrientArea.textContent = formatNutrition(sumNutrientNutrition(nutrientItems, world));
+}
+
+// @fix:6a7b8c9d
+function updateFlowMetricsPanel(snapshot = flowMetricsSnapshot){
+    if( !snapshot ) return;
+    const formatMs = value => Number.isFinite(value) ? `${value.toFixed(3)} ms` : '—';
+    if( flowMetricWindow ) flowMetricWindow.textContent = snapshot.cycles > 0 ? `${snapshot.cycles} cycles / 5 s` : 'no completed cycles';
+    if( flowMetricBuild ) flowMetricBuild.textContent = formatMs(snapshot.avgRawBuildMs);
+    if( flowMetricRgb ) flowMetricRgb.textContent = formatMs(snapshot.avgRgbEncodeMs);
+    if( flowMetricSurface ) flowMetricSurface.textContent = formatMs(snapshot.avgSurfaceMs);
+    if( flowMetricSample ) flowMetricSample.textContent = `${formatMs(snapshot.avgRawSampleMs)} (${snapshot.rawSamples || 0})`;
+    if( flowMetricCycle ) flowMetricCycle.textContent = formatMs(snapshot.avgCycleMs);
+    if( flowMetricShape ) flowMetricShape.textContent = `${snapshot.cycles || 0} / ${snapshot.cells || 0}`;
+}
+
+// @fix:6a7b8c9d
+function updateRecordsPanel(world, force = false){
+    if( !recordsPanel || recordsPanel.hidden ) return;
+    const now = performance.now();
+    if( !force && now - recordsPanelUpdatedAt < 250 ) return;
+    const fish = [...(world?.fish || [])].sort((a, b) => (Number(b?.size) || 0) - (Number(a?.size) || 0));
+    const key = fish.map(item => [item.id, item.ownerKind, item.userName, item.size, item.eatenFishCount, Math.floor(recordLifetimeSeconds(item, now))].join(':')).join('|');
+    if( !force && key === recordsPanelKey ) return;
+    recordsPanelUpdatedAt = now;
+    recordsPanelKey = key;
+    const rowsFor = ownerKind => fish
+        .filter(item => item.ownerKind === ownerKind)
+        .map(item => `<tr><td>${escapeRecordText(recordLabel(item))}</td><td>${formatRecordSize(item.size)}</td><td>${formatCount(item.eatenFishCount)}</td><td>${formatFishLifetime(recordLifetimeSeconds(item, now))}</td></tr>`)
+        .join('');
+    if( userRecordRows ) userRecordRows.innerHTML = rowsFor('user') || '<tr><td colspan="4">—</td></tr>';
+    if( npcRecordRows ) npcRecordRows.innerHTML = rowsFor('npc') || '<tr><td colspan="4">—</td></tr>';
+}
+
+// @fix:6a7b8c9d
+function trackRecordFishAppearance(world, seenAt){
+    const timestamp = Number.isFinite(seenAt) ? seenAt : performance.now();
+    const visibleIds = new Set();
+    for( const fish of world?.fish || [] ){
+        if( fish?.id === undefined || fish?.id === null ) continue;
+        visibleIds.add(fish.id);
+        if( !recordFirstSeenAt.has(fish.id) ) recordFirstSeenAt.set(fish.id, timestamp);
+    }
+    for( const id of recordFirstSeenAt.keys() ){
+        if( !visibleIds.has(id) ) recordFirstSeenAt.delete(id);
+    }
+}
+
+function recordLifetimeSeconds(fish, now = performance.now()){
+    const firstSeenAt = recordFirstSeenAt.get(fish?.id);
+    if( Number.isFinite(firstSeenAt) ) return Math.max(0, (now - firstSeenAt) / 1000);
+    return Math.max(0, Number(fish?.age) || 0);
+}
+
+function recordLabel(fish){
+    if( fish?.ownerKind === 'user' ) return fish.userName || `user-${fish.id ?? '—'}`;
+    return `#${fish?.id ?? '—'}`;
+}
+
+function formatRecordSize(size){
+    const value = Number(size);
+    return Number.isFinite(value) ? value.toFixed(1) : '—';
+}
+
+function formatFishLifetime(age){
+    const seconds = Math.max(0, Number(age) || 0);
+    if( seconds < 60 ) return `${seconds.toFixed(1)}s`;
+    const minutes = Math.floor(seconds / 60);
+    return `${minutes}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
+}
+
+function escapeRecordText(value){
+    return String(value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
 }
 
 // @ds:e7c2a901
@@ -909,17 +1430,25 @@ function updateEventRates(rates = {}){
     if( worldControlRateValue ) worldControlRateValue.textContent = `${Number.isFinite(control) ? Math.max(0, Math.round(control)) : 0} Ev/s`;
 }
 
-function sumFishArea(fishItems){
+function sumFishNutrition(fishItems){
     return fishItems.reduce((sum, fish) =>{
-        const radius = Number.isFinite(fish?.radius) ? fish.radius : technicalRadiusOf(fish?.size || 0);
-        return Number.isFinite(radius) ? sum + Math.PI * radius * radius : sum;
+        const size = Number(fish?.size);
+        return Number.isFinite(size) ? sum + Math.max(0, size) : sum;
     }, 0);
 }
 
-function sumNutrientArea(nutrientItems){
+function sumNutrientNutrition(nutrientItems, world){
+    const worldScale = Math.max(1e-6, Number(world?.scale) || 1);
+    const baseRadius = FISH.nominalStartDiameter / 2 / worldScale;
+    const baseFishArea = Math.PI * baseRadius * baseRadius;
     return nutrientItems.reduce((sum, nutrient) =>{
         const area = Number(nutrient?.geometricArea);
-        return Number.isFinite(area) ? sum + Math.max(0, area) : sum;
+        if( !Number.isFinite(area) || area <= 0 ) return sum;
+        const layers = Array.isArray(nutrient?.remainingLayers)
+            ? nutrient.remainingLayers
+            : SHRED.layerOrder.flat();
+        const layerFraction = layers.reduce((layerSum, layer) => layerSum + (SHRED.layerFractions[layer] || 0), 0);
+        return sum + area / Math.max(1e-6, baseFishArea) * layerFraction * SHRED.nutritionMultiplier;
     }, 0);
 }
 
@@ -927,10 +1456,10 @@ function formatCount(value){
     return String(Math.max(0, Number(value) || 0));
 }
 
-function formatArea(value){
-    const area = Math.max(0, Number(value) || 0);
-    if( area >= 1000 ) return `${Math.round(area / 100) / 10}k`;
-    return area.toFixed(0);
+function formatNutrition(value){
+    const nutrition = Math.max(0, Number(value) || 0);
+    if( nutrition >= 1000 ) return `${Math.round(nutrition / 100) / 10}k`;
+    return nutrition.toFixed(0);
 }
 
 // @ds:e559831a @ds:7b9a7984
@@ -978,7 +1507,8 @@ function extrapolateShred(shred, now, worldWidth, worldHeight){
 
 // @fix:6a7b8c9d
 function updateClientFlowField(world, now){
-    if( !flowMapLocalEnabled || (!flowMapVisible && !flowVectorsVisible) || !world?.fish?.length ) return;
+    const decorativeFlowNeeded = clientFinSparks.length > 0;
+    if( (!flowMapLocalEnabled && !decorativeFlowNeeded) || (!flowMapVisible && !flowVectorsVisible && !decorativeFlowNeeded) || !world?.fish?.length ) return;
     if( cameraPointers.size > 0 ) return; // keep touch gestures free of flow rebuild work
     if( flowMapLastBuildAt && now - flowMapLastBuildAt < FLOW_MAP_LOCAL_UPDATE_MS ) return;
     const startedAt = performance.now();
@@ -991,14 +1521,28 @@ function updateClientFlowField(world, now){
             x: Number(candidate.vel?.x) || 0,
             y: Number(candidate.vel?.y) || 0,
         };
+        const previousVelocity = previous || null;
+        const previousSpeed = previousVelocity
+            ? Math.hypot(previousVelocity.x || 0, previousVelocity.y || 0)
+            : Math.hypot(velocity.x, velocity.y);
+        const currentSpeed = Math.hypot(velocity.x, velocity.y);
         const prevAccel = previous
             ? { x: (velocity.x - previous.x) / elapsedSeconds, y: (velocity.y - previous.y) / elapsedSeconds }
             : (candidate.prevAccel || { x: 0, y: 0 });
         flowVelocitySamples.set(candidate.id, velocity);
-        return { ...candidate, prevAccel };
+        return {
+            ...candidate,
+            prevAccel,
+            previousSpeed,
+            speedDecreasing: currentSpeed < previousSpeed - Math.max(1e-6, SHRED.flowSpeedDropEpsilon),
+        };
     });
+    const buildStartedAt = performance.now();
     const field = buildFlowField({ ...world, fish });
+    const buildMs = performance.now() - buildStartedAt;
+    const encodeStartedAt = performance.now();
     field.pixels = encodeClientFlowFieldPixels(field);
+    const rgbEncodeMs = performance.now() - encodeStartedAt;
     const fieldLength = field.columns * field.rows;
     const sameGrid = flowMapField
         && field.columns === flowMapField.columns
@@ -1010,20 +1554,55 @@ function updateClientFlowField(world, now){
         ? flowMapField.crossVelocities
         : new Float32Array(fieldLength);
     flowMapField = field;
+    const surfaceStartedAt = performance.now();
     flowMapBitmap = updateClientFlowMapSurface(field);
+    const surfaceMs = performance.now() - surfaceStartedAt;
     flowMapLastBuildAt = now;
     flowMapBuildMs = performance.now() - startedAt;
     flowMapBuildFishCount = fish.length;
-    if( debugMode && now - flowMapMetricsLoggedAt >= 5000 ){
-        flowMapMetricsLoggedAt = now;
-        console.debug('[flow-map local]', {
-            fish: flowMapBuildFishCount,
-            buildMs: Number(flowMapBuildMs.toFixed(3)),
-            msPerFish: Number((flowMapBuildMs / Math.max(1, flowMapBuildFishCount)).toFixed(4)),
-            cells: field.columns * field.rows,
-            updateMs: FLOW_MAP_LOCAL_UPDATE_MS,
-        });
-    }
+    flowCycleMetrics.cycles++;
+    flowCycleMetrics.totalMs += flowMapBuildMs;
+    flowCycleMetrics.buildMs += buildMs;
+    flowCycleMetrics.rgbEncodeMs += rgbEncodeMs;
+    flowCycleMetrics.surfaceMs += surfaceMs;
+}
+
+// @fix:6a7b8c9d
+function logFlowCycleMetrics(){
+    const now = performance.now();
+    if( !flowCycleMetrics.windowStartedAt ) flowCycleMetrics.windowStartedAt = now;
+    if( now - flowCycleMetrics.windowStartedAt < 5000 ) return;
+    const cycles = flowCycleMetrics.cycles;
+    const snapshot = {
+        cycles,
+        fish: flowMapBuildFishCount,
+        cells: flowMapField ? flowMapField.columns * flowMapField.rows : 0,
+        avgCycleMs: cycles > 0 ? flowCycleMetrics.totalMs / cycles : null,
+        avgRawBuildMs: cycles > 0 ? flowCycleMetrics.buildMs / cycles : null,
+        avgRgbEncodeMs: cycles > 0 ? flowCycleMetrics.rgbEncodeMs / cycles : null,
+        avgSurfaceMs: cycles > 0 ? flowCycleMetrics.surfaceMs / cycles : null,
+        avgRawSampleMs: flowCycleMetrics.rawSampleCount > 0 ? flowCycleMetrics.rawSampleMs / flowCycleMetrics.rawSampleCount : null,
+        rawSamples: flowCycleMetrics.rawSampleCount,
+    };
+    flowMetricsSnapshot = snapshot;
+    updateFlowMetricsPanel(snapshot);
+    console.info('[flow-map timings]', {
+        ...snapshot,
+        avgCycleMs: snapshot.avgCycleMs === null ? null : Number(snapshot.avgCycleMs.toFixed(3)),
+        avgRawBuildMs: snapshot.avgRawBuildMs === null ? null : Number(snapshot.avgRawBuildMs.toFixed(3)),
+        avgRgbEncodeMs: snapshot.avgRgbEncodeMs === null ? null : Number(snapshot.avgRgbEncodeMs.toFixed(3)),
+        avgSurfaceMs: snapshot.avgSurfaceMs === null ? null : Number(snapshot.avgSurfaceMs.toFixed(3)),
+        avgRawSampleMs: snapshot.avgRawSampleMs === null ? null : Number(snapshot.avgRawSampleMs.toFixed(5)),
+        updateMs: FLOW_MAP_LOCAL_UPDATE_MS,
+    });
+    flowCycleMetrics.windowStartedAt = now;
+    flowCycleMetrics.cycles = 0;
+    flowCycleMetrics.totalMs = 0;
+    flowCycleMetrics.buildMs = 0;
+    flowCycleMetrics.rgbEncodeMs = 0;
+    flowCycleMetrics.surfaceMs = 0;
+    flowCycleMetrics.rawSampleMs = 0;
+    flowCycleMetrics.rawSampleCount = 0;
 }
 
 const flowVelocitySamples = new Map(); // @fix:6a7b8c9d
@@ -1244,6 +1823,7 @@ function wrapValue(value, size){
 
 // @ds:975ca168 @ds:bd354b7a @ds:3ddf8f67 @ds:a44b9d2c @fn:a9a3ed12 @ia:9c0d1e2f @ia:3a4b5c6e
 function applyClientFishDecor(world, bubbles, finSparks, dt, rng){
+    emitShredEatSparks(world, finSparks, rng); // @fix:4f8a2c71
     const visibleFishIds = visibleDecorFishIds(world);
     for( const fishId of clientFishDecor.keys() ){
         if( !visibleFishIds.has(fishId) ) clientFishDecor.delete(fishId);
@@ -1260,6 +1840,7 @@ function applyClientFishDecor(world, bubbles, finSparks, dt, rng){
         fish.swimPhase = decor.swimPhase;
         fish.burstKick = decor.burstKick;
         fish.mouthOpen = decor.mouthOpen;
+        fish.mouthSuctionImpulse = decor.mouthSuctionImpulse; // @fix:6a7b8c9d
         updateClientFishOrientation(decor, fish); // @fix:c13e07b3
         const inertialBraking = !fish.mode || fish.mode === 'cruise' && Number(fish.speedLevel || 0) === 0;
         const targetTilt = fish.mode === 'burst' && !inertialBraking
@@ -1270,6 +1851,105 @@ function applyClientFishDecor(world, bubbles, finSparks, dt, rng){
         fish.visualTilt = decor.visualTilt;
         if( decor.shredBurstHold > 0 ) fish.mode = 'burst'; // @ds:a2d5936f
         if( decor.eatingCruiseHold > 0 ) fish.mode = 'cruise'; // @ds:975ca168
+    }
+}
+
+// @fix:4f8a2c71
+function emitShredEatSparks(world, finSparks, rng){
+    if( !world || !Array.isArray(finSparks) || typeof rng !== 'function' ) return;
+    const currentStates = new Map();
+    const changedPositions = [];
+    for( const shred of world.shreds || [] ){
+        if( !shred?.pos || !Number.isFinite(shred.id) ) continue;
+        const layers = Array.isArray(shred.remainingLayers) ? shred.remainingLayers : [];
+        const current = {
+            layerCount: layers.length,
+            layerKey: layers.join('|'),
+            color: shred.sourceColor || '#d6b84f',
+            pos: { x: shred.pos.x, y: shred.pos.y },
+        };
+        currentStates.set(shred.id, current);
+        const previous = clientShredLayerStates.get(shred.id);
+        if( previous && current.layerCount < previous.layerCount ) changedPositions.push({ position: current.pos, color: current.color });
+    }
+
+    const missingPositions = [];
+    for( const [shredId, previous] of clientShredLayerStates ){
+        if( !currentStates.has(shredId) ) missingPositions.push({ position: previous.pos, color: previous.color });
+    }
+
+    let confirmedEatCount = 0;
+    const fishIds = new Set();
+    for( const fish of world.fish || [] ){
+        if( !Number.isFinite(fish.id) ) continue;
+        fishIds.add(fish.id);
+        const currentCue = Math.max(0, Math.floor(Number(fish.shredEatCueCounter) || 0));
+        const previousCue = clientShredEatCueCounters.get(fish.id);
+        if( previousCue !== undefined && currentCue > previousCue ) confirmedEatCount += currentCue - previousCue;
+        clientShredEatCueCounters.set(fish.id, currentCue);
+    }
+    for( const fishId of clientShredEatCueCounters.keys() ){
+        if( !fishIds.has(fishId) ) clientShredEatCueCounters.delete(fishId);
+    }
+
+    const eventPositions = changedPositions.slice(0, confirmedEatCount);
+    const missingEvents = Math.max(0, confirmedEatCount - eventPositions.length);
+    for( let i = 0; i < missingEvents && i < missingPositions.length; i++ ) eventPositions.push(missingPositions[i]);
+    for( const event of eventPositions ) emitShredEatSparkBurst(event.position, event.color, finSparks, rng);
+    clientShredLayerStates.clear();
+    for( const [shredId, current] of currentStates ) clientShredLayerStates.set(shredId, current);
+}
+
+// @fix:4f8a2c71
+function emitShredEatSparkBurst(position, color, finSparks, rng){
+    const minCount = Math.max(1, Math.floor(Number(SWIM.finSparkShredEatMinCount) || 2));
+    const maxCount = Math.max(minCount, Math.floor(Number(SWIM.finSparkShredEatMaxCount) || minCount));
+    const count = minCount + Math.floor(rng() * (maxCount - minCount + 1));
+    const minImpulse = Math.max(0, Number(SWIM.finSparkShredEatImpulseMin) || 0);
+    const maxImpulse = Math.max(minImpulse, Number(SWIM.finSparkShredEatImpulseMax) || minImpulse);
+    const jitterRadius = Math.max(0, Number(SWIM.finSparkShredEatStartJitterWorldUnits) || 0);
+    const life = Math.max(0.1, Number(SWIM.finSparkShredEatLifeSeconds) || 10);
+    const minSizePx = Math.max(0.1, Number(SWIM.finSparkShredEatMinSizePx) || 1.5);
+    const maxSizePx = Math.max(minSizePx, Number(SWIM.finSparkShredEatMaxSizePx) || minSizePx);
+    const alphaScale = Math.max(0, Number(SWIM.finSparkShredEatAlpha) || 0)
+        / Math.max(1e-6, Number(SWIM.finSparkAlpha) || 1);
+    const minAngularVelocity = Math.max(0, Number(SWIM.finSparkShredEatInitialAngularVelocityMin) || 0);
+    const maxAngularVelocity = Math.max(minAngularVelocity,
+        Number(SWIM.finSparkShredEatInitialAngularVelocityMax) || minAngularVelocity);
+    const shapes = Array.isArray(SWIM.finSparkShredEatShapes) && SWIM.finSparkShredEatShapes.length
+        ? SWIM.finSparkShredEatShapes
+        : ['circle'];
+    for( let i = 0; i < count; i++ ){
+        const angle = rng() * Math.PI * 2;
+        const impulse = minImpulse + rng() * (maxImpulse - minImpulse);
+        const jitterAngle = rng() * Math.PI * 2;
+        const jitter = rng() * jitterRadius;
+        const sizePx = minSizePx + rng() * (maxSizePx - minSizePx);
+        const sizeRatio = (sizePx - minSizePx) / Math.max(1e-6, maxSizePx - minSizePx);
+        const shrinkDuration = life * 0.5 * sizeRatio;
+        const angularVelocity = (minAngularVelocity
+            + rng() * (maxAngularVelocity - minAngularVelocity)) * (rng() < 0.5 ? -1 : 1);
+        finSparks.push({
+            id: `shred-eat:${performance.now()}:${finSparks.length}`,
+            kind: 'shred-eat',
+            pos: {
+                x: position.x + Math.cos(jitterAngle) * jitter,
+                y: position.y + Math.sin(jitterAngle) * jitter,
+            },
+            vel: { x: Math.cos(angle) * impulse, y: Math.sin(angle) * impulse },
+            age: 0,
+            life,
+            initialSizePx: sizePx,
+            minSizePx,
+            shrinkDuration,
+            sizePx,
+            alphaScale,
+            color: color || '#d6b84f',
+            shape: shapes[Math.min(shapes.length - 1, Math.floor(rng() * shapes.length))],
+            rotation: rng() * Math.PI * 2,
+            angularVelocity,
+            alpha: 0,
+        });
     }
 }
 
@@ -1302,6 +1982,7 @@ function makeClientDecor(fish){
         visualTilt: 0, // @fix:6e2a9c41
         burstKick: 0,
         wasBurstSwimming: false,
+        lastFinExtremeSide: 0, // @fix:4f8a2c71
         wasBurstActive: fish.mode === 'burst',
         lastBurstSpeedLevel: fish.mode === 'burst' ? Math.floor(Number(fish.speedLevel) || 0) : 0, // @fix:4f8a2c71
         lastDirection: null,
@@ -1323,6 +2004,7 @@ function makeClientDecor(fish){
             emitTotal: 0,
         },
         mouthOpen: 0,
+        mouthSuctionImpulse: 0, // @fix:6a7b8c9d
         mouthHold: 0,
         mouthEatenSize: 0,
         shredBurstHold: 0,
@@ -1376,12 +2058,15 @@ function updateClientFishOrientation(decor, fish){
 }
 
 function updateClientDecorState(decor, fish, dt, bubbles, finSparks, rng){
+    const previousMouthOpen = Math.max(0, Number(decor.mouthOpen) || 0);
+    const impulseDecay = Math.exp(-Math.max(0, Number(dt) || 0) / Math.max(1e-6, MOUTH.suctionImpulseSeconds));
+    decor.mouthSuctionImpulse = Math.max(0, (Number(decor.mouthSuctionImpulse) || 0) * impulseDecay);
     const speed = Math.hypot(fish.vel?.x || 0, fish.vel?.y || 0);
     const burstActive = fish.mode === 'burst';
     const burstSwimming = burstActive && speed > FISH.facingThreshold;
     const burstSpeedLevel = Math.floor(Number(fish.speedLevel) || 0);
     if( burstActive && burstSpeedLevel !== decor.lastBurstSpeedLevel ){
-        emitFinSparks(fish, finSparks, rng); // @fix:4f8a2c71
+        emitFinSparks(fish, finSparks, rng, finAnimationIntensity(fish, decor)); // @fix:4f8a2c71
     }
     decor.lastBurstSpeedLevel = burstActive ? burstSpeedLevel : 0;
     if( burstActive !== decor.wasBurstActive ) emitMotionCueBubbles(fish, bubbles, rng); // @ds:3ddf8f67
@@ -1395,6 +2080,11 @@ function updateClientDecorState(decor, fish, dt, bubbles, finSparks, rng){
     decor.wasBurstSwimming = burstSwimming;
     decor.burstKick = Math.max(0, decor.burstKick - dt * SWIM.kickDecay);
     decor.swimPhase += dt * (SWIM.basePhaseRate + speed * SWIM.speedPhaseRate);
+    const finExtremeSide = burstSwimming ? burstFinExtremeSide(decor.swimPhase) : 0;
+    if( finExtremeSide && finExtremeSide !== decor.lastFinExtremeSide ){
+        emitBurstExtremeFinSparks(fish, finSparks, rng, finAnimationIntensity(fish, decor)); // @fix:4f8a2c71
+    }
+    decor.lastFinExtremeSide = finExtremeSide;
 
     const eatenCount = fish.eatenFishCount || 0;
     if( eatenCount > decor.lastEatenFishCount ){
@@ -1420,29 +2110,115 @@ function updateClientDecorState(decor, fish, dt, bubbles, finSparks, rng){
     const chaseOpen = burstSwimming && !closeForEating ? MOUTH.chaseOpenRatio : 0;
     const eatOpen = decor.mouthHold > 0 ? Math.min(1, decor.mouthEatenSize / Math.max(1, fish.size || 1)) : 0;
     decor.mouthOpen = closeForEating ? 0 : Math.max(chaseOpen, eatOpen);
+    if( previousMouthOpen <= 0 && decor.mouthOpen > 0 ) decor.mouthSuctionImpulse = decor.mouthOpen;
 }
 
 // @fix:4f8a2c71
-function emitFinSparks(fish, finSparks, rng){
+function finAnimationIntensity(fish, decor){
+    const burstBlend = fish?.mode === 'burst' ? 1 : 0;
+    const burstKick = Math.max(0, Math.min(1, Number(decor?.burstKick) || 0));
+    const amplitude = SWIM.finBaseSwing + SWIM.finBurstSwing * (burstBlend + burstKick);
+    const maximum = SWIM.finBaseSwing + SWIM.finBurstSwing * 2;
+    return maximum > 0 ? Math.max(0, Math.min(1, amplitude / maximum)) : 0;
+}
+
+// @fix:4f8a2c71
+function burstFinExtremeSide(swimPhase){
+    const signal = Math.sin(swimPhase + Math.PI * 0.55);
+    const threshold = Math.max(0, Math.min(1, Number(SWIM.finSparkBurstExtremeThreshold) || 0.88));
+    if( signal >= threshold ) return 1;
+    if( signal <= -threshold ) return -1;
+    return 0;
+}
+
+// @fix:4f8a2c71
+function emitBurstExtremeFinSparks(fish, finSparks, rng, animationIntensity){
+    const maxBurstLevel = Math.max(1, Math.min(100, Number(REGIME.speedLevels) || 99));
+    const speedLevel = Math.max(0, Math.min(maxBurstLevel, Math.floor(Number(fish?.speedLevel) || 0)));
+    const chance = Math.min(1, speedLevel / maxBurstLevel * SWIM.finSparkBurstExtremeMaxChance);
+    emitFinSparks(fish, finSparks, rng, animationIntensity, {
+        chance,
+        minCount: SWIM.finSparkBurstExtremeMinCount,
+        maxCount: SWIM.finSparkBurstExtremeMaxCount,
+        minSizePx: SWIM.finSparkBurstExtremeMinSizePx,
+        maxSizePx: SWIM.finSparkBurstExtremeMaxSizePx,
+    });
+}
+
+// @fix:4f8a2c71
+function emitFinSparks(fish, finSparks, rng, animationIntensity = 1, options = {}){
     if( !Array.isArray(finSparks) || !fish?.pos || (fish.syncOpacity ?? 1) <= 0 ) return;
     const tips = fishFinTipPositions(fish);
-    for( const tip of tips ){
-        if( rng() > SWIM.finSparkChance ) continue;
-        const sizePx = SWIM.finSparkMinSizePx + rng() * (SWIM.finSparkMaxSizePx - SWIM.finSparkMinSizePx);
-        const sizeRatio = (sizePx - SWIM.finSparkMinSizePx) / Math.max(1e-6, SWIM.finSparkMaxSizePx - SWIM.finSparkMinSizePx);
+    const chance = Math.max(0, Math.min(1, Number(options.chance ?? SWIM.finSparkChance) || 0));
+    if( !tips.length || rng() > chance ) return;
+    const countRange = sizeScaledFinSparkCountRange(
+        fish,
+        options.minCount ?? SWIM.finSparkMinCount,
+        options.maxCount ?? SWIM.finSparkMaxCount,
+    );
+    const countMin = countRange.min;
+    const resolvedCountMax = countRange.max;
+    const minSizePx = Number(options.minSizePx ?? SWIM.finSparkMinSizePx) || SWIM.finSparkMinSizePx;
+    const maxSizePx = Math.max(minSizePx, Number(options.maxSizePx ?? SWIM.finSparkMaxSizePx) || minSizePx);
+    const count = countMin + Math.floor(rng() * (resolvedCountMax - countMin + 1));
+    const alphaScale = 0.45 + 0.55 * Math.max(0, Math.min(1, Number(animationIntensity) || 0));
+    for( let i = 0; i < count; i++ ){
+        const tip = tips[i % tips.length];
+        const finPass = Math.floor(i / tips.length);
+        const finPasses = Math.max(1, Math.ceil(count / tips.length));
+        const edgeProgress = finPasses <= 1 ? 1 : 1 - finPass / (finPasses - 1);
+        const baseRatio = Math.max(0, Math.min(1, Number(SWIM.finSparkTrailingEdgeBaseRatio) || 0.5));
+        const edgeRatio = baseRatio + (1 - baseRatio) * edgeProgress;
+        const edgeOffset = {
+            x: tip.offset.x * edgeRatio,
+            y: tip.offset.y * edgeRatio,
+        };
+        const sizePx = minSizePx + rng() * (maxSizePx - minSizePx);
+        const sizeRatio = (sizePx - minSizePx) / Math.max(1e-6, maxSizePx - minSizePx);
         const life = SWIM.finSparkSmallLifeSeconds + (SWIM.finSparkLargeLifeSeconds - SWIM.finSparkSmallLifeSeconds) * sizeRatio;
+        const jitterRadius = rng() * SWIM.finSparkStartJitterWorldUnits;
+        const jitterAngle = rng() * Math.PI * 2;
         finSparks.push({
             id: `${fish.id}:${performance.now()}:${finSparks.length}`,
-            pos: { x: fish.pos.x + tip.offset.x, y: fish.pos.y + tip.offset.y },
+            pos: {
+                x: fish.pos.x + edgeOffset.x + Math.cos(jitterAngle) * jitterRadius,
+                y: fish.pos.y + edgeOffset.y + Math.sin(jitterAngle) * jitterRadius,
+            },
             vel: { x: 0, y: 0 },
             age: 0,
             life,
             initialSizePx: sizePx,
+            minSizePx,
             shrinkDuration: life * 0.5 * sizeRatio,
             sizePx,
-            alpha: SWIM.finSparkAlpha,
+            alphaScale,
+            alpha: 0,
         });
     }
+}
+
+// @fix:4f8a2c71
+function sizeScaledFinSparkCountRange(fish, baseMin, baseMax){
+    const minimum = Math.max(1, Math.floor(Number(baseMin) || 1));
+    const maximum = Math.max(minimum, Math.floor(Number(baseMax) || minimum));
+    const size = Math.max(1, Number(fish?.size) || 1);
+    const size5Min = Math.max(minimum, Math.floor(Number(SWIM.finSparkSize5MinCount) || minimum));
+    const size5Max = Math.max(size5Min, Math.floor(Number(SWIM.finSparkSize5MaxCount) || size5Min));
+    const size10Min = Math.max(size5Min, Math.floor(Number(SWIM.finSparkSize10MinCount) || size5Min));
+    const size10Max = Math.max(size10Min, Math.floor(Number(SWIM.finSparkSize10MaxCount) || size10Min));
+    if( size <= 1 ) return { min: minimum, max: maximum };
+    if( size <= 5 ){
+        const t = (size - 1) / 4;
+        return {
+            min: Math.max(1, Math.round(minimum + (size5Min - minimum) * t)),
+            max: Math.max(1, Math.round(maximum + (size5Max - maximum) * t)),
+        };
+    }
+    const t = Math.min(1, (size - 5) / 5);
+    return {
+        min: Math.max(1, Math.round(size5Min + (size10Min - size5Min) * t)),
+        max: Math.max(1, Math.round(size5Max + (size10Max - size5Max) * t)),
+    };
 }
 
 // @fix:4f8a2c71
@@ -1455,23 +2231,42 @@ function advanceClientFinSparks(world, finSparks, dt, field){
             finSparks.splice(i, 1);
             continue;
         }
-        const flow = sampleLinearFlow(field, spark.pos);
-        spark.vel.x += flow.x * dt;
-        spark.vel.y += flow.y * dt;
-        const drag = Math.exp(-SHRED.dragMin * dt);
+        const sampleStartedAt = performance.now();
+        const flow = field?.flowX && field?.flowY
+            ? sampleFlowField(field, spark.pos, world)
+            : sampleLinearFlow(field, spark.pos);
+        flowCycleMetrics.rawSampleMs += performance.now() - sampleStartedAt;
+        flowCycleMetrics.rawSampleCount++;
+        spark.vel.x += flow.x * SWIM.finSparkFlowResponse * dt;
+        spark.vel.y += flow.y * SWIM.finSparkFlowResponse * dt;
+        if( spark.shape && spark.shape !== 'circle' ){
+            const angularImpulse = field ? sampleAngularFlow(field, spark.pos) : 0;
+            spark.angularVelocity = (Number(spark.angularVelocity) || 0)
+                + angularImpulse * SHRED.flowAngularImpulseStrength * dt;
+            spark.angularVelocity *= Math.exp(-SHRED.flowAngularDrag * dt);
+            spark.rotation = (Number(spark.rotation) || 0) + spark.angularVelocity * dt;
+        }
+        const speed = Math.hypot(spark.vel.x, spark.vel.y);
+        const viscosity = Math.max(0, Number(SWIM.finSparkViscosityBase) || 0)
+            + speed * Math.max(0, Number(SWIM.finSparkViscositySpeedFactor) || 0);
+        const drag = Math.exp(-viscosity * dt);
         spark.vel.x *= drag;
         spark.vel.y *= drag;
         spark.pos.x = wrapValue(spark.pos.x + spark.vel.x * dt, world.width);
         spark.pos.y = wrapValue(spark.pos.y + spark.vel.y * dt, world.height);
+        const birthDuration = Math.max(1e-6, Number(SWIM.finSparkBirthSeconds) || 0.1);
+        const birthAlpha = Math.max(0, Math.min(1, spark.age / birthDuration));
+        const alphaBase = SWIM.finSparkAlpha * Math.max(0, Math.min(1, Number(spark.alphaScale) || 1));
         const shrinkDuration = Math.max(0, Number(spark.shrinkDuration) || 0);
         if( shrinkDuration > 0 && spark.age < shrinkDuration ){
             const shrinkProgress = spark.age / shrinkDuration;
-            spark.sizePx = spark.initialSizePx - (spark.initialSizePx - SWIM.finSparkMinSizePx) * shrinkProgress;
-            spark.alpha = SWIM.finSparkAlpha;
+            const minSizePx = Number(spark.minSizePx) || SWIM.finSparkMinSizePx;
+            spark.sizePx = spark.initialSizePx - (spark.initialSizePx - minSizePx) * shrinkProgress;
+            spark.alpha = alphaBase * birthAlpha;
         }else{
-            spark.sizePx = SWIM.finSparkMinSizePx;
+            spark.sizePx = Number(spark.minSizePx) || SWIM.finSparkMinSizePx;
             const fadeDuration = Math.max(1e-6, spark.life - shrinkDuration);
-            spark.alpha = SWIM.finSparkAlpha * (1 - Math.max(0, spark.age - shrinkDuration) / fadeDuration);
+            spark.alpha = alphaBase * birthAlpha * (1 - Math.max(0, spark.age - shrinkDuration) / fadeDuration);
         }
     }
 }
@@ -1555,9 +2350,18 @@ function advanceSizeDeltaLabelLifetimes(dt){
 // @ds:93b8abba @ds:10baf178 @ds:b43d2f95
 function buildInputPayload(){
     const fish = currentUserFish();
+    const activeInputMode = controlLayoutMode === 'dual-joystick' ? 'dual-joystick' : controlMode.active;
     let accel = keySteer(input.keys);
     const keyboardAccel = Boolean(accel);
     if( joystickBase ) joystickBase.classList.toggle('is-keyboard-control', keyboardAccel); // @fix:5d9e3a71
+    if( activeInputMode === 'dual-joystick' && dualRightJoystickBase ){
+        const rect = dualRightJoystickBase.getBoundingClientRect();
+        const knobRadius = Math.max(0, (dualRightJoystickKnob?.getBoundingClientRect().width || JOYSTICK.dualKnobDiameterPx) / 2);
+        const radius = Math.max(1, rect.width / 2 - knobRadius);
+        // Keyboard direction is the same directional command as the right
+        // grip. Keep the visual grip in sync without mutating pointer state.
+        renderDualRightJoystick(keyboardAccel ? normalize(accel) : (input.rightJoystick.active ? input.rightJoystick.vector : v(0, 0)), radius);
+    }
     if( !accel ){
         if( controlMode.active === 'pointer' && fish && input.pointer.active ){
             const worldPointer = viewportToWorld(input.pointer.pos, state.world, fish, canvas, { viewportFishCapacity, cameraZoom, cameraPan });
@@ -1565,11 +2369,13 @@ function buildInputPayload(){
         }else if( controlMode.active === 'touch' && fish && input.pointer.active && input.touchDown ){
             input.pointer.vector = controlVectorFromFish(fish, input.pointer.pos);
             accel = scale(normalize(input.pointer.vector), FISH.accel * Math.min(1, Math.hypot(input.pointer.vector.x, input.pointer.vector.y)));
+        }else if( activeInputMode === 'dual-joystick' ){
+            accel = joystickSteer(input.rightJoystick);
         }else{
             accel = joystickSteer(input.joystick);
         }
     }
-    const desiredLevel = speedLevel(input, controlMode.active);
+    const desiredLevel = speedLevel(input, activeInputMode);
     const level = fish ? availableSpeedLevelForSize(fish.size, desiredLevel) : desiredLevel;
     const keyboardCruise = keyboardAccel && level > 0 && level <= REGIME.cruiseMaxSpeedLevel;
     return {
@@ -1777,6 +2583,40 @@ function setupViewportScaleWidget(){
     viewportScaleWidget.addEventListener('pointercancel', release);
 }
 
+// @fix:f1c6a8d4
+function setupTouchSpeedMetricDrag(){
+    if( !touchSpeedMetric ) return;
+    touchSpeedMetric.addEventListener('pointerdown', e =>{
+        if( controlLayoutMode !== 'touch' || !uiLayoutEditMode ) return;
+        const rect = touchSpeedMetric.getBoundingClientRect();
+        touchSpeedPointerId = e.pointerId;
+        touchSpeedDragOffset = v(e.clientX - rect.left, e.clientY - rect.top);
+        touchSpeedMetric.setPointerCapture?.(e.pointerId);
+        e.preventDefault();
+    });
+    touchSpeedMetric.addEventListener('pointermove', e =>{
+        if( e.pointerId !== touchSpeedPointerId || !touchSpeedDragOffset ) return;
+        const width = touchSpeedMetric.offsetWidth;
+        const height = touchSpeedMetric.offsetHeight;
+        const viewportWidth = Math.max(1, window.visualViewport?.width || window.innerWidth);
+        const viewportHeight = Math.max(1, window.visualViewport?.height || window.innerHeight);
+        const left = Math.max(8, Math.min(viewportWidth - width - 8, e.clientX - touchSpeedDragOffset.x));
+        const top = Math.max(8, Math.min(viewportHeight - height - 8, e.clientY - touchSpeedDragOffset.y));
+        touchSpeedMetric.style.left = `${left}px`;
+        touchSpeedMetric.style.top = `${top}px`;
+        touchSpeedMetric.style.right = 'auto';
+        touchSpeedMetric.style.bottom = 'auto';
+        e.preventDefault();
+    });
+    const release = e =>{
+        if( e.pointerId !== touchSpeedPointerId ) return;
+        touchSpeedPointerId = null;
+        touchSpeedDragOffset = null;
+    };
+    touchSpeedMetric.addEventListener('pointerup', release);
+    touchSpeedMetric.addEventListener('pointercancel', release);
+}
+
 // @fix:a64e9b31
 function loadViewportFishCapacity(){
     try{
@@ -1832,14 +2672,31 @@ function setViewportFishCapacity(value){
 
 // @ds:70871bc5
 function setupControlModes(){
-    setControlMode(controlMode.active);
+    setControlMode(controlMode.active, { announce: false });
     for( const button of controlModeButtons ){
-        button.addEventListener('click', () => setControlMode(button.dataset.controlMode));
+        button.addEventListener('click', () => setControlMode(button.dataset.controlMode, { announce: true }));
     }
 }
 
-function setControlMode(mode){
+function setControlMode(mode, { announce = false, preserveLayoutMode = false } = {}){
+    const previousLayoutMode = controlLayoutMode;
     controlMode.active = mode === 'keyboard' ? 'joystick' : (mode || controlMode.active);
+    if( !preserveLayoutMode ){
+        controlLayoutMode = controlMode.active === 'touch' ? 'touch' : 'joystick';
+    }
+    if( controlLayoutMode === 'joystick' ){
+        // One joystick starts movable; the lock button opts into fixation.
+        joystickRelocationLocked = false;
+        uiLayoutEditMode = false;
+    }else if( controlLayoutMode === 'touch' ){
+        // Touch layout starts editable so its speed/burst indicator can be placed.
+        joystickRelocationLocked = false;
+        uiLayoutEditMode = true;
+    }else{
+        // Two-grip layout starts fixed until the move button is pressed.
+        joystickRelocationLocked = false;
+        uiLayoutEditMode = false;
+    }
     for( const button of controlModeButtons ){
         const active = button.dataset.controlMode === controlMode.active;
         button.setAttribute('aria-pressed', active ? 'true' : 'false');
@@ -1850,7 +2707,10 @@ function setControlMode(mode){
     input.joystick.vector = v(0, 0);
     input.joystick.rawVector = v(0, 0);
     if( joystickKnob ) joystickKnob.style.transform = 'translate(-50%, -50%)';
+    resetDualRightJoystick();
+    resetDualBurstJoystick();
     updateControlHelp();
+    updateControlLayoutToolsUi(announce && previousLayoutMode !== controlLayoutMode);
     lastSentInputKey = null;
 }
 
@@ -1862,8 +2722,10 @@ function updateControlHelp(){
         pointer: 'Экспериментальная мышь: указатель задаёт направление; удержание кнопки мыши — v31. Клавиши активны.',
         touch: 'Экспериментальный тач: касание вокруг рыбы задаёт направление и v0..v99. Клавиши активны.',
         joystick: 'Визуальный джойстик: рукоятка задаёт направление и v0..v99. Клавиши активны.',
+        'dual-joystick': 'Два джойстика: правый задаёт направление и cruise v0..v30. Клавиши активны.',
     };
-    controlHelp.textContent = `${help[controlMode.active] || help.keyboard} Клик по рыбе — serialize.`;
+    const activeMode = controlLayoutMode === 'dual-joystick' ? 'dual-joystick' : controlMode.active;
+    controlHelp.textContent = `${help[activeMode] || help.keyboard} Клик по рыбе — serialize.`;
 }
 
 // @ds:cff27cd5
@@ -1898,11 +2760,20 @@ function formatThresholdSize(size){
 function updateJoystickPanelVisibility(){
     const visible = isJoystickPanelVisible();
     if( joystickPanel ) joystickPanel.hidden = !visible;
-    if( visible ) requestAnimationFrame(clampJoystickPositionToViewport); // @fix:f1c6a8d4
+    const dualVisible = isDualRightJoystickVisible();
+    if( dualRightJoystickPanel ) dualRightJoystickPanel.hidden = !dualVisible;
+    if( dualBurstPanel ) dualBurstPanel.hidden = !dualVisible;
+    dualBurstScale = null; // @fix:dual-burst-grip
+    if( visible || dualVisible ) requestAnimationFrame(restoreControlLayoutPositions); // @fix:control-viewport-layout
 }
 
 function isJoystickPanelVisible(){
-    return Boolean(entrySessionReady && net?.isJoined && controlMode.active !== 'pointer' && controlMode.active !== 'touch');
+    return Boolean(entrySessionReady && net?.isJoined && controlLayoutMode === 'joystick'
+        && controlMode.active !== 'pointer' && controlMode.active !== 'touch');
+}
+
+function isDualRightJoystickVisible(){
+    return Boolean(entrySessionReady && net?.isJoined && controlLayoutMode === 'dual-joystick');
 }
 
 // @ds:0eef2d19 @ds:e6be3c03 @ds:e41821af
@@ -1963,6 +2834,8 @@ function renderJoystickRingSpecs(ringSpecs){
 function updateJoystickCurrentBurstRing(fish){
     if( !joystickCurrentBurstRing ) return;
     const appliedLevel = Math.max(0, Math.min(REGIME.speedLevels, Math.floor(Number(fish?.speedLevel) || 0)));
+    if( appliedLevel === joystickCurrentBurstRingLevel ) return;
+    joystickCurrentBurstRingLevel = appliedLevel;
     const visible = appliedLevel > 0;
     joystickCurrentBurstRing.classList.toggle('is-visible', visible);
     if( !visible ) return;
@@ -1991,7 +2864,15 @@ function renderJoystickKnob(vector){
 
 // @fix:32ef3d51
 function cameraPanEnabled(e){
-    return e.pointerType === 'touch' && controlMode.active !== 'touch' && controlMode.active !== 'pointer';
+    return e.pointerType === 'touch'
+        && controlMode.active !== 'touch'
+        && controlMode.active !== 'pointer'
+        && !controlLayoutIsFixed();
+}
+
+// @fix:f1c6a8d4
+function controlLayoutIsFixed(){
+    return controlLayoutMode === 'joystick' ? joystickRelocationLocked : !uiLayoutEditMode;
 }
 
 // @fix:32ef3d51
@@ -2089,6 +2970,7 @@ function setupCameraPan(){
 function setupJoystickControls(){
     if( !joystickBase ) return;
     let activePointerId = null;
+    let layoutDragOffset = null;
     const updateJoystick = e =>{
         const pointer = v(e.clientX, e.clientY);
         let rect = joystickBase.getBoundingClientRect();
@@ -2098,7 +2980,7 @@ function setupJoystickControls(){
         const distanceFromCenter = Math.hypot(raw.x, raw.y);
         let isAtOuterBoundary = false;
         const relocationDeadzone = rect.width * JOYSTICK.relocationActivationRatio; // @fix:52cd6e6c
-        if( distanceFromCenter > radius + relocationDeadzone ){
+        if( !joystickRelocationLocked && distanceFromCenter > radius + relocationDeadzone ){
             const outward = normalize(raw);
             const overshoot = distanceFromCenter - radius;
             const desiredCenter = v(center.x + outward.x * overshoot, center.y + outward.y * overshoot);
@@ -2119,26 +3001,544 @@ function setupJoystickControls(){
     };
     const resetJoystick = () =>{
         activePointerId = null;
+        layoutDragOffset = null;
         input.joystick.active = false;
         input.joystick.vector = v(0, 0);
         input.joystick.rawVector = v(0, 0);
         if( joystickKnob ) joystickKnob.style.transform = 'translate(-50%, -50%)';
+        persistControlLayoutPositions();
     };
     joystickBase.addEventListener('pointerdown', e =>{
         activePointerId = e.pointerId;
         joystickBase.setPointerCapture(e.pointerId);
+        if( uiLayoutEditMode ){
+            const rect = joystickBase.getBoundingClientRect();
+            layoutDragOffset = v(e.clientX - (rect.left + rect.width / 2), e.clientY - (rect.top + rect.height / 2));
+            e.preventDefault();
+            return;
+        }
         updateJoystick(e);
     });
     joystickBase.addEventListener('pointermove', e =>{
         if( e.pointerId !== activePointerId ) return;
+        if( uiLayoutEditMode && layoutDragOffset ){
+            const rect = joystickBase.getBoundingClientRect();
+            const radius = Math.max(1, rect.width / 2);
+            const desiredCenter = v(e.clientX - layoutDragOffset.x, e.clientY - layoutDragOffset.y);
+            setJoystickCenter(clampJoystickCenter(desiredCenter, radius));
+            e.preventDefault();
+            return;
+        }
         updateJoystick(e);
     });
     joystickBase.addEventListener('pointerup', resetJoystick);
     joystickBase.addEventListener('pointercancel', resetJoystick);
 }
 
+// @fix:dual-right-grip
+function setupDualRightJoystickControls(){
+    if( !dualRightJoystickBase ) return;
+    dualRightJoystickBase.addEventListener('pointerdown', e =>{
+        if( controlLayoutMode !== 'dual-joystick' ) return;
+        dualRightJoystickPointerId = e.pointerId;
+        dualRightJoystickBase.setPointerCapture?.(e.pointerId);
+        if( uiLayoutEditMode ){
+            const rect = dualRightJoystickBase.getBoundingClientRect();
+            dualRightJoystickLayoutDragOffset = v(
+                e.clientX - (rect.left + rect.width / 2),
+                e.clientY - (rect.top + rect.height / 2),
+            );
+        }else{
+            dualRightJoystickLayoutDragOffset = null;
+            updateDualRightJoystick(e);
+        }
+        e.preventDefault();
+    });
+    dualRightJoystickBase.addEventListener('pointermove', e =>{
+        if( e.pointerId !== dualRightJoystickPointerId ) return;
+        if( uiLayoutEditMode && dualRightJoystickLayoutDragOffset ){
+            const rect = dualRightJoystickBase.getBoundingClientRect();
+            const desiredCenter = v(
+                e.clientX - dualRightJoystickLayoutDragOffset.x,
+                e.clientY - dualRightJoystickLayoutDragOffset.y,
+            );
+            setDualRightJoystickCenter(clampJoystickCenter(
+                desiredCenter,
+                Math.max(1, rect.width / 2),
+                dualRightJoystickKnob,
+            ));
+        }else{
+            updateDualRightJoystick(e);
+        }
+        e.preventDefault();
+    });
+    const release = e =>{
+        if( e.pointerId !== dualRightJoystickPointerId ) return;
+        dualRightJoystickPointerId = null;
+        dualRightJoystickLayoutDragOffset = null;
+        resetDualRightJoystick();
+        persistControlLayoutPositions();
+    };
+    dualRightJoystickBase.addEventListener('pointerup', release);
+    dualRightJoystickBase.addEventListener('pointercancel', release);
+}
+
+// @fix:dual-right-grip
+function updateDualRightJoystick(e){
+    if( !dualRightJoystickBase ) return;
+    const rect = dualRightJoystickBase.getBoundingClientRect();
+    const center = v(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    const raw = v(e.clientX - center.x, e.clientY - center.y);
+    const knobRadius = Math.max(0, (dualRightJoystickKnob?.getBoundingClientRect().width || JOYSTICK.dualKnobDiameterPx) / 2);
+    const radius = Math.max(1, rect.width / 2 - knobRadius);
+    const distance = Math.min(radius, Math.hypot(raw.x, raw.y));
+    const direction = normalize(raw);
+    input.rightJoystick.active = true;
+    input.rightJoystick.rawVector = scale(direction, distance / radius);
+    input.rightJoystick.vector = input.rightJoystick.rawVector;
+    renderDualRightJoystick(input.rightJoystick.vector, radius);
+}
+
+// @fix:dual-right-grip
+function renderDualRightJoystick(vector, radius = JOYSTICK.dualDiameterPx / 2 - JOYSTICK.dualKnobDiameterPx / 2){
+    if( !dualRightJoystickKnob || !dualRightJoystickVector ) return;
+    const raw = vector || v(0, 0);
+    const magnitude = Math.min(1, Math.hypot(raw.x, raw.y));
+    const direction = magnitude > 1e-3 ? normalize(raw) : v(0, 0);
+    const distance = magnitude * Math.max(0, radius);
+    dualRightJoystickKnob.style.transform = `translate(calc(-50% + ${direction.x * distance}px), calc(-50% + ${direction.y * distance}px))`;
+    dualRightJoystickVector.style.setProperty('--dual-right-vector-length', `${distance}px`);
+    dualRightJoystickVector.style.setProperty('--dual-right-vector-angle', `${Math.atan2(direction.y, direction.x)}rad`);
+}
+
+// @fix:dual-right-grip
+function resetDualRightJoystick(){
+    dualRightJoystickPointerId = null;
+    dualRightJoystickLayoutDragOffset = null;
+    input.rightJoystick.active = false;
+    input.rightJoystick.vector = v(0, 0);
+    input.rightJoystick.rawVector = v(0, 0);
+    renderDualRightJoystick(input.rightJoystick.vector);
+}
+
+// @fix:dual-burst-grip
+function burstArcPoint(level, outwardOffset = 0){
+    const normalized = Math.max(0, Math.min(1,
+        (Math.max(REGIME.burstStartSpeedLevel, Math.min(REGIME.speedLevels, Number(level) || REGIME.burstStartSpeedLevel))
+            - REGIME.burstStartSpeedLevel)
+        / Math.max(1, REGIME.speedLevels - REGIME.burstStartSpeedLevel)));
+    const angle = -normalized * Math.PI / 2;
+    const normal = { x: Math.cos(angle), y: Math.sin(angle) };
+    const arc = {
+        x: JOYSTICK.burstArcOriginX + normal.x * JOYSTICK.burstArcRadiusPx,
+        y: JOYSTICK.burstArcOriginY + normal.y * JOYSTICK.burstArcRadiusPx,
+    };
+    return {
+        angle,
+        normal,
+        arc,
+        knob: { x: arc.x + normal.x * outwardOffset, y: arc.y + normal.y * outwardOffset },
+    };
+}
+
+// @fix:dual-burst-grip
+function burstLevelFromArcPoint(point){
+    const dx = point.x - JOYSTICK.burstArcOriginX;
+    const dy = point.y - JOYSTICK.burstArcOriginY;
+    const angle = Math.atan2(dy, dx);
+    const normalized = Math.max(0, Math.min(1, -angle / (Math.PI / 2)));
+    return Math.max(REGIME.burstStartSpeedLevel, Math.min(REGIME.speedLevels,
+        Math.round(REGIME.burstStartSpeedLevel + normalized * (REGIME.speedLevels - REGIME.burstStartSpeedLevel))));
+}
+
+// @fix:dual-burst-grip
+function burstPointerPoint(e){
+    if( !dualBurstSurface ) return v(0, 0);
+    const rect = dualBurstSurface.getBoundingClientRect();
+    return v(
+        (e.clientX - rect.left) / Math.max(1, rect.width) * JOYSTICK.burstPanelWidthPx,
+        (e.clientY - rect.top) / Math.max(1, rect.height) * JOYSTICK.burstPanelHeightPx,
+    );
+}
+
+// @fix:dual-burst-grip
+function burstPointNearArc(point){
+    const dx = point.x - JOYSTICK.burstArcOriginX;
+    const dy = point.y - JOYSTICK.burstArcOriginY;
+    const radius = Math.hypot(dx, dy);
+    const angle = Math.atan2(dy, dx);
+    return radius >= JOYSTICK.burstArcHitInnerRadiusPx
+        && radius <= JOYSTICK.burstArcHitOuterRadiusPx
+        && angle <= 0.08 && angle >= -Math.PI / 2 - 0.08;
+}
+
+// @fix:dual-burst-grip
+function burstPointNearNumber(point){
+    const dx = point.x - JOYSTICK.burstArcOriginX;
+    const dy = point.y - JOYSTICK.burstArcOriginY;
+    return Math.hypot(dx, dy) <= JOYSTICK.burstNumberHitRadiusPx;
+}
+
+// @fix:dual-burst-grip
+function configureDualBurstHitTargets(){
+    if( dualBurstNumberHit ){
+        dualBurstNumberHit.setAttribute('cx', String(JOYSTICK.burstArcOriginX));
+        dualBurstNumberHit.setAttribute('cy', String(JOYSTICK.burstArcOriginY));
+        dualBurstNumberHit.setAttribute('r', String(JOYSTICK.burstNumberHitRadiusPx));
+    }
+    if( dualBurstArcHit ){
+        const ox = JOYSTICK.burstArcOriginX;
+        const oy = JOYSTICK.burstArcOriginY;
+        const outer = JOYSTICK.burstArcHitOuterRadiusPx;
+        const inner = JOYSTICK.burstArcHitInnerRadiusPx;
+        dualBurstArcHit.setAttribute('d',
+            `M${ox} ${oy - outer}`
+            + `A${outer} ${outer} 0 0 1 ${ox + outer} ${oy}`
+            + `L${ox + inner} ${oy}`
+            + `A${inner} ${inner} 0 0 0 ${ox} ${oy - inner}Z`);
+    }
+}
+
+// @fix:dual-burst-grip
+function burstPointNearHandle(point, level, outwardOffset = 0){
+    const knob = burstArcPoint(level, outwardOffset);
+    return Math.hypot(point.x - knob.knob.x, point.y - knob.knob.y) <= JOYSTICK.burstKnobDiameterPx * 0.9;
+}
+
+// @fix:dual-burst-grip
+function setDualBurstText(element, value){
+    if( !element ) return;
+    const text = String(value);
+    if( element.textContent !== text ) element.textContent = text;
+}
+
+// @fix:dual-burst-grip
+function setDualBurstStyle(element, property, value){
+    if( !element || element.style[property] === value ) return;
+    element.style[property] = value;
+}
+
+// @fix:dual-burst-grip
+function setDualBurstAttribute(element, name, value){
+    if( !element ) return;
+    const next = String(value);
+    if( element.getAttribute(name) !== next ) element.setAttribute(name, next);
+}
+
+// @fix:dual-burst-grip
+function setDualBurstLevel(level, active = true){
+    input.burstJoystick.active = active;
+    input.burstJoystick.level = Math.max(REGIME.burstStartSpeedLevel,
+        Math.min(REGIME.speedLevels, Math.round(Number(level) || REGIME.burstStartSpeedLevel)));
+}
+
+// @fix:dual-burst-grip
+function burstPinCandidateFromGesture(gesture, point){
+    if( !gesture || gesture.pinEligible === false ) return null;
+    const delta = v(point.x - gesture.start.x, point.y - gesture.start.y);
+    const outward = delta.x * gesture.normal.x + delta.y * gesture.normal.y;
+    const tangent = delta.x * gesture.normal.y - delta.y * gesture.normal.x;
+    const gestureAngle = Math.atan2(tangent, Math.max(1e-6, outward)) * 180 / Math.PI;
+    const distance = Math.hypot(delta.x, delta.y);
+    const pinDistance = JOYSTICK.burstKnobDiameterPx * JOYSTICK.burstPinDistanceKnobDiameters;
+    if( distance < pinDistance || outward <= 0 || gestureAngle < -10 || gestureAngle > 45 ) return null;
+    const pinAngle = Math.max(0, gestureAngle) / 45;
+    const pinnedLevel = Math.max(REGIME.burstStartSpeedLevel,
+        Math.min(65, Math.round(REGIME.burstStartSpeedLevel + pinAngle * (65 - REGIME.burstStartSpeedLevel))));
+    return { level: pinnedLevel, angle: gestureAngle, distance };
+}
+
+// @fix:dual-burst-grip
+function commitBurstPinGesture(gesture, candidate){
+    if( !gesture || !candidate ) return false;
+    input.burstJoystick.pinned = true;
+    input.burstJoystick.pinnedLevel = candidate.level;
+    // The candidate has already been rendered at the final offset while the
+    // finger was held. Keep that position on release instead of animating
+    // back to the arc and producing a visible jump.
+    setDualBurstLevel(candidate.level, true);
+    return true;
+}
+
+// @fix:dual-burst-grip
+function setupDualBurstJoystickControls(){
+    if( !dualBurstSurface ) return;
+    configureDualBurstHitTargets();
+    dualBurstSurface.addEventListener('pointerdown', e =>{
+        if( controlLayoutMode !== 'dual-joystick' ) return;
+        dualBurstPointerId = e.pointerId;
+        dualBurstSurface.setPointerCapture?.(e.pointerId);
+        if( uiLayoutEditMode ){
+            const rect = dualBurstPanel?.getBoundingClientRect();
+            if( !rect || rect.width <= 0 || rect.height <= 0 ) return;
+            dualBurstLayoutDragOffset = v(
+                e.clientX - (rect.left + rect.width / 2),
+                e.clientY - (rect.top + rect.height / 2),
+            );
+            dualBurstGesture = null;
+            e.preventDefault();
+            return;
+        }
+        const point = burstPointerPoint(e);
+        const burst = input.burstJoystick;
+        const pinnedLevel = burst.pinnedLevel || REGIME.burstStartSpeedLevel;
+        const nearPinnedHandle = burst.pinned
+            && burstPointNearHandle(point, pinnedLevel, JOYSTICK.burstHandleOffsetPx);
+        const hitNumberZone = e.target === dualBurstNumberHit;
+        const hitArcZone = e.target === dualBurstArcHit;
+        if( nearPinnedHandle ){
+            dualBurstGesture = { type: 'pinned-knob', start: point, level: pinnedLevel, normal: burstArcPoint(pinnedLevel).normal };
+            setDualBurstLevel(pinnedLevel, true);
+        }else if( hitNumberZone || (!hitArcZone && burstPointNearNumber(point)) ){
+            if( burst.pinned ){
+                burst.pinned = false;
+                burst.pinnedLevel = 0;
+            }
+            dualBurstGesture = {
+                type: 'number',
+                start: point,
+                normal: burstArcPoint(REGIME.burstStartSpeedLevel).normal,
+                pinCandidate: null,
+                dynamic: false,
+            };
+            setDualBurstLevel(REGIME.burstStartSpeedLevel, true);
+        }else if( hitArcZone || burstPointNearArc(point) ){
+            const level = burstLevelFromArcPoint(point);
+            dualBurstGesture = {
+                type: 'arc',
+                start: point,
+                startLevel: level,
+                pinnedAtStart: burst.pinned,
+                normal: burstArcPoint(level).normal,
+                pinCandidate: null,
+                pinEligible: true,
+                dynamic: false,
+            };
+            setDualBurstLevel(level, true);
+        }else{
+            dualBurstGesture = null;
+            dualBurstPointerId = null;
+            return;
+        }
+        e.preventDefault();
+    });
+    dualBurstSurface.addEventListener('pointermove', e =>{
+        if( e.pointerId !== dualBurstPointerId ) return;
+        if( uiLayoutEditMode && dualBurstLayoutDragOffset ){
+            const rect = dualBurstPanel?.getBoundingClientRect();
+            if( rect && rect.width > 0 && rect.height > 0 ){
+                const desiredCenter = v(
+                    e.clientX - dualBurstLayoutDragOffset.x,
+                    e.clientY - dualBurstLayoutDragOffset.y,
+                );
+                const center = clampControlRectCenter(desiredCenter, rect.width, rect.height);
+                setDualBurstJoystickCenter(center);
+            }
+            e.preventDefault();
+            return;
+        }
+        if( !dualBurstGesture ) return;
+        const point = burstPointerPoint(e);
+        const burst = input.burstJoystick;
+        if( dualBurstGesture.type === 'number' ){
+            const candidate = burstPinCandidateFromGesture(dualBurstGesture, point);
+            dualBurstGesture.pinCandidate = candidate;
+            if( candidate ) setDualBurstLevel(candidate.level, true);
+            const deltaY = point.y - dualBurstGesture.start.y;
+            const level = REGIME.burstStartSpeedLevel
+                + (-deltaY / Math.max(1, JOYSTICK.burstDynamicRangePx))
+                * (REGIME.speedLevels - REGIME.burstStartSpeedLevel);
+            if( !candidate ){
+                const delta = v(point.x - dualBurstGesture.start.x, point.y - dualBurstGesture.start.y);
+                const outward = delta.x * dualBurstGesture.normal.x + delta.y * dualBurstGesture.normal.y;
+                const tangent = delta.x * dualBurstGesture.normal.y - delta.y * dualBurstGesture.normal.x;
+                const gestureAngle = Math.atan2(tangent, Math.max(1e-6, outward)) * 180 / Math.PI;
+                if( gestureAngle > 45 ){
+                    dualBurstGesture.dynamic = true;
+                    if( burst.pinned ){
+                        burst.pinned = false;
+                        burst.pinnedLevel = 0;
+                    }
+                    setDualBurstLevel(level, true);
+                }
+            }
+        }else if( dualBurstGesture.type === 'pinned-knob' ){
+            const delta = v(point.x - dualBurstGesture.start.x, point.y - dualBurstGesture.start.y);
+            const inward = delta.x * dualBurstGesture.normal.x + delta.y * dualBurstGesture.normal.y;
+            if( inward < -JOYSTICK.burstKnobDiameterPx ){
+                burst.pinned = false;
+                burst.pinnedLevel = 0;
+                dualBurstGesture.type = 'arc';
+                dualBurstGesture.dynamic = true;
+                dualBurstGesture.pinEligible = false;
+                setDualBurstLevel(burstLevelFromArcPoint(point), true);
+            }
+        }else if( dualBurstGesture.type === 'arc' ){
+            const candidate = burstPinCandidateFromGesture(dualBurstGesture, point);
+            dualBurstGesture.pinCandidate = candidate;
+            if( candidate ){
+                setDualBurstLevel(candidate.level, true);
+            }else{
+                const delta = v(point.x - dualBurstGesture.start.x, point.y - dualBurstGesture.start.y);
+                const outward = delta.x * dualBurstGesture.normal.x + delta.y * dualBurstGesture.normal.y;
+                const tangent = delta.x * dualBurstGesture.normal.y - delta.y * dualBurstGesture.normal.x;
+                const gestureAngle = Math.atan2(tangent, Math.max(1e-6, outward)) * 180 / Math.PI;
+                if( gestureAngle > 45 ){
+                    burst.pinned = false;
+                    burst.pinnedLevel = 0;
+                    dualBurstGesture.dynamic = true;
+                }
+                setDualBurstLevel(burstLevelFromArcPoint(point), true);
+            }
+        }
+        e.preventDefault();
+    });
+    const release = (e, commit = false) =>{
+        if( e.pointerId !== dualBurstPointerId ) return;
+        if( commit && dualBurstGesture
+            && (dualBurstGesture.type === 'number' || dualBurstGesture.type === 'arc') ){
+            const point = burstPointerPoint(e);
+            const candidate = burstPinCandidateFromGesture(dualBurstGesture, point);
+            if( candidate ) commitBurstPinGesture(dualBurstGesture, candidate);
+        }
+        dualBurstPointerId = null;
+        dualBurstLayoutDragOffset = null;
+        dualBurstGesture = null;
+        input.burstJoystick.active = false;
+        input.burstJoystick.level = 0;
+        persistControlLayoutPositions();
+    };
+    dualBurstSurface.addEventListener('pointerup', e => release(e, true));
+    dualBurstSurface.addEventListener('pointercancel', e => release(e, false));
+}
+
+// @fix:dual-burst-grip
+function resetDualBurstJoystick(){
+    dualBurstPointerId = null;
+    dualBurstLayoutDragOffset = null;
+    dualBurstGesture = null;
+    input.burstJoystick.active = false;
+    input.burstJoystick.level = 0;
+    input.burstJoystick.pinned = false;
+    input.burstJoystick.pinnedLevel = 0;
+    dualBurstVisualKey = null;
+    setDualBurstStyle(dualBurstPreviewMarker, 'display', 'none');
+}
+
+// @fix:dual-burst-grip
+function updateDualBurstArcAvailability(availableLevel){
+    const maxLevel = Math.max(REGIME.burstStartSpeedLevel,
+        Math.min(REGIME.speedLevels, Math.floor(Number(availableLevel) || REGIME.burstStartSpeedLevel)));
+    if( maxLevel === dualBurstArcAvailabilityLevel ) return;
+    dualBurstArcAvailabilityLevel = maxLevel;
+    const limited = maxLevel < REGIME.speedLevels;
+    setDualBurstStyle(dualBurstArcMuted, 'display', limited ? 'inline' : 'none');
+    if( dualBurstArcActiveClipSector ){
+        const endpoint = burstArcPoint(maxLevel).arc;
+        setDualBurstAttribute(dualBurstArcActiveClipSector, 'd',
+            `M0 ${JOYSTICK.burstArcOriginY}L${JOYSTICK.burstArcOriginX + JOYSTICK.burstArcRadiusPx} ${JOYSTICK.burstArcOriginY}`
+            + `A${JOYSTICK.burstArcRadiusPx} ${JOYSTICK.burstArcRadiusPx} 0 0 0 ${endpoint.x} ${endpoint.y}Z`);
+    }
+    if( dualBurstArcBase ){
+        setDualBurstStyle(dualBurstArcBase, 'clipPath', limited ? 'url(#dual-burst-active-clip)' : 'none');
+    }
+}
+
+// @fix:dual-burst-grip
+function updateDualBurstJoystickVisual(fish){
+    if( !dualBurstPanel || dualBurstPanel.hidden ) return;
+    const burst = input.burstJoystick;
+    const rightCruiseLevel = input.rightJoystick?.active
+        ? Math.round(Math.max(0, Math.min(1, Math.hypot(input.rightJoystick.rawVector?.x || 0, input.rightJoystick.rawVector?.y || 0))) * REGIME.cruiseMaxSpeedLevel)
+        : 0;
+    const serverLevel = Math.max(0, Math.min(REGIME.speedLevels, Math.floor(Number(fish?.speedLevel) || 0)));
+    const desiredLevel = burst.active ? burst.level : burst.pinned ? burst.pinnedLevel : (serverLevel || rightCruiseLevel);
+    const availableLevel = fish ? availableSpeedLevelForSize(fish.size, REGIME.speedLevels) : REGIME.speedLevels;
+    const level = fish ? availableSpeedLevelForSize(fish.size, desiredLevel) : desiredLevel;
+    const isBurst = level >= REGIME.burstStartSpeedLevel;
+    const displayLevel = isBurst ? level : REGIME.burstStartSpeedLevel;
+    const pinnedHandleLevel = burst.pinned
+        ? (fish ? availableSpeedLevelForSize(fish.size, burst.pinnedLevel) : burst.pinnedLevel)
+        : displayLevel;
+    const pinPreviewCandidate = !burst.pinned
+        && dualBurstPointerId !== null
+        && dualBurstGesture
+        && (dualBurstGesture.type === 'number' || dualBurstGesture.type === 'arc')
+        ? dualBurstGesture.pinCandidate
+        : null;
+    const pinPreviewActive = Boolean(pinPreviewCandidate);
+    const visualPinned = burst.pinned || pinPreviewActive;
+    const visualPinnedLevel = burst.pinned ? pinnedHandleLevel : (pinPreviewCandidate?.level || displayLevel);
+    const point = burstArcPoint(visualPinnedLevel, visualPinned ? JOYSTICK.burstHandleOffsetPx : 0);
+    if( dualBurstScale === null ){
+        const surfaceRect = dualBurstSurface?.getBoundingClientRect();
+        dualBurstScale = surfaceRect && surfaceRect.width > 0 && surfaceRect.height > 0
+            ? Math.min(
+                surfaceRect.width / Math.max(1, JOYSTICK.burstPanelWidthPx),
+                surfaceRect.height / Math.max(1, JOYSTICK.burstPanelHeightPx),
+            )
+            : 1;
+    }
+    const burstScale = dualBurstScale;
+    const visualKey = [
+        level,
+        visualPinnedLevel,
+        visualPinned ? 1 : 0,
+        pinPreviewActive ? 1 : 0,
+        burst.active ? 1 : 0,
+        availableLevel,
+        burstScale,
+        displayLevel,
+    ].join('|');
+    if( visualKey === dualBurstVisualKey ) return;
+    dualBurstVisualKey = visualKey;
+    const burstScaleValue = String(burstScale);
+    if( dualBurstPanel.style.getPropertyValue('--burst-ui-scale') !== burstScaleValue ){
+        dualBurstPanel.style.setProperty('--burst-ui-scale', burstScaleValue);
+    }
+    if( dualBurstNumber ){
+        setDualBurstText(dualBurstNumber, level);
+        setDualBurstStyle(dualBurstNumber, 'color', isBurst ? '#ffb963' : '#11b8ee');
+    }
+    if( dualBurstHandle ){
+        setDualBurstStyle(dualBurstHandle, 'left', `${point.knob.x * burstScale}px`);
+        setDualBurstStyle(dualBurstHandle, 'top', `${point.knob.y * burstScale}px`);
+        setDualBurstStyle(dualBurstHandle, 'background', visualPinned || isBurst
+            ? 'rgba(255, 185, 99, 0.45)'
+            : 'rgba(25, 104, 155, 0.8)');
+    }
+    setDualBurstText(dualBurstHandleLevel, visualPinned ? visualPinnedLevel : '');
+    updateDualBurstArcAvailability(availableLevel);
+    if( dualBurstPinLine ){
+        setDualBurstAttribute(dualBurstPinLine, 'x1', point.arc.x);
+        setDualBurstAttribute(dualBurstPinLine, 'y1', point.arc.y);
+        setDualBurstAttribute(dualBurstPinLine, 'x2', point.knob.x);
+        setDualBurstAttribute(dualBurstPinLine, 'y2', point.knob.y);
+        // The connector is visible for the preview and the committed pin. Once
+        // that logical state is stable, leave the DOM value alone so a
+        // CSS/DevTools adjustment is not overwritten on every game frame.
+        const desiredPinLineOpacity = visualPinned ? '1' : '0';
+        if( desiredPinLineOpacity !== dualBurstPinLineOpacity ){
+            dualBurstPinLineOpacity = desiredPinLineOpacity;
+            dualBurstPinLine.style.opacity = desiredPinLineOpacity;
+        }
+    }
+    if( dualBurstPreviewMarker ){
+        const hasTemporaryLevel = burst.pinned && burst.active
+            && displayLevel !== pinnedHandleLevel;
+        if( hasTemporaryLevel ){
+            const previewPoint = burstArcPoint(displayLevel).arc;
+            setDualBurstStyle(dualBurstPreviewMarker, 'display', 'block');
+            setDualBurstStyle(dualBurstPreviewMarker, 'left', `${previewPoint.x * burstScale}px`);
+            setDualBurstStyle(dualBurstPreviewMarker, 'top', `${previewPoint.y * burstScale}px`);
+        }else{
+            setDualBurstStyle(dualBurstPreviewMarker, 'display', 'none');
+        }
+    }
+}
+
 // @fix:f1c6a8d4
-function setJoystickCenter(center){
+function setJoystickCenter(center, { remember = true } = {}){
     if( !joystickPanel || !joystickBase || !center ) return;
     const panelRect = joystickPanel.getBoundingClientRect();
     const baseRect = joystickBase.getBoundingClientRect();
@@ -2146,17 +3546,54 @@ function setJoystickCenter(center){
     const baseCenterOffsetY = baseRect.top + baseRect.height / 2 - panelRect.top;
     // Position the panel from the base center; the base itself is inset inside
     // the larger footprint on mobile.
-    joystickPanel.style.width = `${panelRect.width}px`;
-    joystickPanel.style.height = `${panelRect.height}px`;
     joystickPanel.style.left = `${center.x - baseCenterOffsetX}px`;
     joystickPanel.style.top = `${center.y - baseCenterOffsetY}px`;
     joystickPanel.style.right = 'auto';
     joystickPanel.style.bottom = 'auto';
+    if( remember ){
+        rememberControlCenter('joystick', center);
+        markControlPositionCustom('joystick');
+    }
+}
+
+// @fix:dual-right-grip
+function setDualRightJoystickCenter(center, { remember = true } = {}){
+    if( !dualRightJoystickPanel || !dualRightJoystickBase || !center ) return;
+    const panelRect = dualRightJoystickPanel.getBoundingClientRect();
+    const viewport = controlViewportSize();
+    const rightPx = Math.max(0, viewport.width - center.x - panelRect.width / 2);
+    const bottomPx = Math.max(0, viewport.height - center.y - panelRect.height / 2);
+    dualRightJoystickPanel.style.left = 'auto';
+    dualRightJoystickPanel.style.top = 'auto';
+    dualRightJoystickPanel.style.right = `${rightPx}px`;
+    dualRightJoystickPanel.style.bottom = `${bottomPx}px`;
+    if( remember ){
+        rememberControlCenter('dualRight', center);
+        markControlPositionCustom('dualRight');
+    }
+}
+
+// @fix:control-viewport-layout
+function setDualBurstJoystickCenter(center, { remember = true } = {}){
+    if( !dualBurstPanel || !center ) return;
+    const rect = dualBurstPanel.getBoundingClientRect();
+    if( rect.width <= 0 || rect.height <= 0 ) return;
+    const viewport = controlViewportSize();
+    const leftPx = Math.max(0, center.x - rect.width / 2);
+    const bottomPx = Math.max(0, viewport.height - center.y - rect.height / 2);
+    dualBurstPanel.style.left = `${leftPx}px`;
+    dualBurstPanel.style.top = 'auto';
+    dualBurstPanel.style.right = 'auto';
+    dualBurstPanel.style.bottom = `${bottomPx}px`;
+    if( remember ){
+        rememberControlCenter('dualBurst', center);
+        markControlPositionCustom('dualBurst');
+    }
 }
 
 // @fix:f1c6a8d4
-function clampJoystickCenter(center, outerRadius){
-    const knobRect = joystickKnob?.getBoundingClientRect();
+function clampJoystickCenter(center, outerRadius, knobElement = joystickKnob){
+    const knobRect = knobElement?.getBoundingClientRect();
     const knobSize = Math.max(1, Number(knobRect?.width) || 0);
     const inset = knobSize * JOYSTICK.edgeInsetKnobRatio;
     const viewportWidth = Math.max(1, window.visualViewport?.width || window.innerWidth);
@@ -2179,6 +3616,121 @@ function clampJoystickPositionToViewport(){
     const center = v(rect.left + rect.width / 2, rect.top + rect.height / 2);
     const clamped = clampJoystickCenter(center, Math.max(rect.width, rect.height) / 2);
     if( Math.hypot(clamped.x - center.x, clamped.y - center.y) > 0.5 ) setJoystickCenter(clamped);
+}
+
+// @fix:dual-right-grip
+function clampDualRightJoystickPositionToViewport(){
+    if( !dualRightJoystickBase || dualRightJoystickPanel?.hidden ) return;
+    const rect = dualRightJoystickBase.getBoundingClientRect();
+    if( rect.width <= 0 || rect.height <= 0 ) return;
+    const center = v(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    const clamped = clampJoystickCenter(center, Math.max(rect.width, rect.height) / 2, dualRightJoystickKnob);
+    if( Math.hypot(clamped.x - center.x, clamped.y - center.y) > 0.5 ) setDualRightJoystickCenter(clamped);
+}
+
+// @fix:control-viewport-layout
+function clampControlRectCenter(center, width, height, element = null){
+    const viewport = controlViewportSize();
+    const elementRect = element?.getBoundingClientRect();
+    const elementSize = Math.max(1, Number(elementRect?.width) || 0);
+    const inset = elementSize * JOYSTICK.edgeInsetKnobRatio;
+    const halfWidth = Math.max(1, width / 2);
+    const halfHeight = Math.max(1, height / 2);
+    const minX = halfWidth + inset;
+    const maxX = viewport.width - halfWidth - inset;
+    const minY = halfHeight + inset;
+    const maxY = viewport.height - halfHeight - inset;
+    return v(
+        minX > maxX ? viewport.width / 2 : Math.max(minX, Math.min(maxX, center.x)),
+        minY > maxY ? viewport.height / 2 : Math.max(minY, Math.min(maxY, center.y)),
+    );
+}
+
+// @fix:dual-right-grip
+function visibleBottomInfoHeight(){
+    const panels = [worldInfo, flowInfoPanel, recordsPanel]
+        .filter(panel => panel && !panel.hidden)
+        .map(panel => panel.getBoundingClientRect())
+        .filter(rect => rect.width > 0 && rect.height > 0);
+    if( panels.length ) return Math.max(...panels.map(rect => rect.height));
+    const cssHeight = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bottom-info-bar-height'));
+    return Number.isFinite(cssHeight) ? cssHeight : 0;
+}
+
+// @fix:dual-right-grip
+function applyDefaultDualGripAnchors(){
+    const viewport = controlViewportSize();
+    const rightRect = dualRightJoystickBase?.getBoundingClientRect();
+    const burstRect = dualBurstPanel?.getBoundingClientRect();
+    if( !rightRect || !burstRect || rightRect.width <= 0 || burstRect.width <= 0 ) return;
+    const rightKnobDiameter = Math.max(1, Number(dualRightJoystickKnob?.getBoundingClientRect().width) || JOYSTICK.dualKnobDiameterPx);
+    const burstKnobDiameter = Math.max(1, Number(dualBurstHandle?.getBoundingClientRect().width) || JOYSTICK.burstKnobDiameterPx);
+    const bottomGap = Math.max(rightKnobDiameter, burstKnobDiameter);
+    const bottomInfoHeight = visibleBottomInfoHeight();
+    const rightCenterY = viewport.height - bottomInfoHeight - bottomGap - rightRect.height / 2;
+    const burstCenterY = viewport.height - bottomInfoHeight - bottomGap - burstRect.height / 2;
+
+    const leftBlock = viewportControlTools?.getBoundingClientRect();
+    const leftEdge = leftBlock && leftBlock.width > 0
+        ? leftBlock.right
+        : Math.max(0, Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--viewport-control-gap')) || 0);
+    if( !controlLayoutPositions.dualBurstCustom ){
+        const defaultBurstCenter = clampControlRectCenter(
+            v(leftEdge + burstKnobDiameter + burstRect.width / 2, burstCenterY),
+            burstRect.width,
+            burstRect.height,
+            dualBurstHandle,
+        );
+        setDualBurstJoystickCenter(defaultBurstCenter, { remember: false });
+    }
+    if( !controlLayoutPositions.dualRightCustom ){
+        // Mirror the burst grip's actual left margin in pixels: the right
+        // grip's outer edge receives the same margin from the right side.
+        const burstAnchorRect = dualBurstPanel.getBoundingClientRect();
+        const mirroredSideMargin = Math.max(0, burstAnchorRect.left);
+        const defaultRightCenter = clampJoystickCenter(
+            v(viewport.width - mirroredSideMargin - rightRect.width / 2, rightCenterY),
+            Math.max(rightRect.width, rightRect.height) / 2,
+            dualRightJoystickKnob,
+        );
+        setDualRightJoystickCenter(defaultRightCenter, { remember: false });
+    }
+}
+
+// @fix:control-viewport-layout
+function restoreControlLayoutPositions(){
+    if( joystickBase && joystickPanel && !joystickPanel.hidden ){
+        rememberCurrentControlCenter('joystick', joystickBase);
+        const remembered = rememberedControlCenter('joystick');
+        if( remembered ){
+            const rect = joystickBase.getBoundingClientRect();
+            const center = clampJoystickCenter(remembered, Math.max(rect.width, rect.height) / 2);
+            setJoystickCenter(center, { remember: false });
+            rememberControlCenter('joystick', center);
+        }
+    }
+    if( dualRightJoystickBase && dualRightJoystickPanel && !dualRightJoystickPanel.hidden ){
+        applyDefaultDualGripAnchors();
+        rememberCurrentControlCenter('dualRight', dualRightJoystickBase);
+        const remembered = rememberedControlCenter('dualRight');
+        if( remembered ){
+            const rect = dualRightJoystickBase.getBoundingClientRect();
+            const center = clampJoystickCenter(remembered, Math.max(rect.width, rect.height) / 2, dualRightJoystickKnob);
+            setDualRightJoystickCenter(center, { remember: false });
+            rememberControlCenter('dualRight', center);
+        }
+    }
+    if( dualBurstPanel && !dualBurstPanel.hidden ){
+        rememberCurrentControlCenter('dualBurst', dualBurstPanel);
+        const remembered = rememberedControlCenter('dualBurst');
+        if( remembered ){
+            const rect = dualBurstPanel.getBoundingClientRect();
+            const center = clampControlRectCenter(remembered, rect.width, rect.height);
+            setDualBurstJoystickCenter(center, { remember: false });
+            rememberControlCenter('dualBurst', center);
+        }
+    }
+    persistControlLayoutPositions();
 }
 
 // @ds:727e9afe

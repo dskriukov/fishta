@@ -871,16 +871,36 @@ function drawFinSparks(ctx, sparks, renderWorld, world, viewport){
     const anchor = renderWorld.anchor || { x: world.width / 2, y: world.height / 2 };
     const worldScale = Math.max(1e-6, world?.scale || 1);
     ctx.save();
-    ctx.fillStyle = '#d9f6ff';
+    ctx.fillStyle = '#94c7d6';
     for( const spark of sparks ){
         if( !spark?.pos || !(spark.alpha > 0) ) continue;
         const x = nearestToroidalCoordinate(spark.pos.x, anchor.x, world.width);
         const y = nearestToroidalCoordinate(spark.pos.y, anchor.y, world.height);
         const radius = Math.max(0.25, Number(spark.sizePx) || 1) / WORLD.pixelsPerWorldUnit / worldScale;
         ctx.globalAlpha = Math.max(0, Math.min(1, Number(spark.alpha) || 0));
-        ctx.beginPath();
-        ctx.arc(x, y, radius, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.fillStyle = spark.color || '#94c7d6';
+        if( spark.shape === 'square' ){
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(Number(spark.rotation) || 0);
+            ctx.fillRect(-radius, -radius, radius * 2, radius * 2);
+            ctx.restore();
+        }else if( spark.shape === 'triangle' ){
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(Number(spark.rotation) || 0);
+            ctx.beginPath();
+            ctx.moveTo(0, -radius);
+            ctx.lineTo(radius * 0.866, radius * 0.5);
+            ctx.lineTo(-radius * 0.866, radius * 0.5);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+        }else{
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fill();
+        }
     }
     ctx.restore();
 }

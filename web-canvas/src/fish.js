@@ -159,6 +159,7 @@ export function makeFish({
         bubbleTimer: 0,              // @ia 7a8b9c0d
         bubbleBurstRemaining: 0,     // @ia 7a8b9c0d
         mouthOpen: 0,                // @ia 9c0d1e2f
+        mouthSuctionImpulse: 0,      // @fix:6a7b8c9d
         mouthHold: 0,                // @ia 9c0d1e2f
         mouthEatenSize: 0,           // @ia 9c0d1e2f
         swimPhase: 0,                // @ia 3a4b5c6e
@@ -232,6 +233,7 @@ export function integrate(fish, accel, world, dt){
     const level = normalizeSpeedLevel(fish.speedLevel);
     const thrusting = level > 0 && len(accel) > 1e-6;
     const previousSpeed = len(fish.vel);
+    fish.previousSpeed = previousSpeed; // @fix:6a7b8c9d
     if( thrusting ){
         // Speed tunables are expressed in game pixels per second; positions
         // are stored in the fixed technical grid.
@@ -329,6 +331,9 @@ export function advanceFeedingState(fish, dt){
 
 // ds:975ca168
 export function updateMouth(fish, accel, dt){
+    const previousMouthOpen = Math.max(0, Number(fish.mouthOpen) || 0);
+    const impulseDecay = Math.exp(-Math.max(0, Number(dt) || 0) / Math.max(1e-6, MOUTH.suctionImpulseSeconds));
+    fish.mouthSuctionImpulse = Math.max(0, (Number(fish.mouthSuctionImpulse) || 0) * impulseDecay);
     if( fish.mouthHold > 0 ) fish.mouthHold = Math.max(0, fish.mouthHold - dt);
     if( fish.mouthEatenSize > 0 ) fish.mouthEatenSize = Math.max(0, fish.mouthEatenSize - dt * fish.size * 2);
 
@@ -336,6 +341,7 @@ export function updateMouth(fish, accel, dt){
     const chaseOpen = thrusting && fish.mode === 'burst' ? MOUTH.chaseOpenRatio : 0;
     const eatOpen = fish.mouthHold > 0 ? Math.min(1, fish.mouthEatenSize / Math.max(1, fish.size)) : 0;
     fish.mouthOpen = Math.max(chaseOpen, eatOpen);
+    if( previousMouthOpen <= 0 && fish.mouthOpen > 0 ) fish.mouthSuctionImpulse = fish.mouthOpen;
 }
 
 // ds:bd354b7a

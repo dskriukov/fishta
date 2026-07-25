@@ -140,6 +140,8 @@ contract_map:
   debug.drawFishCollisionRadius:            render.js#drawDebugFishCollisionRadius  # @ds:6b4e90d2 @ds:a3e394a8
   ui.showAppVersion:                         server.js#appVersion main.js#showAppVersion index.html#app-version  # @ds:8d13f6a2
   ui.worldSnapshotInfo:                      main.js#updateWorldSnapshotInfo main.js#updateWorldSyncMetrics index.html#world-info style.css#world-info  # @ds:e42a7c19 @ds:world.status-sync-metrics @fix:b8c4d9e2
+  ui.infoPanels:                              main.js#setInfoPanelMode main.js#toggleInfoPanel main.js#updateFlowMetricsPanel main.js#updateRecordsPanel index.html#info-panel-toggle index.html#flow-info-panel index.html#records-panel style.css#.diagnostic-info-panel  # @fix:6a7b8c9d
+  ui.controlLayoutTools:                      main.js#toggleUiLayoutEditMode main.js#cycleControlLayoutMode main.js#setupJoystickControls main.js#setJoystickCenter index.html#viewport-left-controls index.html#viewport-scale-widget index.html#viewport-control-tools index.html#ui-layout-toggle index.html#control-layout-toggle style.css#viewport-left-controls style.css#viewport-scale-widget style.css#viewport-control-tools  # @fix:f1c6a8d4 @ds:70871bc5
   multiplayer.syncRateFeedback:              client-net.js#connect main.js#updateSyncRate index.html#world-sync-rate style.css#world-info  # @ds:e7c2a901
   multiplayer.clientEventRates:              protocol.js#applyWorldFragment client-net.js#connect client-net.js#input client-net.js#recordEvents client-net.js#getEventRates main.js#updateEventRates index.html#world-dynamic-rate index.html#world-control-rate style.css#world-info  # @ds:7c2d91e4
   multiplayer.performanceMetrics:            server.js#broadcastWorldSync server.js#performanceStatistics client-net.js#connect main.js#updateWorldPerformanceMetrics main.js#updateWorldSyncMetrics index.html#world-calc-ms index.html#world-sync-cycle-ms style.css#world-info  # @ds:4d8c2f1a @ds:6e3b91c7
@@ -324,6 +326,8 @@ data_model:
       - decorative bubble emission, advancement, and rendering
       - size delta label accumulation, lifetime, current user size metric, and rendering for the current user fish only
       - world snapshot information panel derived from the latest received WebSocket snapshot
+      - info panel mode and latest flow timing/records panel snapshots derived from client diagnostics and synchronized fish rows
+      - uiLayoutEditMode and controlLayoutMode for moving the joystick and selecting one-joystick/two-joystick/touch control layouts
       - background asset loading and client-only background rendering
 
 implementation_instructions:
@@ -680,7 +684,7 @@ implementation_instructions:
     #debug-mode-toggle toggles only debugMode and does not own menu visibility.
     #leave-game remains the explicit leave/enter command inside the menu and keeps the same joined-state behavior.  # @ds:ab1e4f02 @ds:8d13f6a2 @ds:59c118f5 @ds:70871bc5 @ds:fb11044e @ds:22fd3ab4
   world_map_ui: |
-    The synchronization layer is drawn first, the flow-map bitmap second, and the danger-map grid/bitmap third. flow.js#buildFlowField uses the danger-raster cell size and accumulates directional wake, coasting wake, mouth suction, and signed side angular impulses into Float32 arrays. main.js#updateClientFlowField rebuilds the same full-resolution field locally from the fish currently known to the client, derives a short previous-velocity acceleration estimate, packs the field through main.js#encodeClientFlowFieldPixels, and refreshes a canvas surface through main.js#updateClientFlowMapSurface. The client updates this decorative field every FLOW_MAP_LOCAL_UPDATE_MS (100 ms) without opening the `/flow-map` WebSocket; server.js#/flow-map and danger-map.js#encodeFlowMapPng remain available as compatibility/diagnostic endpoints but are not required for the active client path. flow.js#sampleFlowField uses toroidal bilinear interpolation of the four cell-centre samples for each shred; main.js#advanceClientShredRotation applies angular impulse only to visual shred rotation and damps angular velocity by SHRED.flowAngularDrag. The flow-map button opens the minimap, controls the locally generated flow bitmap there, and, when Debug is active, render.js#drawFlowMapUnderlay repeats it under gameplay objects. The flow-vectors button independently enables render.js#drawFlowVectorField on the gameplay canvas; main.js#advanceClientFlowCrosses updates per-cell cross angle/velocity, while the renderer draws white crosses and blue-left/green vectors using the alpha/R/G channels. main.js logs absolute build time, known fish count, and milliseconds per fish in Debug mode. tools/flow-benchmark.mjs and package.json#scripts provide repeatable absolute/relative build and PNG-size measurements. Danger-map rendering retains its black grid and diagnostic overlays above the flow layer.
+    The synchronization layer is drawn first, the flow-map bitmap second, and the danger-map grid/bitmap third. flow.js#buildFlowField uses the danger-raster cell size and accumulates directional wake, coasting wake, mouth suction, and signed side angular impulses into Float32 arrays. main.js#updateClientFlowField rebuilds the same full-resolution field locally from the fish currently known to the client, derives a short previous-velocity acceleration estimate, keeps raw flowX/flowY/flowAngular for client sampling, packs a display copy through main.js#encodeClientFlowFieldPixels, and refreshes a canvas surface through main.js#updateClientFlowMapSurface. The client updates this decorative field every FLOW_MAP_LOCAL_UPDATE_MS (100 ms) without opening the `/flow-map` WebSocket; active fin-sparks also request this short-lived local field while they are alive, independently of diagnostic overlay visibility. main.js#advanceClientFinSparks samples raw flowX/flowY directly when available, while the RGBA copy remains the visual representation for the minimap and gameplay overlay. main.js#logFlowCycleMetrics aggregates five-second averages for raw field build, RGB encoding, canvas surface refresh, raw fin-spark sampling, and the full cycle, publishes the latest snapshot to #flow-info-panel, and writes the same diagnostic object to the browser debug console without requiring Debug mode. The right-toolbar #info-panel-toggle cycles #world-info, #flow-info-panel, and #records-panel; only the selected panel is visible. #records-panel builds separate user-fish and NPC-fish tables from the latest synchronized world, sorts each block by descending size, and displays name/number, size, eaten count, and fish.age formatted as lifetime since map appearance. server.js#/flow-map and danger-map.js#encodeFlowMapPng remain available as compatibility/diagnostic endpoints but are not required for the active client path. flow.js#sampleFlowField uses toroidal bilinear interpolation of the four cell-centre samples for each shred; main.js#advanceClientShredRotation applies angular impulse only to visual shred rotation and damps angular velocity by SHRED.flowAngularDrag. The flow-map button opens the minimap, controls the locally generated flow bitmap there, and, when Debug is active, render.js#drawFlowMapUnderlay repeats it under gameplay objects. The flow-vectors button independently enables render.js#drawFlowVectorField on the gameplay canvas; main.js#advanceClientFlowCrosses updates per-cell cross angle/velocity, while the renderer draws white crosses and blue-left/green vectors using the alpha/R/G channels. tools/flow-benchmark.mjs and package.json#scripts provide repeatable absolute/relative build and PNG-size measurements. Danger-map rendering retains its black grid and diagnostic overlays above the flow layer.
     index.html contains #world-map-toggle in the top-right of #hud and #world-map as a screen-space 200x200 px overlay. The map button is visible only while an active joined session exists, has the same toolbar button footprint as #game-menu-toggle, and independently toggles worldMapVisible without changing debugMode, world state, input, or socket messages. #world-map is hidden unless worldMapVisible is true. In every responsive breakpoint, #hud .hud-row keeps explicit left-button, shrinkable metrics, and right-button grid tracks; #world-map-toggle uses the same breakpoint-specific width, height, border radius, and visual container as #game-menu-toggle, so neither button can wrap below the toolbar.  # @ds:3a980720
     constants.js exports WORLD_MAP with the fixed 200px square size, 12px left inset, and 12px overlay gap; do not reuse DEBUG minimap coordinates for player-facing map UI. main.js#getWorldMapTop reads #hud and visible #player-metrics bounding rectangles every animation frame, takes the greater bottom edge, and adds WORLD_MAP.overlayGapPx. Pass this screen-space top coordinate, flowMapBitmap, flowMapVisible, dangerMapBitmap, syncSegmentsVisible, dangerMapVisible, and cellSyncAverages in the render state. render.js#drawWorldMap(ctx, world, currentUserFishId, top, inspection) runs after restoring the viewport transform, uses WORLD_MAP.sizePx and WORLD_MAP.leftPx with the supplied top coordinate, validates positive world dimensions, draws the fixed square frame, then composites synchronization averages/grid, flow bitmap, and danger grid/bitmap in that order before mapping each canonical fish position into the square using clamped float coordinates without mutating fish.pos. NPC point diameter is derived from linear size sqrt(max(0, fish.size)): nominal PLAYER.startSize maps to 2px, every smaller value also maps to 2px, and the largest current fish maps to 5px; clamp the final diameter to [2, 5] and handle the no-range case without division by zero. Other user fish use a 3px inner point plus a 1px-gap, 1px-stroke outer circle; the current user uses a 5px inner point plus a 1px-gap, 2px-stroke outer circle. Keep the fish color resolution used by the existing minimap.  # @ds:3a980720 @ds:8f2c91ad @fix:6a7b8c9d
   world_snapshot_info_ui: |
@@ -704,15 +708,81 @@ implementation_instructions:
     stored from WebSocket synchronization, not extrapolated render-only bubbles
     or server-only state:
       - fishCount = world.fish.length;
-      - fishArea = sum(Math.PI * fish.radius^2) for finite synchronized fish radii;
+      - fishNutrition = sum(max(0, fish.size)) for finite synchronized fish sizes, where size 1 is one nutrition unit;
       - nutrientCount = world.shreds.length;
-      - nutrientArea = sum(shred.geometricArea) for finite synchronized shreds.
+      - nutrientNutrition = each finite shred geometricArea normalized by the current technical area of a size-1 fish, multiplied by its remaining layer fraction and SHRED.nutritionMultiplier.
+    The two UI values retain their existing DOM ids but are labelled "fish nutrition"
+    and "food nutrition"; formatNutrition keeps the compact integer/k notation.
     main.js#updateWorldPerformanceMetrics formats the latest server world calculation
     average and the client sync-cycle average as `X.XX ms`, leaving each placeholder
     as `—` until a valid value exists. The lower panel keeps both metrics in the same
     compact responsive layout as the existing status items.
     style.css#world-info anchors the panel at bottom left, uses a compact
-    translucent background, and leaves pointer-events disabled.  # @ds:e42a7c19
+    translucent background, and leaves pointer-events disabled. #info-panel-toggle
+    is a right-toolbar button visible during a joined session. The default information
+    mode is none, so the lower stats panel is hidden until the user cycles the button.
+    main.js#toggleInfoPanel cycles the selected information surface through world
+    snapshot, flow timings, records, and none; setInfoPanelMode hides the three
+    unselected surfaces. #flow-info-panel
+    shows the latest five-second averages for raw-field construction, RGB encoding,
+    canvas-surface refresh, raw spark sampling, and full-cycle duration. #records-panel
+    has separate user and NPC tables sorted by descending synchronized fish.size,
+    with name/number, size, eaten count, and lifetime columns. On every transition to
+    the entry/join screen, main.js#resetEntryScreenPanels closes the menu, hides all
+    information surfaces, clears world/debug/map overlay flags, resets their toolbar
+    states, and closes the diagnostic map transports. main.js#trackRecordFishAppearance
+    stores the first client-observed timestamp for each live id and removes stale ids;
+    records use that elapsed time (falling back to fish.age when available) as the
+    map-appearance lifetime. The #hud-right-controls and #viewport-left-controls
+    groups become vertically scrollable when their controls do not fit before the
+    viewport bottom; their scrollbars remain visually hidden and touch scrolling is
+    contained within the group. #hud-right-controls is a fixed overlay anchored to
+    the same top/right padding as the HUD, so its intrinsic scroll height never
+    participates in the HUD grid row or moves the player metrics, and its scroll
+    range ends at the viewport bottom without reserving space for a hidden lower
+    information panel. #viewport-left-controls is the single left toolbar scroll
+    group and contains both #viewport-scale-widget and #viewport-control-tools,
+    preserving their order and shared spacing while allowing the scale control to
+    scroll with its buttons.  # @ds:e42a7c19 @fix:6a7b8c9d
+  control_layout_tools: |
+    In portrait orientation style.css makes the selected information panel full width,
+    scrollable, and no taller than one third of the viewport. In every orientation the
+    viewport scale widget is anchored below the top-left menu button with the same gap
+    used by the right toolbar stack. main.js#viewportScaleWidget remains the single zoom control.
+    #viewport-control-tools contains two small toolbar-style buttons: #ui-layout-toggle
+    locks/unlocks relocation for the one-joystick layout, while in touch and the
+    reserved two-joystick layout it toggles uiLayoutEditMode. In edit mode,
+    main.js#setupJoystickControls drags the joystick by its grab offset and clamps its
+    center through clampJoystickCenter; touch mode exposes #touch-speed-metric and
+    drags that metric by the same mechanism. #control-layout-toggle cycles one joystick,
+    two-grip, and touch layouts in that order, replaces its SVG icon for the active mode, and shows
+    the mode name beside the button for two seconds. In two-grip mode the right circular
+    grip controls direction and cruise speed, while the left arc grip controls temporary
+    or pinned burst levels. The left grip uses two explicit SVG hit regions: a circular
+    speed region centered at the number's lower-left/baseline construction point and a
+    separate annular sector following the burst arc; pinned-handle geometry has priority.
+main.js#updateDualBurstJoystickVisual keeps a stable visual key, caches the measured
+panel scale and availability geometry, and writes SVG/DOM styles only when their
+logical values change; the pin connector opacity is written only when the preview
+or committed-pin visibility state changes. The burst grip accepts the same pin gesture from its speed
+    number and commits only on pointer release when the direct start-to-end segment
+    exceeds the protective distance and its signed angle lies in [-10°, 45°]. As soon
+    as that candidate is valid during pointer movement, render the offset handle and
+    connector at the candidate level; pointer release preserves that already visible
+    position instead of jumping from the arc. While a pinned burst is temporarily overridden by a new touch, the pinned handle remains
+    fixed and a separate white marker shows the temporary arc level. The burst arc
+    always uses its burst color while the current-speed number retains its cruise/burst
+    color distinction. Keyboard
+    movement keys provide the right-grip direction and cruise level when no burst key
+    is held. Dual-grip defaults anchor the left grip after the left toolbar, the right
+    grip has a right-edge margin equal to the burst grip's left-edge margin, and both
+    grips sit above the lower information panel by one handle diameter; user drag
+    positions are stored as CSS-pixel offsets from the anchored left/right and bottom
+    edges (legacy normalized positions are migrated on first restore), so viewport
+    rotation preserves the same edge margins while the 30vmin size cap is reapplied.
+    The two default footprints may overlap on narrow viewports; users can reposition
+    them in layout-edit mode.
+    # @fix:f1c6a8d4 @ds:70871bc5 @fix:dual-right-grip @fix:dual-burst-grip
   join_after_leave: |
     main.js owns the local entry/game UI state.
     setJoinedUiState(joined) hides the join panel and labels #leave-game as
@@ -1101,9 +1171,9 @@ implementation_instructions:
     plus "unknown" digest rather than hiding the field.  # @ds:8d13f6a2
   mobile_joystick_layout: |
     style.css owns the on-screen joystick layout.
-    Define --joystick-footprint-size as min(340px, 40vmin), where vmin makes the cap follow the smaller viewport side in both portrait and landscape. Keep --joystick-knob-size as the existing responsive knob diameter and derive --joystick-size as calc(var(--joystick-footprint-size) - var(--joystick-knob-size)). Mobile media rules may change only --joystick-knob-size; they must not replace the footprint-derived --joystick-size with a fixed base diameter.
+    Define --joystick-footprint-default-size as clamp(212px, 35vw, 340px) to preserve the established one-joystick size. Define --joystick-footprint-max-size as 61vmin, where vmin follows the smaller viewport side in both portrait and landscape, and define the effective --joystick-footprint-size as the minimum of those two values. Keep --joystick-knob-size as the existing responsive knob diameter and derive --joystick-size as calc(var(--joystick-footprint-size) - var(--joystick-knob-size)). Mobile media rules may change only --joystick-knob-size; they must not replace the footprint-derived --joystick-size with a fixed base diameter.
     #joystick-panel is a fixed square whose width and height are exactly --joystick-footprint-size. Anchor it to the lower-right with the existing safe-area-aware right and bottom offsets until a touch relocation occurs. It is shown after join whenever activeControlMode is not pointer or touch and hidden while pointer or touch experimental mode is active. Do not stretch the panel toward the left viewport edge.
-    #joystick-base is the visible circular joystick control anchored one half knob diameter inward from the panel's lower-right edges. Its width and height are --joystick-size, so the knob remains within the panel when its center reaches the base edge. Rings remain inside the base and the complete visual footprint remains within min(340px, 40% of min(viewport width, viewport height)).
+    #joystick-base is the visible circular joystick control anchored one half knob diameter inward from the panel's lower-right edges. Its width and height are --joystick-size, so the knob remains within the panel when its center reaches the base edge. Rings remain inside the base and the complete visual footprint remains within 61% of min(viewport width, viewport height).
     Joystick speed comes from pointer displacement from the visible joystick base center in the same radial control that owns steering.
     setupJoystickControls stores input.joystick.rawVector as the normalized actual displacement with magnitude 0..1, and stores input.joystick.vector as the same direction clamped to the current available speed radius for internal consistency. During an active touch, the panel relocation activation threshold is the full burst-99 radius plus JOYSTICK.relocationActivationRatio of the joystick diameter; within this protective zone the panel remains fixed while the control vector stays at the maximum available radius. After the threshold is crossed, setJoystickCenter shifts the panel radially so the touch remains on or inside that radius, then clampJoystickCenter keeps the outer circle plus JOYSTICK.edgeInsetKnobRatio of knob size inside the viewport. Pointer release resets only the knob vector; the relocated panel position remains. controls.js#joystickSteer uses rawVector so steering strength follows the held pointer position; controls.js#speedLevel maps rawVector magnitude to desired speedLevel 0..99 with the expanded cruise radius before buildInputPayload clamps it through availableSpeedLevelForSize. main.js#updateJoystickBurstAvailability computes the current available speedLevel for the user fish and redraws rings for v=30 cruise boundary plus selected burst availability levels. If the current user fish has applied speedLevel 1..99, main.js#updateJoystickCurrentBurstRing shows #joystick-current-burst-ring at speedLevelToControlMagnitude(fish.speedLevel), uses a 2px border, and colors it through main.js#joystickCurrentSpeedColor: levels 1..30 return the blue cruise color, and levels 31..99 return the existing pink burstSpeedColor scale. speedLevel 0 hides that ring.  # @ds:cd1c5776 @ds:0eef2d19 @ds:e41821af @fix:f1c6a8d4 @fix:52cd6e6c
     index.html#game-menu contains #burst-endurance-table with rows for speedLevel v=1..99. main.js#updateBurstEnduranceTable reads BURST_ENDURANCE_SIZE_THRESHOLDS and currentUserFish.size, writes mode, minimum size threshold, current availability, energy factor, expected size loss, and the time window for each speed. updateGameMenu refreshes the table while the menu is open and whenever current fish state changes.  # @ds:cff27cd5

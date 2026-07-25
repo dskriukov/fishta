@@ -47,6 +47,7 @@ export function spawnTestShreds(world, amount, rng = Math.random){
         const remaining = target - created.length;
         const groupAmount = Math.min(remaining, 8 + Math.floor(rng() * 17));
         const groupSize = 15 + rng() * 20;
+        const groupColor = randomTestShredColor(rng);
         const fish = {
             pos: { x: rng() * world.width, y: rng() * world.height },
             radius: FISH.nominalStartDiameter * Math.sqrt(groupSize) / 2 / Math.max(1e-6, world.scale || 1),
@@ -54,12 +55,23 @@ export function spawnTestShreds(world, amount, rng = Math.random){
         for( let i = 0; i < groupAmount && created.length < target && canAddControlledObjects(world, 1); i++ ){
             const sampledSize = technicalDiameterFromPixelDiameter(sampleShredDiameterPx(rng), world.scale);
             const geometricArea = circleAreaFromDiameter(sampledSize);
-            const shred = makeShred(world, fish, sampledSize, geometricArea, DEFAULT_NPC_COLOR, rng);
+            const shred = makeShred(world, fish, sampledSize, geometricArea, groupColor, rng);
             world.shreds.push(shred);
             created.push(shred);
         }
     }
     return created;
+}
+
+// @fix:7c8d9e0f
+function randomTestShredColor(rng){
+    const hue = Math.max(0, Math.min(359, Math.floor(rng() * 360)));
+    const saturation = 68;
+    const lightness = 58;
+    const rgb = hslToRgb(hue, saturation / 100, lightness / 100);
+    const channel = value => Math.max(0, Math.min(255, Math.round(value * 255)))
+        .toString(16).padStart(2, '0');
+    return `#${channel(rgb.r)}${channel(rgb.g)}${channel(rgb.b)}`;
 }
 
 function makeShred(world, fish, size, geometricArea, sourceColor, rng){

@@ -81,11 +81,20 @@ export function speedLevel(input, activeControlMode = null){
     input = input || {};
     const keyLevel = keyboardSpeedLevel(input.keys || new Set());
     if( keyLevel > 0 ) return keyLevel;
-    if( keyboardMovementActive(input.keys || new Set()) ) return REGIME.cruiseMaxSpeedLevel;
     const mode = activeControlMode || 'auto';
+    // Direction keys steer the right grip in dual mode, but they must not
+    // release an already active or pinned burst from the left grip.
+    if( mode === 'dual-joystick' ){
+        if( input.burstJoystick?.pinned ) return input.burstJoystick.pinnedLevel || REGIME.burstStartSpeedLevel;
+        if( input.burstJoystick?.active ) return input.burstJoystick.level || REGIME.burstStartSpeedLevel;
+    }
+    if( keyboardMovementActive(input.keys || new Set()) ) return REGIME.cruiseMaxSpeedLevel;
     if( mode === 'keyboard' ) return 0;
     if( mode === 'pointer' ) return input.pointerDown ? 31 : 0;
     if( mode === 'touch' ) return pointerSpeedLevel(input.pointer);
+    if( mode === 'dual-joystick' ){
+        return dualJoystickSpeedLevel(input.rightJoystick);
+    }
     if( mode === 'joystick' ) return joystickSpeedLevel(input.joystick);
     return Math.max(
         input.pointerDown ? 31 : 0,
@@ -118,6 +127,12 @@ function joystickSpeedLevel(joystick){
     if( !joystick?.active ) return 0;
     const magnitude = len(joystick.rawVector || joystick.vector || v(0, 0));
     return joystickLevelFromUnit(magnitude);
+}
+
+function dualJoystickSpeedLevel(joystick){
+    if( !joystick?.active ) return 0;
+    const magnitude = Math.max(0, Math.min(1, len(joystick.rawVector || joystick.vector || v(0, 0))));
+    return Math.round(magnitude * REGIME.cruiseMaxSpeedLevel);
 }
 
 // @ds:cd1c5776 @ds:0eef2d19
@@ -184,6 +199,8 @@ export function createInput(canvas){
         touchDown: false,
         touchCount: 0,
         joystick: { active: false, vector: v(0, 0), rawVector: v(0, 0) },
+        rightJoystick: { active: false, vector: v(0, 0), rawVector: v(0, 0) },
+        burstJoystick: { active: false, level: 0, pinned: false, pinnedLevel: 0 },
         keys: new Set(),
     };
 
@@ -203,6 +220,11 @@ export function createInput(canvas){
         input.joystick.active = false;
         input.joystick.vector = v(0, 0);
         input.joystick.rawVector = v(0, 0);
+        input.rightJoystick.active = false;
+        input.rightJoystick.vector = v(0, 0);
+        input.rightJoystick.rawVector = v(0, 0);
+        input.burstJoystick.active = false;
+        input.burstJoystick.level = 0;
     };
 
     // @ds:5d92a6ef

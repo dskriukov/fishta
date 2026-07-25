@@ -59,6 +59,24 @@ export const VIEWPORT_FISH_CAPACITY = {
 export const JOYSTICK = {
     edgeInsetKnobRatio: 0.7, // additional safe inset from viewport edge, relative to knob size — @fix:f1c6a8d4
     relocationActivationRatio: 0.05, // touch overshoot before the panel starts following — @fix:52cd6e6c
+    dualDiameterPx: 200, // right grip diameter in two-grip mode — @fix:dual-right-grip
+    dualKnobDiameterPx: 40, // right grip handle diameter — @fix:dual-right-grip
+    // Dimensions and anchor points are taken from the Figma burst-grip export.
+    // The arc ends at (151.344, 151.344); the 40px handle is centred at x=187.
+    burstPanelWidthPx: 207,
+    burstPanelHeightPx: 171,
+    burstArcRadiusPx: 151.344,
+    burstArcOriginX: 0,
+    burstArcOriginY: 151.344,
+    burstHandleOffsetPx: 36,
+    burstKnobDiameterPx: 40,
+    // The speed zone is constructed from the lower-left/baseline point of
+    // the number, which is the same construction point used by the Figma arc.
+    burstNumberHitRadiusPx: 112,
+    burstArcHitInnerRadiusPx: 118,
+    burstArcHitOuterRadiusPx: 193,
+    burstPinDistanceKnobDiameters: 1.5,
+    burstDynamicRangePx: 150,
 };
 
 export const CAMERA = {
@@ -104,6 +122,9 @@ export const DEBUG = {
     absoluteTraceColor: '#5cff9d', // @ds:727e9afe
     receivedQuadrantFadeMs: 200, // @ds:727e9afe
     receivedQuadrantColor: '#3f8cff', // @ds:727e9afe
+    decorativeSparkTestCount: 1000,
+    decorativeSparkTestLifeSeconds: 20,
+    decorativeSparkTestTapWindowMs: 350,
 };
 
 export const WORLD_MAP = {
@@ -256,6 +277,11 @@ export const SHRED = {
     flowWakeRadiusRatio: 4.8, // @fix:6a7b8c9d
     flowRearStrength: 0.85, // @fix:6a7b8c9d
     flowFrontStrength: 0.25, // @fix:6a7b8c9d
+    flowCruiseFrontStrengthFactor: 0.5, // cruise-mode nose push multiplier — @fix:6a7b8c9d
+    flowFrontDeadZoneRadiusRatio: 0.3, // front push reaches zero through the inner 30% of the fish radius — @fix:6a7b8c9d
+    flowBrakingCoreStrength: 0.85, // braking wake drives both halves along current movement — @fix:6a7b8c9d
+    flowBrakingInwardStrength: 0.18, // braking wake pulls lateral layers toward the movement axis — @fix:6a7b8c9d
+    flowSpeedDropEpsilon: 0.01, // minimum speed decrease that enters inertial-braking flow mode — @fix:6a7b8c9d
     flowRearInwardStrength: 0.18, // @fix:6a7b8c9d
     flowAccelerationLeadSeconds: 0.25, // @fix:6a7b8c9d
     mouthPositionRadiusRatio: 0.9, // @fix:6a7b8c9d
@@ -265,6 +291,7 @@ export const SHRED = {
     flowAngularReferenceSpeed: 90, // @fix:4e9b2c71
     flowAngularImpulseStrength: 22, // @fix:4e9b2c71
     flowAngularDrag: 5.8, // @fix:4e9b2c71
+    flowVorticityShoulder: 0.18, // cell-size-normalized vorticity contribution to the angular field — @fix:4e9b2c71
     layerFractions: {
         part_30_percents: 0.3,
         part_30_percents_main_color: 0.3,
@@ -319,6 +346,7 @@ export const MOUTH = {
     chaseOpenRatio: 0.22,   // slight open while thrusting in burst — fish.air#ia:9c0d1e2f, ds:975ca168
     holdDuration: 0.4,      // seconds to keep post-eat open state — fish.air#ia:9c0d1e2f, ds:975ca168
     eatingCruiseHoldSeconds: 0.3, // @ds:975ca168
+    suctionImpulseSeconds: 0.12, // transient pull duration after the mouth opens — @fix:6a7b8c9d
 };
 
 export const SWIM = {
@@ -337,8 +365,38 @@ export const SWIM = {
     finSparkMinSizePx: 1,
     finSparkMaxSizePx: 2,
     finSparkSmallLifeSeconds: 1,
-    finSparkLargeLifeSeconds: 1.4,
+    finSparkLargeLifeSeconds: 5,
+    finSparkBirthSeconds: 0.1,
+    finSparkStartJitterWorldUnits: 1,
+    finSparkTrailingEdgeBaseRatio: 0.5, // inner anchor of the trailing-fin emission edge — @fix:4f8a2c71
     finSparkAlpha: 0.86,
+    finSparkFlowResponse: 2, // client-only response multiplier; does not affect ordinary shreds
+    finSparkViscosityBase: 0.55, // baseline client-only drag for decorative points — @fix:4f8a2c71
+    finSparkViscositySpeedFactor: 0.015, // additional drag per unit of decorative-point speed — @fix:4f8a2c71
+    finSparkShredEatMinCount: 2, // client-only spark burst after each consumed shred layer — @fix:4f8a2c71
+    finSparkShredEatMaxCount: 3,
+    finSparkShredEatLifeSeconds: 10,
+    finSparkShredEatImpulseMin: 1,
+    finSparkShredEatImpulseMax: 3,
+    finSparkShredEatMinSizePx: 1.5,
+    finSparkShredEatMaxSizePx: 3.4,
+    finSparkShredEatAlpha: 0.55,
+    finSparkShredEatShapes: ['circle', 'square', 'triangle'],
+    finSparkShredEatStartJitterWorldUnits: 0.5,
+    finSparkShredEatInitialAngularVelocityMin: 0.35, // small client-only starting spin, rad/s
+    finSparkShredEatInitialAngularVelocityMax: 1.1,
+    finSparkMinCount: 2,
+    finSparkMaxCount: 5,
+    finSparkBurstExtremeMaxChance: 0.99, // level 99 gives 99% chance at a burst-fin extreme — @fix:4f8a2c71
+    finSparkBurstExtremeThreshold: 0.88,
+    finSparkBurstExtremeMinCount: 1,
+    finSparkBurstExtremeMaxCount: 2,
+    finSparkSize5MinCount: 5, // size-dependent burst spark range at size 5 — @fix:4f8a2c71
+    finSparkSize5MaxCount: 10,
+    finSparkSize10MinCount: 7, // size-dependent burst spark range at size 10 — @fix:4f8a2c71
+    finSparkSize10MaxCount: 20,
+    finSparkBurstExtremeMinSizePx: 0.7,
+    finSparkBurstExtremeMaxSizePx: 1.2,
 };
 
 export const FEAR_EYE = {

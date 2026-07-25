@@ -71,20 +71,31 @@
                 <span id="player-size"><span id="player-size-label">size</span><strong id="player-size-value">-</strong></span>
                 <span id="eaten-metric"><span>eaten</span><strong id="eaten">0</strong></span>
             </div>
-            <button id="world-map-toggle" type="button" aria-label="Map" aria-controls="world-map" aria-pressed="false">
-                <svg viewBox="0 0 512 512" aria-hidden="true"><path d="M256 48C141.13 48 48 141.13 48 256s93.13 208 208 208 208-93.13 208-208S370.87 48 256 48Z"/><path d="M256 48c-58.07 0-112.67 93.13-112.67 208S197.93 464 256 464s112.67-93.13 112.67-208S314.07 48 256 48Z"/><path d="M117.33 117.33c38.24 27.15 86.38 43.34 138.67 43.34s100.43-16.19 138.67-43.34M394.67 394.67c-38.24-27.15-86.38-43.34-138.67-43.34s-100.43 16.19-138.67 43.34"/><path d="M256 48v416M464 256H48"/></svg>
-            </button>
-            <button id="sync-segments-toggle" type="button" aria-label="Synchronization segments" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4zM4 10h16M4 16h16M10 4v16M16 4v16"/></svg></button>
-            <button id="flow-map-toggle" type="button" aria-label="Flow map" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h12M3 12h18M3 17h12"/><path d="m13 4 3 3-3 3M17 9l3 3-3 3M13 14l3 3-3 3"/></svg></button>
-            <button id="flow-vectors-toggle" type="button" aria-label="Flow vectors on game field" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18M7 7l10 10M17 7 7 17"/><path d="m12 3-2 3M12 3l2 3M21 12l-3-2M21 12l-3 2"/></svg></button>
-            <button id="danger-map-toggle" type="button" aria-label="Danger map" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 1v3M23 12h-3M12 23v-3M1 12h3"/></svg></button>
+            <div id="hud-right-controls" aria-label="Map and diagnostic controls">
+                <button id="world-map-toggle" type="button" aria-label="Map" aria-controls="world-map" aria-pressed="false">
+                    <svg viewBox="0 0 512 512" aria-hidden="true"><path d="M256 48C141.13 48 48 141.13 48 256s93.13 208 208 208 208-93.13 208-208S370.87 48 256 48Z"/><path d="M256 48c-58.07 0-112.67 93.13-112.67 208S197.93 464 256 464s112.67-93.13 112.67-208S314.07 48 256 48Z"/><path d="M117.33 117.33c38.24 27.15 86.38 43.34 138.67 43.34s100.43-16.19 138.67-43.34M394.67 394.67c-38.24-27.15-86.38-43.34-138.67-43.34s-100.43 16.19-138.67 43.34"/><path d="M256 48v416M464 256H48"/></svg>
+                </button>
+                <button id="sync-segments-toggle" type="button" aria-label="Synchronization segments" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4zM4 10h16M4 16h16M10 4v16M16 4v16"/></svg></button>
+                <button id="flow-map-toggle" type="button" aria-label="Flow map" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h12M3 12h18M3 17h12"/><path d="m13 4 3 3-3 3M17 9l3 3-3 3M13 14l3 3-3 3"/></svg></button>
+                <button id="flow-vectors-toggle" type="button" aria-label="Flow vectors on game field" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18M7 7l10 10M17 7 7 17"/><path d="m12 3-2 3M12 3l2 3M21 12l-3-2M21 12l-3 2"/></svg></button>
+                <button id="danger-map-toggle" type="button" aria-label="Danger map" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 1v3M23 12h-3M12 23v-3M1 12h3"/></svg></button>
+                <button id="info-panel-toggle" type="button" aria-label="Information panels" aria-controls="world-info flow-info-panel records-panel" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v14H5z"/><path d="M8 9h8M8 12h8M8 15h5"/></svg></button>
+                <button id="decorative-sparks-test-toggle" type="button" aria-label="Create decorative sparks: single, double or triple tap"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="5" r="1.4"/><rect x="11" y="3.6" width="2.8" height="2.8" rx=".4"/><path d="m19 3.6 1.4 2.8h-2.8z"/><rect x="3.6" y="10.6" width="2.8" height="2.8" rx=".4"/><path d="m12 10.2 1.4 2.8h-2.8z"/><circle cx="19" cy="12" r="1.4"/><path d="m5 17.2 1.4 2.8H3.6z"/><circle cx="12" cy="19" r="1.4"/><rect x="17.6" y="17.6" width="2.8" height="2.8" rx=".4"/></svg></button>
+            </div>
         </div>
     </div>
-    <aside id="viewport-scale-widget" hidden aria-label="Viewport scale">
-        <span class="viewport-scale-label">max</span>
-        <span class="viewport-scale-track" aria-hidden="true"><span id="viewport-scale-marker"></span></span>
-        <span class="viewport-scale-label">5</span>
-    </aside>
+    <div id="viewport-left-controls" hidden aria-label="Viewport and control tools">
+        <aside id="viewport-scale-widget" aria-label="Viewport scale">
+            <span class="viewport-scale-label">max</span>
+            <span class="viewport-scale-track" aria-hidden="true"><span id="viewport-scale-marker"></span></span>
+            <span class="viewport-scale-label">5</span>
+        </aside>
+        <div id="viewport-control-tools" aria-label="Control layout tools">
+            <button id="control-layout-toggle" type="button" aria-label="Control mode" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
+            <button id="ui-layout-toggle" type="button" aria-label="Lock joystick position" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="10" width="12" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 7.2-2.4"/></svg></button>
+            <span id="control-layout-toast" aria-live="polite"></span>
+        </div>
+    </div>
     <!-- @ds:ab1e4f02 -->
     <aside id="game-menu" hidden>
         <div id="control-modes" class="menu-row" hidden>
@@ -122,12 +133,12 @@
     </aside>
     <div id="world-map" hidden aria-label="world map"></div>
     <!-- @ds:e42a7c19 -->
-    <div id="world-info" aria-label="world snapshot info">
+    <div id="world-info" aria-label="world snapshot info" hidden>
         <span class="world-info-item"><span>fish</span><strong id="world-fish-count">0</strong></span>
         <span class="world-info-item"><span>nutrients</span><strong id="world-nutrient-count">0</strong></span>
         <span id="world-speed-info" class="world-info-item"><span>speed</span><strong id="player-speed-real">0.00</strong></span>
-        <span class="world-info-item world-info-area"><span>fish area</span><em id="world-fish-area">0</em></span>
-        <span class="world-info-item world-info-area"><span>food area</span><em id="world-nutrient-area">0</em></span>
+        <span class="world-info-item world-info-area"><span>fish nutrition</span><em id="world-fish-area">0</em></span>
+        <span class="world-info-item world-info-area"><span>food nutrition</span><em id="world-nutrient-area">0</em></span>
         <span class="world-info-item"><span>Scale</span><strong id="world-scale">1.00</strong></span>
         <span class="world-info-item"><span>Sync</span><strong id="world-sync">— · 0.00</strong></span>
         <span class="world-info-item"><span>Rate</span><strong id="world-sync-rate">—</strong></span>
@@ -136,6 +147,27 @@
         <span class="world-info-item"><span>World calc</span><strong id="world-calc-ms">—</strong></span>
         <span class="world-info-item"><span>Sync cycle</span><strong id="world-sync-cycle-ms">—</strong></span>
     </div>
+    <section id="flow-info-panel" class="diagnostic-info-panel" aria-label="flow map timings" hidden>
+        <header><strong>flow map timings</strong><span id="flow-metric-window">waiting for 5 s window</span></header>
+        <div class="diagnostic-info-grid">
+            <span><em>raw field</em><strong id="flow-metric-build">—</strong></span>
+            <span><em>RGB encode</em><strong id="flow-metric-rgb">—</strong></span>
+            <span><em>canvas surface</em><strong id="flow-metric-surface">—</strong></span>
+            <span><em>spark samples</em><strong id="flow-metric-sample">—</strong></span>
+            <span><em>full cycle</em><strong id="flow-metric-cycle">—</strong></span>
+            <span><em>cycles / cells</em><strong id="flow-metric-shape">—</strong></span>
+        </div>
+    </section>
+    <section id="records-panel" class="diagnostic-info-panel records-info-panel" aria-label="fish records" hidden>
+        <div class="records-block">
+            <header><strong>user fish</strong></header>
+            <table><thead><tr><th>name</th><th>size</th><th>eaten</th><th>lifetime</th></tr></thead><tbody id="user-record-rows"></tbody></table>
+        </div>
+        <div class="records-block">
+            <header><strong>NPC fish</strong></header>
+            <table><thead><tr><th>number</th><th>size</th><th>eaten</th><th>lifetime</th></tr></thead><tbody id="npc-record-rows"></tbody></table>
+        </div>
+    </section>
     <div id="joystick-panel" hidden>
         <div id="joystick-base" aria-label="joystick">
             <div id="joystick-burst-base"></div>
@@ -147,6 +179,42 @@
             </div>
             <div id="joystick-knob"></div>
         </div>
+    </div>
+    <div id="dual-right-joystick-panel" hidden>
+        <div id="dual-right-joystick-base" aria-label="right cruise joystick">
+            <span id="dual-right-joystick-vector" aria-hidden="true"></span>
+            <span id="dual-right-joystick-knob" aria-hidden="true"></span>
+        </div>
+    </div>
+    <div id="dual-burst-panel" hidden aria-label="burst joystick">
+        <svg id="dual-burst-surface" viewBox="0 0 207 171" aria-hidden="true">
+            <defs>
+                <linearGradient id="dual-burst-cruise-gradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0" stop-color="#11b8ee"/>
+                    <stop offset="1" stop-color="#2369bb"/>
+                </linearGradient>
+                <linearGradient id="dual-burst-active-gradient" x1="75.6719" y1="0" x2="75.6719" y2="151.344" gradientUnits="userSpaceOnUse">
+                    <stop offset="0" stop-color="#ac814d"/>
+                    <stop offset="1" stop-color="#373e40"/>
+                </linearGradient>
+                <clipPath id="dual-burst-active-clip" clipPathUnits="userSpaceOnUse">
+                    <path id="dual-burst-active-clip-sector" d="M0 151.344L151.344 151.344A151.344 151.344 0 0 0 151.344 151.344Z"/>
+                </clipPath>
+            </defs>
+            <path id="dual-burst-arc-muted" d="M0 0C83.5847 0.000224074 151.343 67.7592 151.344 151.344H147.498C147.498 151.229 147.5 151.115 147.5 151C147.5 78.7054 85.3237 20.0001 8.5 20C5.64561 20 2.81151 20.0824 0 20.2422V0Z"/>
+            <path id="dual-burst-arc-base" d="M0 0C83.5847 0.000224074 151.343 67.7592 151.344 151.344H147.498C147.498 151.229 147.5 151.115 147.5 151C147.5 78.7054 85.3237 20.0001 8.5 20C5.64561 20 2.81151 20.0824 0 20.2422V0Z"/>
+            <line id="dual-burst-pin-line" x1="148" y1="150.5" x2="167" y2="150.5"/>
+            <!-- @fix:dual-burst-grip: transparent geometric hit targets -->
+            <circle id="dual-burst-number-hit" cx="0" cy="151.344" r="112" fill="#000" fill-opacity="0.001" pointer-events="fill"/>
+            <path id="dual-burst-arc-hit" d="M0 -41.656A193 193 0 0 1 193 151.344H118A118 118 0 0 0 0 33.344Z" fill="#000" fill-opacity="0.001" pointer-events="fill"/>
+        </svg>
+        <div id="dual-burst-number" aria-hidden="true">0</div>
+        <div id="dual-burst-preview-marker" aria-hidden="true"></div>
+        <div id="dual-burst-handle" aria-hidden="true"><span id="dual-burst-handle-level"></span></div>
+    </div>
+    <div id="touch-speed-metric" hidden aria-label="Touch speed and regime">
+        <strong id="touch-speed-value">0</strong>
+        <span id="touch-speed-mode">cruise</span>
     </div>
     <script type="module" src="./src/main.js"></script>
 </body>
