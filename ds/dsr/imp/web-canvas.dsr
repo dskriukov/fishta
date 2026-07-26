@@ -82,7 +82,7 @@ contract_map:
   wsProtocol.serverSync:                     protocol.js#encodeWorldCycle protocol.js#parseWorldFragment client-net.js#connect  # @ds:682570c7 @ds:915ab0e4
   wsProtocol.spatialFragments:                server.js#broadcastWorldSync server.js#runSyncPhases protocol.js#encodeWorldCycle  # @ds:c39827ed @ds:0a2b6379
   wsProtocol.syncOrderMatrix7x7:               server.js#makeSyncPlan  # @ds:c1f4a9e2
-  wsProtocol.syncAckThroughput:               client-net.js#connect client-net.js#acknowledgeSyncCycle server.js#sendPlanFragment server.js#handleSyncAck protocol.js#encodeClientSyncAck  # @ds:77faf734 @fix:sync-cycle-timing
+  wsProtocol.snapshotFreshness:               server.js#makeSyncPlan server.js#sendPlanFragment protocol.js#applyWorldFragment client-net.js#connect  # @fix:9d3f6a71 @fix:b8e4c1d2
   wsProtocol.cellLocalPosition:               protocol.js#encodeFishRow protocol.js#encodeShredRow protocol.js#applyWorldFragment  # @ds:e047bbdf
   wsProtocol.newObjectRow:                    protocol.js#encodeWorldCycle protocol.js#applyWorldFragment  # @ds:6c8c56e7
   wsProtocol.sharedWorldSnapshot:            server.js#broadcastWorldSync protocol.js#encodeWorldCycle  # @ds:2afd71a0
@@ -317,9 +317,13 @@ data_model:
       droppedFragmentCount: "unsubmitted common-phase messages discarded by a newer cycle"
       phaseTotalMs: "sum of common delivery phase durations"
       phaseCount: "completed common delivery phases"
-      syncAckCount: "received v:N confirmations in the current window"
-      activeClientRateMin: "minimum latest bytes/sec rate among active clients at report time"
-      activeClientRateMax: "maximum latest bytes/sec rate among active clients at report time"
+      syncEncodeTotalMs: "sum of shared cycle serialization durations"
+      syncPlanTotalMs: "sum of common delivery-plan construction durations"
+      syncMessageCount: "world fragments accepted by socket.send"
+      syncByteCount: "bytes in accepted world fragments"
+      heldClientCycleCount: "per-socket cycles withheld while bufferedAmount is nonzero"
+      bufferedClientDurationTotalMs: "sum of completed per-socket write-buffer hold durations"
+      fullResynchronizationCount: "completed all-absolute recovery plans"
       worldCalculationMs: "current-window average of stepAuthoritativeWorld elapsed durations, sent to clients with each sync broadcast"
     client_performance_metrics:
       worldCalculationMs: "latest finite server-provided worldCalculationMs value"
@@ -463,15 +467,13 @@ implementation_instructions:
     one immutable encoded snapshot and replaces only the unsent portion of the previous plan.
     server.js#runSyncPhases processes the current phase until either all entries are consumed or
     SYNC.deliveryBudgetMs elapses, then yields with setImmediate; it advances phase/index only after
-    the current phase is complete. Each entry is consumed exactly once. Every client gets at most
-    one unacknowledged world cycle: the first non-empty matrix cell is sent as that cycle's ACK
-    anchor, and client-net.js sends v:N after applying the fragment containing the current user fish.
-    If that ACK is still pending when the next cycle is prepared, the client's whole new cycle is
-    skipped; the server records whether the pending age has reached SYNC.clientCycleDeadlineMs.
-    This keeps only the freshest state and prevents a slow client from accumulating queued cycles.
-    SYNC.maxSocketBufferedBytes is reserved for diagnostic PNG sockets, not world synchronization.
+    the current phase is complete. Each entry is consumed exactly once. World fragments carry the
+    shared cycle timestamp in base36. A socket with bufferedAmount above zero receives no new
+    fragments for that cycle; two held cycles retain an all-absolute recovery marker until the
+    current buffer clears and the complete recovery plan is sent. SYNC.maxSocketBufferedBytes is
+    reserved for diagnostic PNG sockets, not world synchronization.
     The plan's encoded strings are never rebuilt during delivery, and its cycle/state remain
-    independent of input, join, reconnect, or ACK timing.  # @fix:7c4d2e91 @fix:91ab6e30 @fix:sync-cycle-timing
+    independent of input, join, reconnect, or client frame timing.  # @fix:7c4d2e91 @fix:91ab6e30 @fix:9d3f6a71 @fix:b8e4c1d2
   server_performance_statistics: |
     server.js owns one module-level performanceStatistics accumulator and resets its window counters only after reporting. In tick(), time only stepAuthoritativeWorld({ world }, inputsByClient, dt, Math.random), then add its elapsed milliseconds, increment the iteration count, and add world.fish.length + world.shreds.length after the step. broadcastWorldSync() increments preparedSyncCycleCount once, replaces any unsubmitted common phase plan while adding its remaining message count to droppedFragmentCount, and records each completed phase duration. sendPlanFragment marks the first non-empty ACK-anchor fragment of every client cycle with its sent timestamp; client-net.js sends `v:N` after applying each cycle's fragment containing the current user fish; server.js#handleSyncAck clears the pending cycle and, for global absolute cycles, computes rate = anchor bytes / elapsed seconds and sends `v:N:rate`. The five-second report prints world iteration time, phase time, controlled object count, dropped fragments per cycle, ACK count, skipped client cycles, timed-out client cycles, and current min/max active-client rate.  # @ds:61245206 @ds:0a2b6379 @ds:77faf734 @ds:e7c2a901 @fix:sync-cycle-timing
   join_identity: |
@@ -1522,7 +1524,8 @@ new_or_changed_constants:
   PERCEPTION.dangerStampRadiusFactor: 1.50 # @ds:9a6e4c31 @fix:3a7c9e21
   PERCEPTION.dangerRasterMotionTicks: 3 # current tick plus two extrapolated ticks — @fix:7f3c9a21
   SYNC.snapshotHz: 10                 # @ds:e559831a @ds:682570c7
-  SYNC.clientCycleDeadlineMs: 190     # allow one following snapshot interval for a client ACK — @fix:sync-cycle-timing
+  SYNC.snapshotMaxAgeMs: 500          # @fix:b8e4c1d2
+  SYNC.backlogCyclesBeforeResync: 2   # @fix:9d3f6a71
   SYNC.maxExtrapolationMs: 180        # @ds:e559831a @ds:7b9a7984
   RECONNECT.graceSeconds: 3           # @ds:93a64773
   LEAVE.attackWindowSeconds: 2        # @ds:8917ad63
@@ -1722,3 +1725,18 @@ verification_checks:
   - "A user fish depleted by burst remains larger than PREY.minSize by the predation margin and can still eat the smallest fully grown ordinary NPC."
 
 preferred_agent: "strong coding model for IMP; server/client split is non-trivial"
+
+snapshot_stream_delivery:
+  server.js:
+    - "Remove client sync ACK parsing, pending-cycle state, ACK throughput messages, and ACK-gated delivery."
+    - "Attach one Date.now() timestamp in base36 to every prepared world cycle and serialize each fragment as a:N:T:X:Y|ROWS or |N:T:X:Y|ROWS."
+    - "Track each socket's nonzero bufferedAmount by consecutive sync cycles. A socket with buffered bytes contributes no new fragments during that cycle; after two held cycles mark it for an all-absolute recovery plan."
+    - "Keep the recovery marker until the last scheduled recovery fragment has been sent. A newer common plan may replace unsent work while retaining that marker."
+    - "Accumulate five-second server metrics for tick preparation, scale update, world step, removal broadcast, cycle encoding, plan construction, phase delivery, diagnostic-map encoding, sent messages/bytes, held cycles, buffer recovery duration, full recoveries, and monitorEventLoopDelay mean/max."
+  protocol.js:
+    - "Parse the timestamp header, reject a spatial fragment older than SYNC.snapshotMaxAgeMs, then retain the existing monotonic-cycle and absolute/delta validity checks."
+  client-net.js:
+    - "World replication sends no application ACK. Client-originated world-socket messages remain join, reconnect, leave, control, and ping."
+  constants.js:
+    - "Use SYNC.snapshotMaxAgeMs=500 and SYNC.backlogCyclesBeforeResync=2."
+  trace: "@fix:9d3f6a71 @fix:b8e4c1d2 @fix:d4a7c920"

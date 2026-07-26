@@ -546,10 +546,6 @@ net = createClientNet({
         });
         while( snapshotBuffer.length > 6 ) snapshotBuffer.shift();
     },
-    // @ds:e7c2a901
-    onSyncRate(message){
-        updateSyncRate(message.rate);
-    },
     onEventRates(rates){
         updateEventRates(rates);
     },

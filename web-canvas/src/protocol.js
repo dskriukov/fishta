@@ -32,10 +32,6 @@ export function encodeClientPing(n){
     return `p:${n}`;
 }
 
-export function encodeClientSyncAck(cycle){
-    return `v:${Math.max(0, Math.floor(Number(cycle) || 0))}`;
-}
-
 export function encodeClientControl(payload = {}){
     const x = encodeSignedThousand(payload.accel?.x || 0);
     const y = encodeSignedThousand(payload.accel?.y || 0);
@@ -59,7 +55,6 @@ export function parseClientMessage(raw){
     if( kind === 'r' ) return { type: 'reconnect', temporaryConnectionCode: text.slice(2) };
     if( kind === 'q' ) return { type: 'leave' };
     if( kind === 'p' ) return { type: 'ping', n: Number(text.slice(2)) || 0 };
-    if( kind === 'v' ) return { type: 'syncAck', cycle: Number(text.slice(2)) || 0 };
     if( kind === 'c' ){
         const mods = text.slice(9);
         const speedLevel = parseSpeedLevelMod(mods);
@@ -241,24 +236,26 @@ function encodedPosition(pos, cell){
     };
 }
 
-// @ds:682570c7 @ds:e047bbdf @ds:6c8c56e7 @ds:28d9098a @ds:8c663384 @ds:9f50b1be
+// @ds:682570c7 @ds:e047bbdf @ds:6c8c56e7 @ds:28d9098a @ds:8c663384 @ds:9f50b1be @fix:b8e4c1d2
 export function applyWorldFragment(world, message, transportState, receivedAt){
     const text = String(message || '');
     const absoluteFragment = text.startsWith('a:');
     const headerStart = absoluteFragment ? 2 : 1;
     const separator = text.indexOf('|', headerStart);
     if( separator < 0 ) return null;
-    const [cycleText, cellXText, cellYText] = text.slice(headerStart, separator).split(':');
+    const [cycleText, createdAtText, cellXText, cellYText] = text.slice(headerStart, separator).split(':');
     const cycle = Number(cycleText);
+    const createdAt = parseInt(createdAtText, 36);
     const cellX = Number(cellXText);
     const cellY = Number(cellYText);
-    if( !Number.isInteger(cycle) || !Number.isFinite(cellX) || !Number.isFinite(cellY) ) return null;
+    if( !Number.isInteger(cycle) || !Number.isFinite(createdAt) || !Number.isFinite(cellX) || !Number.isFinite(cellY) ) return null;
+    if( Date.now() - createdAt > SYNC.snapshotMaxAgeMs ) return null;
     if( transportState.currentCycle !== null && cycle < transportState.currentCycle ) return null;
     if( cycle > (transportState.currentCycle ?? -1) ) beginTransportCycle(world, transportState, cycle, receivedAt);
     const rows = text.slice(separator + 1).split('|').filter(Boolean);
     const byId = new Map((world.fish || []).map(fish => [fish.id, fish]));
     const shredById = new Map((world.shreds || []).map(shred => [shred.id, shred]));
-    const syncDiagnostics = { absolute: absoluteFragment, cycle, cellX, cellY, fish: [], dynamicEvents: 0 };
+    const syncDiagnostics = { absolute: absoluteFragment, cycle, createdAt, cellX, cellY, fish: [], dynamicEvents: 0 };
 
     for( const sourceRow of rows ){
         if( sourceRow === '~' ) continue;

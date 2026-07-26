@@ -32,9 +32,6 @@ client_messages:
     format: "p:${N}"
     fields:
       N: { type: integer, rule: "increments for each sent ping" }
-  sync_ack:
-    format: "v:${N}"
-    rule: "acknowledges the central cell of global absolute cycle N exactly once; never gates sending"
   control:
     format: "c${x}${y}${mods}"
     fields:
@@ -136,19 +133,6 @@ empty_cell_fragment_fix:
   contract:
     name: nonEmptyCellDeliveryOnly
     rule: "filter matrix coordinates through the current non-empty cell index before adding plan entries; empty coordinates remain ordering positions and produce no WebSocket message"
-
-sync_ack_throughput:
-  from: ds:ws-protocol.sync-ack-throughput
-  trigger: "client receives the central cell fragment of a global absolute cycle"
-  client_message: "v:N once per global absolute cycle"
-  server_measurement:
-    sample: "the sent central-cell absolute fragment"
-    elapsed: "from socket.send() placement to receipt of matching v:N"
-    rate: "sent message bytes / elapsed seconds"
-  server_message:
-    format: "v:N:rate"
-    unit: bytes_per_second
-  effect: "does not gate or alter synchronization delivery"
 
 cell_local_position:
   from: ds:ws-protocol.cell-local-position
@@ -353,3 +337,10 @@ diagnostic_danger_map_stream:
     layers: [monochrome_danger_raster, interaction_segment_grid]
     coordinate_space: world
   client_role: "read-only diagnostic consumer"
+
+snapshot_stream:
+  from: [fix:multiplayer.one-way-snapshot-stream, fix:multiplayer.snapshot-expiry]
+  client_messages: [n, r, q, p, c]
+  fragment_formats: ["a:N:T:CELL_X:CELL_Y|ROWS", "|N:T:CELL_X:CELL_Y|ROWS"]
+  freshness: { max_age_ms: 500, timestamp_encoding: base36 }
+  recovery: "two held write-buffer cycles prepare a full absolute current-cycle delivery after the buffer clears"

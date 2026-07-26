@@ -102,7 +102,8 @@ export const PERCEPTION = {
 export const SYNC = {
     snapshotHz: 10,         // @ds:e559831a
     deliveryBudgetMs: 2,    // @fix:7c4d2e91 @fix:91ab6e30
-    clientCycleDeadlineMs: 190, // allow the client through the upper edge of the following snapshot interval
+    snapshotMaxAgeMs: 500,  // @fix:b8e4c1d2
+    backlogCyclesBeforeResync: 2, // @fix:9d3f6a71
     maxSocketBufferedBytes: 256 * 1024, // diagnostic PNG socket guard; world sync uses client-cycle ACK timing
     maxExtrapolationMs: 180, // @ds:e559831a @ds:7b9a7984
     cellSize: WORLD.cellSize, // @ds:c39827ed @ds:10dc892b

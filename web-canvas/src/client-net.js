@@ -1,6 +1,6 @@
 // imp/web-canvas/src/client-net.js
 // WebSocket client, reconnect code, server snapshots/events.
-// @ds:4bfe0352 @ds:93a64773 @ds:e559831a @ds:704ab317 @ds:671e9773 @ds:682570c7 @ds:0aaccaf8 @ds:28d9098a @ds:8c663384
+// @ds:4bfe0352 @ds:93a64773 @ds:e559831a @ds:704ab317 @ds:671e9773 @ds:682570c7 @ds:0aaccaf8 @ds:28d9098a @ds:8c663384 @fix:9d3f6a71 @fix:b8e4c1d2
 
 import {
     applyObjectRemoval,
@@ -8,7 +8,6 @@ import {
     encodeClientControl,
     encodeClientJoin,
     encodeClientPing,
-    encodeClientSyncAck,
     encodeClientReconnect,
     parseEvent,
     parseIdentity,
@@ -45,7 +44,7 @@ function createDiagnosticMapSocket(path, onFrame){
 }
 
 // @ds:a14c7e52 @ds:b6e39d14 @ia:4a8d0f72
-export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onInitialCommunication, onSyncRate, onEventRates, onPerformanceMetrics, onPing, onTraffic, onConnectionLost, initialConnectionCode = '' }){
+export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onInitialCommunication, onEventRates, onPerformanceMetrics, onPing, onTraffic, onConnectionLost, initialConnectionCode = '' }){
     let socket = null;
     let currentUserFishId = null;
     let temporaryConnectionCode = String(initialConnectionCode || '');
@@ -62,7 +61,6 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onI
     let lastPingSentAt = 0;
     const pendingPings = new Map();
     const trafficBytes = { input: 0, output: 0 };
-    const acknowledgedCycles = new Set();
     const eventTimes = { dynamic: [], control: [] };
     window.setInterval(() => publishEventRates(performance.now()), 250);
     window.setInterval(() => publishTraffic(), 250);
@@ -203,13 +201,6 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onI
                 if( Number.isFinite(sentAt) && onPing ) onPing({ counter, rttMs: Math.max(0, performance.now() - sentAt) });
                 return;
             }
-            if( text.startsWith('v:') ){
-                const [, cycleText, rateText] = text.split(':');
-                const cycle = Number(cycleText);
-                const rate = Number(rateText);
-                if( Number.isInteger(cycle) && Number.isFinite(rate) && rate >= 0 && onSyncRate ) onSyncRate({ cycle, rate });
-                return;
-            }
             if( text[0] === 'x' ){
                 const receivedAt = performance.now();
                 const removal = applyObjectRemoval(world, text, transportState, receivedAt);
@@ -230,7 +221,6 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onI
                 if( !syncDiagnostics ) return;
                 recordEvents('dynamic', syncDiagnostics.dynamicEvents || 0, receivedAt);
                 applyTechnicalScale();
-                acknowledgeSyncCycle(syncDiagnostics);
                 logAbsolutePositionDrift(syncDiagnostics, elapsedSeconds);
                 lastSyncAt = receivedAt;
                 publishSnapshot(syncDiagnostics.cycleStartedAt, syncDiagnostics);
@@ -312,17 +302,6 @@ export function createClientNet({ onSnapshot, onEvent, onStatus, onIdentity, onI
         const scale = Math.max(1e-6, world.scale || 1);
         for( const fish of world.fish || [] ) fish.radius = technicalRadiusOf(fish.size, scale);
         for( const shred of world.shreds || [] ) shred.radius = (shred.size || 0) / 2;
-    }
-
-    // @ds:77faf734
-    function acknowledgeSyncCycle(syncDiagnostics){
-        const cycle = syncDiagnostics?.cycle;
-        if( !Number.isInteger(cycle) ) return;
-        if( !(syncDiagnostics.fish || []).some(fish => fish.id === currentUserFishId) ) return;
-        if( acknowledgedCycles.has(cycle) ) return;
-        acknowledgedCycles.add(cycle);
-        sendRaw(encodeClientSyncAck(cycle));
-        while( acknowledgedCycles.size > 12 ) acknowledgedCycles.delete(acknowledgedCycles.values().next().value);
     }
 
     function publishSnapshot(receivedAt, syncDiagnostics){

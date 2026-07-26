@@ -148,3 +148,15 @@ identity:
   abandoned_fish_visual:
     from: ds:multiplayer.abandoned-fish-visual
     rule: "on leave or timeout, fish loses user name and paid/free protection, becomes NPC, and keeps part of former user color through a gradient toward NPC yellow"
+
+snapshot_delivery:
+  from: [fix:multiplayer.one-way-snapshot-stream, fix:multiplayer.snapshot-expiry]
+  authority: server
+  recovery: "per-socket write-buffer hold for two cycles leads to full absolute current-state recovery"
+  client_acceptance: "timestamp age at most 500 ms and monotonic cycle progression"
+
+server_pipeline_metrics:
+  from: fix:multiplayer.server-pipeline-metrics
+  interval_seconds: 5
+  destination: server_console
+  stages: [input_preparation, world_scale, world_step, removals, cycle_encode, sync_plan, delivery_phase, danger_map, flow_map, event_loop]
