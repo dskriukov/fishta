@@ -33,6 +33,12 @@ function isControlKey(key){
     return isMovementKey(key) || key === ' ' || key === 'Space' || key === '1' || key === '2' || key === '3';
 }
 
+function isEditableTarget(target){
+    return target instanceof HTMLInputElement
+        || target instanceof HTMLTextAreaElement
+        || target?.isContentEditable === true;
+}
+
 // @ds:cf6ad7d6
 export function detectControlDevice(){
     return window.matchMedia?.('(pointer: coarse)').matches ? 'touch' : 'pointer';
@@ -265,12 +271,16 @@ export function createInput(canvas){
     }, { passive: false });
 
     window.addEventListener('keydown', e =>{
+        if( isEditableTarget(e.target) ) return;
         const key = normalizeKey(e.key);
         if( isControlKey(key) ) e.preventDefault();
         input.keys.add(key);
         if( isMovementKey(key) ) input.pointer.lockedByKeyboard = true;
     });
-    window.addEventListener('keyup', e =>{ input.keys.delete(normalizeKey(e.key)); });
+    window.addEventListener('keyup', e =>{
+        if( isEditableTarget(e.target) ) return;
+        input.keys.delete(normalizeKey(e.key));
+    });
     window.addEventListener('blur', clearPressedControls);
     document.addEventListener('visibilitychange', () =>{
         if( document.hidden ) clearPressedControls();
